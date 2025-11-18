@@ -1,0 +1,34 @@
+{
+  "name": "swixter",
+  "version": "1.0.0",
+  "description": "Claude Code 配置管理工具 - 轻松切换供应商和模型",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "cli": "bun src/cli/index.ts",
+    "cli:dev": "bun --hot src/cli/index.ts",
+    "test": "bun test",
+    "test:e2e": "bash test/e2e-docker.sh"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "llm",
+    "config",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "picocolors": "^1.1.1",
+    "zod": "^4.1.12"
+  }
+}
