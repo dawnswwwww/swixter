@@ -12,33 +12,33 @@ import {
 import { exportConfig, importConfig } from "../config/export.js";
 
 /**
- * 显示欢迎界面
+ * Show welcome screen
  */
 export function showWelcome(): void {
   console.clear();
-  p.intro(pc.bgCyan(pc.black(" Swixter - Claude Code 配置管理工具 ")));
+  p.intro(pc.bgCyan(pc.black(" Swixter - Claude Code Configuration Manager ")));
 }
 
 /**
- * 主菜单
+ * Main menu
  */
 export async function showMainMenu(): Promise<string> {
   const currentProfile = await getActiveProfile();
   const currentInfo = currentProfile
-    ? pc.dim(`当前: ${currentProfile.name} (${getPresetById(currentProfile.providerId)?.displayName})`)
-    : pc.dim("未配置");
+    ? pc.dim(`Current: ${currentProfile.name} (${getPresetById(currentProfile.providerId)?.displayName})`)
+    : pc.dim("Not configured");
 
   const action = await p.select({
-    message: `选择操作 ${currentInfo}`,
+    message: `Select action ${currentInfo}`,
     options: [
-      { value: "create", label: "创建新配置", hint: "配置新的供应商和模型" },
-      { value: "switch", label: "切换配置", hint: "在已有配置间切换" },
-      { value: "list", label: "查看所有配置", hint: "列出所有保存的配置" },
-      { value: "delete", label: "删除配置", hint: "删除不需要的配置" },
-      { value: "export", label: "导出配置", hint: "导出配置到文件" },
-      { value: "import", label: "导入配置", hint: "从文件导入配置" },
-      { value: "providers", label: "查看支持的供应商", hint: "列出所有预设供应商" },
-      { value: "exit", label: "退出" },
+      { value: "create", label: "Create new configuration", hint: "Configure new provider and model" },
+      { value: "switch", label: "Switch configuration", hint: "Switch between existing configurations" },
+      { value: "list", label: "View all configurations", hint: "List all saved configurations" },
+      { value: "delete", label: "Delete configuration", hint: "Delete unwanted configurations" },
+      { value: "export", label: "Export configurations", hint: "Export configurations to file" },
+      { value: "import", label: "Import configurations", hint: "Import configurations from file" },
+      { value: "providers", label: "View supported providers", hint: "List all preset providers" },
+      { value: "exit", label: "Exit" },
     ],
   });
 
@@ -50,26 +50,26 @@ export async function showMainMenu(): Promise<string> {
 }
 
 /**
- * 创建新配置
+ * Create new configuration
  */
 export async function createProfile(): Promise<void> {
   const group = await p.group(
     {
       profileName: () =>
         p.text({
-          message: "配置名称",
+          message: "Configuration name",
           placeholder: "my-config",
           validate: (value) => {
-            if (!value) return "配置名称不能为空";
+            if (!value) return "Configuration name cannot be empty";
             if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
-              return "只能包含字母、数字、下划线和连字符";
+              return "Can only contain letters, numbers, underscores and hyphens";
             }
           },
         }),
 
       provider: () =>
         p.select({
-          message: "选择供应商",
+          message: "Select provider",
           options: allPresets.map((preset) => ({
             value: preset.id,
             label: preset.displayName,
@@ -77,41 +77,27 @@ export async function createProfile(): Promise<void> {
           })),
         }),
 
-      customUrl: ({ results }) => {
+      baseURL: ({ results }) => {
         const preset = getPresetById(results.provider as string);
         if (preset?.id === "custom") {
           return p.text({
-            message: "自定义 API URL",
+            message: "API Base URL",
             placeholder: "https://api.example.com/v1",
             validate: (value) => {
-              if (!value) return "URL 不能为空";
+              if (!value) return "URL cannot be empty";
               try {
                 new URL(value);
               } catch {
-                return "请输入有效的 URL";
+                return "Please enter a valid URL";
               }
             },
           });
-        }
-      },
-
-      model: ({ results }) => {
-        const preset = getPresetById(results.provider as string);
-        if (preset && preset.id !== "custom") {
-          return p.select({
-            message: "选择模型",
-            options: preset.defaultModels.map((model) => ({
-              value: model,
-              label: model,
-            })),
-          });
         } else {
+          // Preset provider shows default baseURL, allows user to override
           return p.text({
-            message: "输入模型名称",
-            placeholder: "model-name",
-            validate: (value) => {
-              if (!value) return "模型名称不能为空";
-            },
+            message: "API Base URL (leave empty to use default)",
+            placeholder: preset?.baseURL || "",
+            defaultValue: "",
           });
         }
       },
@@ -120,42 +106,44 @@ export async function createProfile(): Promise<void> {
         p.password({
           message: "API Key",
           validate: (value) => {
-            if (!value) return "API Key 不能为空";
+            if (!value) return "API Key cannot be empty";
           },
         }),
 
       confirm: ({ results }) => {
         const preset = getPresetById(results.provider as string);
         return p.confirm({
-          message: `确认创建配置 "${results.profileName}"？`,
+          message: `Confirm creating configuration "${results.profileName}"?`,
           initialValue: true,
         });
       },
     },
     {
       onCancel: () => {
-        p.cancel("操作已取消");
+        p.cancel("Operation cancelled");
         process.exit(0);
       },
     }
   );
 
   if (!group.confirm) {
-    p.cancel("已取消创建配置");
+    p.cancel("Configuration creation cancelled");
     return;
   }
 
   const s = p.spinner();
-  s.start("正在保存配置...");
+  s.start("Saving configuration...");
 
   try {
     const preset = getPresetById(group.provider);
+    // Use user-provided baseURL, or fall back to preset baseURL if empty
+    const finalBaseURL = group.baseURL || preset?.baseURL;
+
     const profile: ClaudeCodeProfile = {
       name: group.profileName,
       providerId: group.provider,
       apiKey: group.apiKey,
-      model: group.model,
-      baseURL: group.customUrl || preset?.baseURL,
+      baseURL: finalBaseURL,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -163,70 +151,70 @@ export async function createProfile(): Promise<void> {
     await upsertProfile(profile);
     await setActiveProfile(profile.name);
 
-    s.stop("配置创建成功！");
+    s.stop("Configuration created successfully!");
     p.note(
-      `配置名称: ${pc.cyan(profile.name)}\n供应商: ${pc.green(preset?.displayName)}\n模型: ${pc.yellow(profile.model)}`,
-      "新配置详情"
+      `Configuration name: ${pc.cyan(profile.name)}\nProvider: ${pc.green(preset?.displayName)}\nBase URL: ${pc.yellow(finalBaseURL || "default")}`,
+      "New configuration details"
     );
   } catch (error) {
-    s.stop("保存失败");
-    p.log.error(`错误: ${error}`);
+    s.stop("Save failed");
+    p.log.error(`Error: ${error}`);
   }
 }
 
 /**
- * 切换配置
+ * Switch configuration
  */
 export async function switchProfile(): Promise<void> {
   const profiles = await listProfiles();
 
   if (profiles.length === 0) {
-    p.log.warn("没有可用的配置，请先创建一个");
+    p.log.warn("No available configurations, please create one first");
     return;
   }
 
   const current = await getActiveProfile();
 
   const selected = await p.select({
-    message: "选择要切换的配置",
+    message: "Select configuration to switch to",
     options: profiles.map((profile) => {
       const preset = getPresetById(profile.providerId);
       const isCurrent = current?.name === profile.name;
       return {
         value: profile.name,
-        label: isCurrent ? `${profile.name} ${pc.green("(当前)")}` : profile.name,
-        hint: `${preset?.displayName} - ${profile.model}`,
+        label: isCurrent ? `${profile.name} ${pc.green("(current)")}` : profile.name,
+        hint: `${preset?.displayName}`,
       };
     }),
   });
 
   if (p.isCancel(selected)) {
-    p.cancel("操作已取消");
+    p.cancel("Operation cancelled");
     return;
   }
 
   const s = p.spinner();
-  s.start("正在切换配置...");
+  s.start("Switching configuration...");
 
   try {
     await setActiveProfile(selected as string);
-    s.stop("切换成功！");
-    p.log.success(`已切换到: ${pc.cyan(selected)}`);
+    s.stop("Switch successful!");
+    p.log.success(`Switched to: ${pc.cyan(selected)}`);
   } catch (error) {
-    s.stop("切换失败");
-    p.log.error(`错误: ${error}`);
+    s.stop("Switch failed");
+    p.log.error(`Error: ${error}`);
   }
 }
 
 /**
- * 列出所有配置
+ * List all configurations
  */
 export async function showProfiles(): Promise<void> {
   const profiles = await listProfiles();
   const current = await getActiveProfile();
 
   if (profiles.length === 0) {
-    p.log.warn("还没有任何配置");
+    p.log.warn("No configurations yet");
     return;
   }
 
@@ -234,25 +222,26 @@ export async function showProfiles(): Promise<void> {
     const preset = getPresetById(profile.providerId);
     const isCurrent = current?.name === profile.name;
     const marker = isCurrent ? pc.green("●") : pc.dim("○");
-    return `${marker} ${pc.cyan(profile.name.padEnd(20))} ${pc.dim("|")} ${preset?.displayName.padEnd(25)} ${pc.dim("|")} ${pc.yellow(profile.model)}`;
+    const baseUrl = profile.baseURL || preset?.baseURL || "default";
+    return `${marker} ${pc.cyan(profile.name.padEnd(20))} ${pc.dim("|")} ${preset?.displayName.padEnd(25)} ${pc.dim("|")} ${pc.yellow(baseUrl)}`;
   });
 
-  p.note(lines.join("\n"), `配置列表 (共 ${profiles.length} 个)`);
+  p.note(lines.join("\n"), `Configuration list (${profiles.length} total)`);
 }
 
 /**
- * 删除配置
+ * Delete configuration
  */
 export async function removeProfile(): Promise<void> {
   const profiles = await listProfiles();
 
   if (profiles.length === 0) {
-    p.log.warn("没有可删除的配置");
+    p.log.warn("No configurations to delete");
     return;
   }
 
   const selected = await p.select({
-    message: "选择要删除的配置",
+    message: "Select configuration to delete",
     options: profiles.map((profile) => ({
       value: profile.name,
       label: profile.name,
@@ -261,55 +250,55 @@ export async function removeProfile(): Promise<void> {
   });
 
   if (p.isCancel(selected)) {
-    p.cancel("操作已取消");
+    p.cancel("Operation cancelled");
     return;
   }
 
   const confirm = await p.confirm({
-    message: `确认删除配置 "${selected}"？`,
+    message: `Confirm deleting configuration "${selected}"?`,
     initialValue: false,
   });
 
   if (p.isCancel(confirm) || !confirm) {
-    p.cancel("已取消删除");
+    p.cancel("Deletion cancelled");
     return;
   }
 
   const s = p.spinner();
-  s.start("正在删除配置...");
+  s.start("Deleting configuration...");
 
   try {
     await deleteProfile(selected as string);
-    s.stop("删除成功！");
-    p.log.success(`已删除配置: ${pc.cyan(selected)}`);
+    s.stop("Deletion successful!");
+    p.log.success(`Configuration deleted: ${pc.cyan(selected)}`);
   } catch (error) {
-    s.stop("删除失败");
-    p.log.error(`错误: ${error}`);
+    s.stop("Deletion failed");
+    p.log.error(`Error: ${error}`);
   }
 }
 
 /**
- * 导出配置
+ * Export configurations
  */
 export async function exportProfiles(): Promise<void> {
   const group = await p.group(
     {
       filePath: () =>
         p.text({
-          message: "导出文件路径",
+          message: "Export file path",
           placeholder: "./swixter-config.json",
           defaultValue: "./swixter-config.json",
         }),
 
       sanitize: () =>
         p.confirm({
-          message: "是否脱敏 API Key？",
+          message: "Sanitize API Keys?",
           initialValue: true,
         }),
     },
     {
       onCancel: () => {
-        p.cancel("操作已取消");
+        p.cancel("Operation cancelled");
       },
     }
   );
@@ -319,44 +308,44 @@ export async function exportProfiles(): Promise<void> {
   }
 
   const s = p.spinner();
-  s.start("正在导出配置...");
+  s.start("Exporting configurations...");
 
   try {
     await exportConfig(group.filePath, {
       sanitizeKeys: group.sanitize,
     });
-    s.stop("导出成功！");
-    p.log.success(`配置已导出到: ${pc.cyan(group.filePath)}`);
+    s.stop("Export successful!");
+    p.log.success(`Configurations exported to: ${pc.cyan(group.filePath)}`);
   } catch (error) {
-    s.stop("导出失败");
-    p.log.error(`错误: ${error}`);
+    s.stop("Export failed");
+    p.log.error(`Error: ${error}`);
   }
 }
 
 /**
- * 导入配置
+ * Import configurations
  */
 export async function importProfiles(): Promise<void> {
   const group = await p.group(
     {
       filePath: () =>
         p.text({
-          message: "导入文件路径",
+          message: "Import file path",
           placeholder: "./swixter-config.json",
           validate: (value) => {
-            if (!value) return "文件路径不能为空";
+            if (!value) return "File path cannot be empty";
           },
         }),
 
       overwrite: () =>
         p.confirm({
-          message: "是否覆盖已存在的同名配置？",
+          message: "Overwrite existing configurations with same name?",
           initialValue: false,
         }),
     },
     {
       onCancel: () => {
-        p.cancel("操作已取消");
+        p.cancel("Operation cancelled");
       },
     }
   );
@@ -366,30 +355,30 @@ export async function importProfiles(): Promise<void> {
   }
 
   const s = p.spinner();
-  s.start("正在导入配置...");
+  s.start("Importing configurations...");
 
   try {
     const result = await importConfig(group.filePath, {
       overwrite: group.overwrite,
     });
 
-    s.stop("导入完成！");
+    s.stop("Import completed!");
     p.note(
-      `成功导入: ${pc.green(result.imported)} 个\n跳过: ${pc.yellow(result.skipped)} 个\n错误: ${pc.red(result.errors.length)} 个`,
-      "导入结果"
+      `Successfully imported: ${pc.green(result.imported)} items\nSkipped: ${pc.yellow(result.skipped)} items\nErrors: ${pc.red(result.errors.length)} items`,
+      "Import results"
     );
 
     if (result.errors.length > 0) {
-      p.log.error("错误详情:\n" + result.errors.join("\n"));
+      p.log.error("Error details:\n" + result.errors.join("\n"));
     }
   } catch (error) {
-    s.stop("导入失败");
-    p.log.error(`错误: ${error}`);
+    s.stop("Import failed");
+    p.log.error(`Error: ${error}`);
   }
 }
 
 /**
- * 显示所有供应商
+ * Show all providers
  */
 export async function showProviders(): Promise<void> {
   const international = allPresets.filter((p) => !p.isChinese && p.id !== "custom");
@@ -404,8 +393,8 @@ export async function showProviders(): Promise<void> {
   );
 
   console.log();
-  p.note(intLines.join("\n"), pc.green("🌐 国际服务商"));
+  p.note(intLines.join("\n"), pc.green("🌐 International Providers"));
   console.log();
-  p.note(cnLines.join("\n"), pc.green("🇨🇳 国内服务商"));
+  p.note(cnLines.join("\n"), pc.green("🇨🇳 Chinese Providers"));
   console.log();
 }

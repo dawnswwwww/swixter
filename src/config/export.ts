@@ -1,24 +1,24 @@
 import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import type { ExportConfig, ClaudeCodeProfile } from "../types.js";
 import { ExportConfigSchema } from "../types.js";
 import { loadConfig, saveConfig } from "./manager.js";
-
-const EXPORT_VERSION = "1.0.0";
+import { API_KEY_FORMAT, SERIALIZATION, EXPORT_VERSION } from "../constants/index.js";
 
 /**
- * 脱敏 API Key
+ * Sanitize API Key
  */
 function sanitizeApiKey(apiKey: string): string {
-  if (apiKey.length <= 8) {
+  if (apiKey.length <= API_KEY_FORMAT.sanitizeLength) {
     return "***";
   }
-  const start = apiKey.slice(0, 4);
-  const end = apiKey.slice(-4);
+  const start = apiKey.slice(0, API_KEY_FORMAT.prefixLength);
+  const end = apiKey.slice(-API_KEY_FORMAT.suffixLength);
   return `${start}***${end}`;
 }
 
 /**
- * 导出配置
+ * Export configuration
  */
 export async function exportConfig(
   filePath: string,
@@ -32,24 +32,24 @@ export async function exportConfig(
   const config = await loadConfig();
   let profilesToExport: ClaudeCodeProfile[];
 
-  // 选择要导出的 profiles
+  // Select profiles to export
   if (profileNames && profileNames.length > 0) {
     profilesToExport = profileNames
       .map(name => config.profiles[name])
       .filter(Boolean);
 
     if (profilesToExport.length === 0) {
-      throw new Error("没有找到要导出的 Profile");
+      throw new Error("No profiles found to export");
     }
   } else {
     profilesToExport = Object.values(config.profiles);
   }
 
   if (profilesToExport.length === 0) {
-    throw new Error("没有可导出的 Profile");
+    throw new Error("No profiles available to export");
   }
 
-  // 脱敏处理
+  // Sanitization processing
   if (sanitizeKeys) {
     profilesToExport = profilesToExport.map(profile => ({
       ...profile,
@@ -64,16 +64,16 @@ export async function exportConfig(
     sanitized: sanitizeKeys,
   };
 
-  // 验证导出数据
+  // Validate export data
   ExportConfigSchema.parse(exportData);
 
-  // 写入文件
-  const content = JSON.stringify(exportData, null, 2);
-  await Bun.write(filePath, content);
+  // Write to file
+  const content = JSON.stringify(exportData, null, SERIALIZATION.jsonIndent);
+  await writeFile(filePath, content, "utf-8");
 }
 
 /**
- * 导入配置
+ * Import configuration
  */
 export async function importConfig(
   filePath: string,
@@ -85,26 +85,25 @@ export async function importConfig(
   const { overwrite = false, skipSanitized = true } = options;
 
   if (!existsSync(filePath)) {
-    throw new Error(`文件不存在: ${filePath}`);
+    throw new Error(`File does not exist: ${filePath}`);
   }
 
-  // 读取文件
-  const file = Bun.file(filePath);
-  const content = await file.text();
+  // Read file
+  const content = await readFile(filePath, "utf-8");
   const data = JSON.parse(content);
 
-  // 验证导入数据
+  // Validate import data
   let importData: ExportConfig;
   try {
     importData = ExportConfigSchema.parse(data);
   } catch (error) {
-    throw new Error(`导入文件格式无效: ${error}`);
+    throw new Error(`Invalid import file format: ${error}`);
   }
 
-  // 如果配置已脱敏且设置跳过，则报错
+  // If config is sanitized and set to skip, throw error
   if (importData.sanitized && skipSanitized) {
     throw new Error(
-      "导入的配置文件包含脱敏的 API Key，无法导入。请使用完整的配置文件或设置 skipSanitized=false"
+      "Import file contains sanitized API Keys and cannot be imported. Please use the complete configuration file or set skipSanitized=false"
     );
   }
 
@@ -117,13 +116,13 @@ export async function importConfig(
     try {
       const exists = profile.name in config.profiles;
 
-      // 检查是否需要跳过
+      // Check if should skip
       if (exists && !overwrite) {
         skipped++;
         continue;
       }
 
-      // 更新时间戳
+      // Update timestamps
       const now = new Date().toISOString();
       config.profiles[profile.name] = {
         ...profile,
@@ -133,11 +132,11 @@ export async function importConfig(
 
       imported++;
     } catch (error) {
-      errors.push(`导入 "${profile.name}" 失败: ${error}`);
+      errors.push(`Failed to import "${profile.name}": ${error}`);
     }
   }
 
-  // 如果导入了至少一个 profile，保存配置
+  // If at least one profile was imported, save config
   if (imported > 0) {
     await saveConfig(config);
   }
@@ -146,7 +145,7 @@ export async function importConfig(
 }
 
 /**
- * 验证导出文件
+ * Validate export file
  */
 export async function validateExportFile(filePath: string): Promise<{
   valid: boolean;
@@ -156,11 +155,10 @@ export async function validateExportFile(filePath: string): Promise<{
 }> {
   try {
     if (!existsSync(filePath)) {
-      return { valid: false, error: "文件不存在" };
+      return { valid: false, error: "File does not exist" };
     }
 
-    const file = Bun.file(filePath);
-    const content = await file.text();
+    const content = await readFile(filePath, "utf-8");
     const data = JSON.parse(content);
 
     const importData = ExportConfigSchema.parse(data);

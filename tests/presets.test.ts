@@ -2,54 +2,40 @@ import { test, expect, describe } from "bun:test";
 import {
   allPresets,
   getPresetById,
-  getInternationalPresets,
-  getChinesePresets,
+  getStandardPresets,
   anthropicPreset,
-  minimaxPreset,
-  zhipuPreset,
-  moonshotPreset,
+  ollamaPreset,
+  customPreset,
 } from "../src/providers/presets.js";
 
-describe("供应商预设", () => {
-  test("应该包含所有必要的供应商", () => {
+describe("Provider Presets", () => {
+  test("should contain all required providers", () => {
     const presetIds = allPresets.map(p => p.id);
 
     expect(presetIds).toContain("anthropic");
-    expect(presetIds).toContain("openrouter");
-    expect(presetIds).toContain("minimax");
-    expect(presetIds).toContain("zhipu");
-    expect(presetIds).toContain("moonshot");
-    expect(presetIds).toContain("deepseek");
-    expect(presetIds).toContain("alibaba");
+    expect(presetIds).toContain("ollama");
     expect(presetIds).toContain("custom");
+    expect(presetIds.length).toBe(3);
   });
 
-  test("应该能够通过ID获取预设", () => {
+  test("should be able to get preset by ID", () => {
     const preset = getPresetById("anthropic");
     expect(preset).toBeDefined();
     expect(preset?.id).toBe("anthropic");
     expect(preset?.name).toBe("Anthropic");
   });
 
-  test("应该能够获取所有国际服务商", () => {
-    const international = getInternationalPresets();
-    expect(international.length).toBeGreaterThan(0);
+  test("should be able to get standard presets (excluding custom)", async () => {
+    const standard = await getStandardPresets();
+    expect(standard.length).toBe(2);
 
-    international.forEach(preset => {
-      expect(preset.isChinese).toBeUndefined();
-    });
+    const ids = standard.map(p => p.id);
+    expect(ids).toContain("anthropic");
+    expect(ids).toContain("ollama");
+    expect(ids).not.toContain("custom");
   });
 
-  test("应该能够获取所有国内服务商", () => {
-    const chinese = getChinesePresets();
-    expect(chinese.length).toBeGreaterThan(0);
-
-    chinese.forEach(preset => {
-      expect(preset.isChinese).toBe(true);
-    });
-  });
-
-  test("Anthropic预设应该包含正确的配置", () => {
+  test("Anthropic preset should contain correct configuration", () => {
     expect(anthropicPreset.id).toBe("anthropic");
     expect(anthropicPreset.baseURL).toBe("https://api.anthropic.com");
     expect(anthropicPreset.authType).toBe("api-key");
@@ -57,36 +43,20 @@ describe("供应商预设", () => {
     expect(anthropicPreset.defaultModels).toContain("claude-3-5-sonnet-20241022");
   });
 
-  test("MiniMax预设应该包含正确的配置", () => {
-    expect(minimaxPreset.id).toBe("minimax");
-    expect(minimaxPreset.isChinese).toBe(true);
-    expect(minimaxPreset.baseURL).toBe("https://api.minimax.chat/v1");
-    expect(minimaxPreset.authType).toBe("bearer");
-    expect(minimaxPreset.defaultModels).toContain("abab6.5s-chat");
+  test("Ollama preset should contain correct configuration", () => {
+    expect(ollamaPreset.id).toBe("ollama");
+    expect(ollamaPreset.baseURL).toBe("http://localhost:11434");
+    expect(ollamaPreset.authType).toBe("custom");
+    expect(ollamaPreset.defaultModels).toContain("qwen2.5-coder:7b");
   });
 
-  test("智谱AI预设应该包含正确的配置", () => {
-    expect(zhipuPreset.id).toBe("zhipu");
-    expect(zhipuPreset.isChinese).toBe(true);
-    expect(zhipuPreset.baseURL).toBe("https://open.bigmodel.cn/api/paas/v4");
-    expect(zhipuPreset.defaultModels).toContain("glm-4");
+  test("Custom preset should have empty configuration", () => {
+    expect(customPreset.id).toBe("custom");
+    expect(customPreset.baseURL).toBe("");
+    expect(customPreset.defaultModels.length).toBe(0);
   });
 
-  test("Moonshot预设应该包含正确的配置", () => {
-    expect(moonshotPreset.id).toBe("moonshot");
-    expect(moonshotPreset.isChinese).toBe(true);
-    expect(moonshotPreset.baseURL).toBe("https://api.moonshot.cn/v1");
-    expect(moonshotPreset.defaultModels).toContain("moonshot-v1-8k");
-  });
-
-  test("自定义预设应该为空配置", () => {
-    const custom = getPresetById("custom");
-    expect(custom?.id).toBe("custom");
-    expect(custom?.baseURL).toBe("");
-    expect(custom?.defaultModels.length).toBe(0);
-  });
-
-  test("所有预设都应该有必要的属性", () => {
+  test("All presets should have required properties", () => {
     allPresets.forEach(preset => {
       expect(preset.id).toBeDefined();
       expect(preset.name).toBeDefined();
@@ -97,18 +67,8 @@ describe("供应商预设", () => {
     });
   });
 
-  test("应该正确区分国际和国内服务", () => {
-    const international = getInternationalPresets();
-    const chinese = getChinesePresets();
-    const allProviderIds = [...international, ...chinese].map(p => p.id);
-
-    // 验证没有重叠
-    const overlap = international.filter(i =>
-      chinese.some(c => c.id === i.id)
-    );
-    expect(overlap.length).toBe(0);
-
-    // 验证所有供应商都被分类
-    expect(allProviderIds.length).toBe(allPresets.length - 1); // 减去custom
+  test("should return undefined for non-existent preset", () => {
+    const preset = getPresetById("non-existent");
+    expect(preset).toBeUndefined();
   });
 });

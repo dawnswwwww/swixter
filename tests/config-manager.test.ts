@@ -13,29 +13,29 @@ import { existsSync, rmSync } from "node:fs";
 
 const TEST_CONFIG_PATH = "/tmp/swixter-test-config.json";
 
-describe("配置管理器", () => {
-  // 每个测试前清理
+describe("Configuration Manager", () => {
+  // Clean up before each test
   beforeEach(() => {
     if (existsSync(TEST_CONFIG_PATH)) {
       rmSync(TEST_CONFIG_PATH);
     }
   });
 
-  // 每个测试后清理
+  // Clean up after each test
   afterEach(() => {
     if (existsSync(TEST_CONFIG_PATH)) {
       rmSync(TEST_CONFIG_PATH);
     }
   });
 
-  test("应该能够创建默认配置", async () => {
+  test("should be able to create default configuration", async () => {
     const config = await loadTestConfig();
     expect(config.version).toBeDefined();
     expect(config.profiles).toEqual({});
-    expect(config.activeProfile).toBe("");
+    expect(config.coders).toEqual({});
   });
 
-  test("应该能够保存和加载配置", async () => {
+  test("should be able to save and load configuration", async () => {
     const testProfile: ClaudeCodeProfile = {
       name: "test-profile",
       providerId: "anthropic",
@@ -53,7 +53,7 @@ describe("配置管理器", () => {
     expect(loaded?.apiKey).toBe("test-api-key");
   });
 
-  test("应该能够切换活跃配置", async () => {
+  test("should be able to switch active profile", async () => {
     const profile1: ClaudeCodeProfile = {
       name: "profile-1",
       providerId: "anthropic",
@@ -65,9 +65,9 @@ describe("配置管理器", () => {
 
     const profile2: ClaudeCodeProfile = {
       name: "profile-2",
-      providerId: "openrouter",
-      apiKey: "key-2",
-      model: "claude-3-opus",
+      providerId: "ollama",
+      apiKey: "",
+      model: "qwen2.5-coder:7b",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -85,12 +85,12 @@ describe("配置管理器", () => {
     expect(active?.name).toBe("profile-2");
   });
 
-  test("应该能够删除配置", async () => {
+  test("should be able to delete profile", async () => {
     const profile: ClaudeCodeProfile = {
       name: "to-delete",
-      providerId: "minimax",
+      providerId: "anthropic",
       apiKey: "key",
-      model: "abab6.5s-chat",
+      model: "claude-3-5-sonnet-20241022",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -106,21 +106,21 @@ describe("配置管理器", () => {
     expect(deleted).toBeUndefined();
   });
 
-  test("应该能够列出所有配置", async () => {
+  test("should be able to list all profiles", async () => {
     const profile1: ClaudeCodeProfile = {
       name: "list-test-1",
-      providerId: "zhipu",
+      providerId: "anthropic",
       apiKey: "key-1",
-      model: "glm-4",
+      model: "claude-3-5-sonnet-20241022",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     const profile2: ClaudeCodeProfile = {
       name: "list-test-2",
-      providerId: "moonshot",
-      apiKey: "key-2",
-      model: "moonshot-v1-8k",
+      providerId: "ollama",
+      apiKey: "",
+      model: "qwen2.5-coder:7b",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -134,13 +134,13 @@ describe("配置管理器", () => {
     expect(profiles.find(p => p.name === "list-test-2")).toBeDefined();
   });
 
-  test("应该抛出错误当尝试切换不存在的配置时", async () => {
+  test("should throw error when trying to switch to non-existent profile", async () => {
     try {
       await setActiveTestProfile("non-existent-profile");
-      expect(true).toBe(false); // 应该不执行到这里
+      expect(true).toBe(false); // Should not reach here
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toContain("不存在");
+      expect((error as Error).message).toContain("does not exist");
     }
   });
 });

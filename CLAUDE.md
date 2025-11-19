@@ -1,170 +1,111 @@
+# CLAUDE.md
 
-# Claude Code Config Manager (Swixter)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This project provides a CLI tool for managing Claude Code configurations across multiple AI providers.
+## Project Overview
 
-## Quick Start
+Swixter is a CLI tool for managing Claude Code configurations across multiple AI providers. It allows users to easily switch between different providers (Anthropic, Ollama, custom) and manage API keys/configurations for AI coding assistants.
 
-```bash
-# Start interactive mode
-bun run cli
-
-# List all configurations
-bun run cli list
-
-# Switch to a specific configuration
-bun run cli switch my-config
-
-# Export configurations
-bun run cli export config.json
-
-# Import configurations
-bun run cli import config.json
-```
-
-## Supported Providers
-
-**International Providers:**
-- Anthropic (Official API)
-- OpenRouter (Multi-model aggregator)
-- AWS Bedrock
-
-**Chinese Providers (🇨🇳):**
-- MiniMax (海螺AI)
-- Zhipu AI (智谱AI/GLM)
-- Moonshot (Kimi)
-- DeepSeek
-- Alibaba Cloud (阿里云百炼)
-- Tencent Hunyuan (腾讯混元)
-- Volcengine (字节豆包)
-
-## Configuration Storage
-
-Configurations are stored at: `~/.config/swixter/config.json`
-
-Each profile includes:
-- Provider ID
-- API Key
-- Model selection
-- Custom base URL (optional)
-- Creation and update timestamps
-
-## Development
+## Development Commands
 
 ```bash
-# Run CLI in development mode with hot reload
+# Build the CLI
+bun run build
+
+# Run CLI in development mode (with hot reload)
 bun run cli:dev
 
-# Run tests
+# Run CLI directly
+bun run cli
+
+# Run all unit tests
 bun test
+
+# Run E2E tests (Docker-based)
+bun run test:e2e
+
+# Test package contents before publishing
+npm pack --dry-run
 ```
 
----
+## Architecture Overview
 
-# Bun Defaults
+### Core Data Flow
 
-Default to using Bun instead of Node.js.
+1. **Configuration Storage** (`~/.config/swixter/config.json`)
+   - Stores all profiles, active profile per coder, and metadata
+   - Schema defined in `src/types.ts` (ConfigFile interface)
+   - Managed through `src/config/manager.ts`
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Bun automatically loads .env, so don't use dotenv.
+2. **Provider System** (Two-tier)
+   - **Built-in providers**: Hardcoded in `src/providers/presets.ts` (Anthropic, Ollama, Custom)
+   - **User-defined providers**: Stored in `~/.config/swixter/providers.json`, managed via `src/providers/user-providers.ts`
+   - User providers can override built-in ones with same ID
+   - Synchronous access (`getPresetById`) for built-in only, async (`getPresetByIdAsync`) for merged access
 
-## APIs
+3. **Adapter Pattern** (`src/adapters/`)
+   - Each AI coder tool has an adapter (Claude Code, Continue.dev)
+   - Adapters handle reading/writing tool-specific config files
+   - Base interface in `src/adapters/base.ts`
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+### Key Module Responsibilities
+
+**CLI Layer** (`src/cli/`):
+- `index.ts` - Main entry point, routes commands to handlers
+- `claude.ts` / `qwen.ts` - Per-coder command handlers (create, switch, list, delete, apply)
+- `providers.ts` - Provider management commands (add, remove, list, show)
+- `help.ts` - Detailed help system with command documentation
+- `completions.ts` - Shell completion generation (bash/zsh/fish)
+- `commands/parsers.ts` - Unified argument parsing supporting long/short options
+
+**Configuration Layer** (`src/config/`):
+- `manager.ts` - CRUD operations on profiles, atomic file writes
+- `export.ts` - Import/export with optional API key sanitization
+
+**Constants** (`src/constants/`):
+- Split into multiple files for organization (messages, formatting, defaults, etc.)
+- All UI text centralized in `src/constants/messages.ts` for i18n
+
+**Utilities** (`src/utils/`):
+- `validation.ts` - Input validation (profile names, URLs, API keys)
+- `ui.ts` - Shared UI functions (spinners, formatters, error display)
+
+### Important Design Patterns
+
+1. **Coder-agnostic design**: Most code works with any "coder" (claude/qwen). Coder-specific logic is in adapters and constants/coders.ts.
+
+2. **Profile = Configuration template**: A profile contains provider ID, API key, base URL, etc. Multiple profiles can exist; one is "active" per coder.
+
+3. **Apply flow**: `switch` changes active profile in swixter config → `apply` writes active profile to coder's config file (e.g., `~/.claude/settings.json`)
+
+4. **Validation timing**: Input validation happens at prompt time (immediate feedback) AND at save time (for non-interactive mode)
 
 ## Testing
 
-Use `bun test` to run tests.
+- Unit tests use Bun's built-in test runner (`bun:test`)
+- E2E tests run in Docker to ensure clean environment
+- Test structure mirrors src structure: `tests/` directory
+- All constants used in validation must be testable (exported from constants/)
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+## Code Style Notes
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
+- Use TypeScript with strict mode
+- Prefer `async/await` over promises
+- Use `@clack/prompts` for all interactive inputs (provides cancellation, validation)
+- Error messages use `ERRORS` constants from `src/constants/messages.ts`
+- Exit codes defined in `src/constants/formatting.ts` (EXIT_CODES)
+- Cancellation: Use `p.cancel(ERRORS.cancelled)` + `process.exit(EXIT_CODES.userCancelled)`
 
-## Frontend
+## Configuration File Paths
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+- Main config: `~/.config/swixter/config.json`
+- User providers: `~/.config/swixter/providers.json`
+- Claude Code settings: `~/.claude/settings.json`
+- Continue.dev config: `~/.continue/config.json`
 
-Server:
+## When Adding New Features
 
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-
-// import .css files directly and it works
-import './index.css';
-
-import { createRoot } from "react-dom/client";
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
+- If adding a new coder: Create adapter in `src/adapters/`, add to `src/constants/coders.ts`, create CLI handler like `claude.ts`
+- If adding new provider: Users can add via CLI (`swixter providers add`), no code changes needed
+- If adding new commands: Update `src/cli/help.ts` with detailed help, add to completions, add command aliases to `src/constants/commands.ts`
+- All user-facing text must go into `src/constants/messages.ts`

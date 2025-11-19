@@ -1,33 +1,71 @@
 {
   "name": "swixter",
-  "version": "1.0.0",
-  "description": "Claude Code 配置管理工具 - 轻松切换供应商和模型",
-  "module": "index.ts",
+  "version": "0.0.1-alpha",
+  "description": "Claude Code configuration manager - easily switch between AI providers (Anthropic, Ollama, custom providers)",
+  "main": "dist/cli/index.js",
+  "module": "dist/cli/index.js",
   "type": "module",
+  "bin": {
+    "swixter": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "build": "bun build src/cli/index.ts --outdir dist/cli --target node --format esm && chmod +x dist/cli/index.js",
+    "prepublishOnly": "bun run build && bun test",
     "cli": "bun src/cli/index.ts",
     "cli:dev": "bun --hot src/cli/index.ts",
     "test": "bun test",
-    "test:e2e": "bash test/e2e-docker.sh"
+    "test:e2e": "bash test/e2e-docker.sh",
+    "release": "npm version",
+    "release:patch": "npm version patch && git push --follow-tags && npm publish",
+    "release:minor": "npm version minor && git push --follow-tags && npm publish",
+    "release:major": "npm version major && git push --follow-tags && npm publish"
   },
   "keywords": [
     "claude",
     "claude-code",
+    "claude-ai",
     "ai",
     "llm",
     "config",
-    "cli"
+    "configuration",
+    "manager",
+    "cli",
+    "tool",
+    "anthropic",
+    "ollama",
+    "qwen",
+    "provider",
+    "switch",
+    "api-key"
   ],
-  "author": "",
+  "author": "dawnswwwww",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dawnswwwww/swixter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dawnswwwww/swixter/issues"
+  },
+  "homepage": "https://github.com/dawnswwwww/swixter#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/js-yaml": "^4.0.9"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
+    "js-yaml": "^4.1.1",
     "picocolors": "^1.1.1",
     "zod": "^4.1.12"
   }
