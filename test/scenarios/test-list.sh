@@ -1,22 +1,54 @@
 #!/bin/bash
-# 测试列出配置功能
+# Test list configuration functionality
 
 set -e
 
-CLI_CMD="bun /home/testuser/src/cli/index.ts"
+CLI_CMD="node /home/testuser/dist/cli/index.js"
 
-echo "=== 测试: 列出配置 ==="
+echo "=== Test: List Configurations ==="
 
-# 测试: 列出配置（应该输出配置列表）
-echo "测试: 列出所有配置..."
-OUTPUT=$($CLI_CMD list)
+# Test 1: List configurations for claude
+echo "Test 1: List all configurations for claude..."
+OUTPUT=$($CLI_CMD claude list)
 
-# 验证输出包含配置名称
+# Verify output contains configuration names
 if ! echo "$OUTPUT" | grep -q "test-anthropic"; then
-    echo "❌ 错误: 输出中未找到 test-anthropic"
+    echo "❌ Error: test-anthropic not found in claude list output"
     exit 1
 fi
 
-echo "✓ 列表测试通过"
+if ! echo "$OUTPUT" | grep -q "test-both-keys"; then
+    echo "❌ Error: test-both-keys not found in claude list output"
+    exit 1
+fi
 
-echo "✅ 所有列表配置测试通过"
+echo "✓ Test 1 passed"
+
+# Test 2: List configurations for qwen (should see the same profiles)
+echo "Test 2: List all configurations for qwen..."
+OUTPUT=$($CLI_CMD qwen list)
+
+if ! echo "$OUTPUT" | grep -q "test-anthropic"; then
+    echo "❌ Error: test-anthropic not found in qwen list output"
+    exit 1
+fi
+
+if ! echo "$OUTPUT" | grep -q "test-ollama"; then
+    echo "❌ Error: test-ollama not found in qwen list output"
+    exit 1
+fi
+
+echo "✓ Test 2 passed"
+
+# Test 3: Global providers command
+echo "Test 3: List all providers..."
+OUTPUT=$($CLI_CMD providers)
+
+if ! echo "$OUTPUT" | grep -q "Anthropic"; then
+    echo "❌ Error: Anthropic not found in providers output"
+    exit 1
+fi
+
+echo "✓ Test 3 passed"
+
+echo "✅ All list configuration tests passed"

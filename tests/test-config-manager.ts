@@ -4,36 +4,36 @@ import { join } from "node:path";
 import type { ConfigFile, ClaudeCodeProfile } from "../src/types.js";
 import { ConfigFileSchema } from "../src/types.js";
 
-const CONFIG_VERSION = "1.0.0";
+const CONFIG_VERSION = "2.0.0";
 let testConfigPath = "/tmp/swixter-test-config.json";
 
 /**
- * 设置测试配置路径
+ * Set test config path
  */
 export function setTestConfigPath(path: string): void {
   testConfigPath = path;
 }
 
 /**
- * 获取测试配置路径
+ * Get test config path
  */
 export function getTestConfigPath(): string {
   return testConfigPath;
 }
 
 /**
- * 创建默认配置
+ * Create default configuration
  */
 function createDefaultConfig(): ConfigFile {
   return {
-    activeProfile: "",
     profiles: {},
+    coders: {},
     version: CONFIG_VERSION,
   };
 }
 
 /**
- * 加载测试配置文件
+ * Load test configuration file
  */
 export async function loadTestConfig(): Promise<ConfigFile> {
   try {
@@ -50,13 +50,13 @@ export async function loadTestConfig(): Promise<ConfigFile> {
     const validated = ConfigFileSchema.parse(data);
     return validated;
   } catch (error) {
-    console.error("加载配置失败，使用默认配置:", error);
+    console.error("Failed to load config, using default config:", error);
     return createDefaultConfig();
   }
 }
 
 /**
- * 保存测试配置文件
+ * Save test configuration file
  */
 export async function saveTestConfig(config: ConfigFile): Promise<void> {
   try {
@@ -65,14 +65,14 @@ export async function saveTestConfig(config: ConfigFile): Promise<void> {
     const content = JSON.stringify(config, null, 2);
     await Bun.write(testConfigPath, content);
   } catch (error) {
-    throw new Error(`保存配置失败: ${error}`);
+    throw new Error(`Failed to save config: ${error}`);
   }
 }
 
 /**
- * 添加或更新测试Profile
+ * Add or update test Profile
  */
-export async function upsertTestProfile(profile: ClaudeCodeProfile): Promise<void> {
+export async function upsertTestProfile(profile: ClaudeCodeProfile, coder: string = "claude"): Promise<void> {
   const config = await loadTestConfig();
 
   const now = new Date().toISOString();
@@ -84,62 +84,77 @@ export async function upsertTestProfile(profile: ClaudeCodeProfile): Promise<voi
     updatedAt: now,
   };
 
-  if (Object.keys(config.profiles).length === 1) {
-    config.activeProfile = profile.name;
+  // Ensure coder config exists
+  if (!config.coders[coder]) {
+    config.coders[coder] = { activeProfile: "" };
+  }
+
+  // If this is the first profile, automatically set as active
+  if (Object.keys(config.profiles).length === 1 || !config.coders[coder].activeProfile) {
+    config.coders[coder].activeProfile = profile.name;
   }
 
   await saveTestConfig(config);
 }
 
 /**
- * 设置激活的测试Profile
+ * Set active test Profile
  */
-export async function setActiveTestProfile(profileName: string): Promise<void> {
+export async function setActiveTestProfile(profileName: string, coder: string = "claude"): Promise<void> {
   const config = await loadTestConfig();
 
   if (!config.profiles[profileName]) {
-    throw new Error(`Profile "${profileName}" 不存在`);
+    throw new Error(`Profile "${profileName}" does not exist`);
   }
 
-  config.activeProfile = profileName;
+  // Ensure coder config exists
+  if (!config.coders[coder]) {
+    config.coders[coder] = { activeProfile: "" };
+  }
+
+  config.coders[coder].activeProfile = profileName;
   await saveTestConfig(config);
 }
 
 /**
- * 获取当前激活的测试Profile
+ * Get current active test Profile
  */
-export async function getActiveTestProfile(): Promise<ClaudeCodeProfile | null> {
+export async function getActiveTestProfile(coder: string = "claude"): Promise<ClaudeCodeProfile | null> {
   const config = await loadTestConfig();
 
-  if (!config.activeProfile || !config.profiles[config.activeProfile]) {
+  const coderConfig = config.coders[coder];
+  if (!coderConfig || !coderConfig.activeProfile || !config.profiles[coderConfig.activeProfile]) {
     return null;
   }
 
-  return config.profiles[config.activeProfile];
+  return config.profiles[coderConfig.activeProfile];
 }
 
 /**
- * 删除测试Profile
+ * Delete test Profile
  */
 export async function deleteTestProfile(profileName: string): Promise<void> {
   const config = await loadTestConfig();
 
   if (!config.profiles[profileName]) {
-    throw new Error(`Profile "${profileName}" 不存在`);
+    throw new Error(`Profile "${profileName}" does not exist`);
   }
 
   delete config.profiles[profileName];
 
-  if (config.activeProfile === profileName) {
-    const remainingProfiles = Object.keys(config.profiles);
-    config.activeProfile = remainingProfiles.length > 0 ? remainingProfiles[0] : "";
+  // Update all coder active configurations
+  for (const coder in config.coders) {
+    if (config.coders[coder].activeProfile === profileName) {
+      const remainingProfiles = Object.keys(config.profiles);
+      config.coders[coder].activeProfile = remainingProfiles.length > 0 ? remainingProfiles[0] : "";
+    }
   }
 
   await saveTestConfig(config);
 }
 
 /**
- * 列出所有测试Profiles
+ * List all test Profiles
  */
 export async function listTestProfiles(): Promise<ClaudeCodeProfile[]> {
   const config = await loadTestConfig();

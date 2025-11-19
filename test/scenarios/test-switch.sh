@@ -1,39 +1,58 @@
 #!/bin/bash
-# 测试切换配置功能
+# Test switch configuration functionality
 
 set -e
 
-CLI_CMD="bun /home/testuser/src/cli/index.ts"
+CLI_CMD="node /home/testuser/dist/cli/index.js"
 CONFIG_FILE="$HOME/.config/swixter/config.json"
 
-echo "=== 测试: 切换配置 ==="
+echo "=== Test: Switch Configuration ==="
 
-# 前提: 已有两个配置 test-anthropic 和 test-kimi
-# 当前激活的是 test-kimi
+# Prerequisite: Already have test-anthropic and test-both-keys configurations
+# Currently claude has test-both-keys active
 
-# 测试: 切换到 test-anthropic
-echo "测试: 切换到 test-anthropic..."
-$CLI_CMD switch test-anthropic
+# Test 1: Switch claude to test-anthropic
+echo "Test 1: Switch claude to test-anthropic..."
+$CLI_CMD claude switch test-anthropic
 
-# 验证激活配置
-ACTIVE=$(jq -r '.activeProfile' "$CONFIG_FILE")
+# Verify claude's active configuration
+ACTIVE=$(jq -r '.coders.claude.activeProfile' "$CONFIG_FILE")
 if [ "$ACTIVE" != "test-anthropic" ]; then
-    echo "❌ 错误: 切换失败，期望 test-anthropic，实际 $ACTIVE"
+    echo "❌ Error: Claude switch failed, expected test-anthropic, got $ACTIVE"
     exit 1
 fi
 
-echo "✓ 切换测试通过"
+echo "✓ Test 1 passed"
 
-# 测试: 切换回 test-kimi
-echo "测试: 切换到 test-kimi..."
-$CLI_CMD switch test-kimi
+# Test 2: Switch claude back to test-both-keys
+echo "Test 2: Switch claude to test-both-keys..."
+$CLI_CMD claude switch test-both-keys
 
-ACTIVE=$(jq -r '.activeProfile' "$CONFIG_FILE")
-if [ "$ACTIVE" != "test-kimi" ]; then
-    echo "❌ 错误: 切换失败，期望 test-kimi，实际 $ACTIVE"
+ACTIVE=$(jq -r '.coders.claude.activeProfile' "$CONFIG_FILE")
+if [ "$ACTIVE" != "test-both-keys" ]; then
+    echo "❌ Error: Claude switch failed, expected test-both-keys, got $ACTIVE"
     exit 1
 fi
 
-echo "✓ 切换回测试通过"
+echo "✓ Test 2 passed"
 
-echo "✅ 所有切换配置测试通过"
+# Test 3: Switch qwen configuration (shared profiles, but independent active state)
+echo "Test 3: Switch qwen to test-anthropic..."
+$CLI_CMD qwen switch test-anthropic
+
+QWEN_ACTIVE=$(jq -r '.coders.qwen.activeProfile' "$CONFIG_FILE")
+if [ "$QWEN_ACTIVE" != "test-anthropic" ]; then
+    echo "❌ Error: Qwen switch failed, expected test-anthropic, got $QWEN_ACTIVE"
+    exit 1
+fi
+
+# Verify claude's active configuration was not affected
+CLAUDE_ACTIVE=$(jq -r '.coders.claude.activeProfile' "$CONFIG_FILE")
+if [ "$CLAUDE_ACTIVE" != "test-both-keys" ]; then
+    echo "❌ Error: Claude active configuration was unexpectedly modified, expected test-both-keys, got $CLAUDE_ACTIVE"
+    exit 1
+fi
+
+echo "✓ Test 3 passed"
+
+echo "✅ All switch configuration tests passed"

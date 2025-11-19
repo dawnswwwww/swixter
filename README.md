@@ -1,188 +1,262 @@
-# Swixter - Claude Code 配置管理工具
+# Swixter
 
-一个强大的CLI工具，用于管理Claude Code的多供应商配置，支持快速切换不同的AI服务提供商和模型。
+> Make AI coding tools effortlessly switchable
 
-## ✨ 特性
+A lightweight CLI tool that makes it easy to switch between AI providers for Claude Code and other AI coding assistants.
 
-- 🎯 **多供应商支持** - 内置10+主流AI服务提供商预设
-- 🔄 **快速切换** - 一键切换不同的供应商和模型配置
-- 💾 **配置管理** - 创建、保存、切换、删除多个配置文件
-- 📤 **导入导出** - 支持配置的导入导出，方便团队共享
-- 🔐 **API Key脱敏** - 导出时可选择脱敏API密钥
-- 🎨 **美观的CLI界面** - 使用 @clack/prompts 提供现代化交互体验
-- 🚀 **基于Bun** - 快速、轻量的运行时环境
+## Why Swixter?
 
-## 📦 安装
+Working with AI coding tools shouldn't be complicated. Swixter lets you:
 
-```bash
-# 克隆仓库
-git clone https://github.com/your-username/swixter.git
-cd swixter
+- **Switch providers instantly** - Change between Anthropic, Ollama, or custom APIs with one command
+- **Manage multiple configs** - Keep separate profiles for work, personal, or experimental setups
+- **Add custom providers** - Easily integrate any AI service with a simple configuration
+- **Stay in control** - All configs stored locally, no cloud dependencies
 
-# 安装依赖
-bun install
-```
-
-## 🚀 快速开始
-
-### 交互式模式
-
-启动交互式界面，通过菜单完成所有操作：
+## Installation
 
 ```bash
-bun run cli
+npm install -g swixter
 ```
 
-### 命令行模式
-
-直接使用命令完成特定操作：
+Or use with npx (no install needed):
 
 ```bash
-# 查看帮助
-bun run cli help
-
-# 列出所有配置
-bun run cli list
-
-# 切换到指定配置
-bun run cli switch my-config
-
-# 导出配置到文件
-bun run cli export ./config.json
-
-# 从文件导入配置
-bun run cli import ./config.json
-
-# 查看所有支持的供应商
-bun run cli providers
+npx swixter --help
 ```
 
-## 🌐 支持的供应商
-
-### 国际服务商
-
-| 供应商 | 说明 | API端点 |
-|-------|------|---------|
-| **Anthropic** | 官方API | https://api.anthropic.com |
-| **OpenRouter** | 多模型聚合服务 | https://openrouter.ai/api/v1 |
-| **AWS Bedrock** | 企业级部署 | https://bedrock-runtime.us-east-1.amazonaws.com |
-
-### 国内服务商 🇨🇳
-
-| 供应商 | 说明 | API端点 |
-|-------|------|---------|
-| **MiniMax** | 海螺AI | https://api.minimax.chat/v1 |
-| **智谱AI** | GLM系列模型 | https://open.bigmodel.cn/api/paas/v4 |
-| **Moonshot** | Kimi | https://api.moonshot.cn/v1 |
-| **DeepSeek** | DeepSeek Chat & Coder | https://api.deepseek.com/v1 |
-| **阿里云百炼** | 通义千问 | https://dashscope.aliyuncs.com/api/v1 |
-| **腾讯混元** | 腾讯混元大模型 | https://hunyuan.tencentcloudapi.com |
-| **字节豆包** | 火山引擎 | https://ark.cn-beijing.volces.com/api/v3 |
-
-还支持**自定义端点**，可配置任意兼容的API服务。
-
-## 📖 使用示例
-
-### 1. 创建新配置
+## Quick Start
 
 ```bash
-bun run cli
-# 选择 "创建新配置"
-# 输入配置名称: anthropic-prod
-# 选择供应商: Anthropic (官方)
-# 选择模型: claude-3-5-sonnet-20241022
-# 输入 API Key: sk-ant-...
-# 确认创建
+# Create your first profile
+swixter claude create
+
+# List all profiles
+swixter claude list
+
+# Switch between profiles
+swixter claude switch my-profile
+
+# Apply profile to Claude Code
+swixter claude apply
 ```
 
-### 2. 切换配置
+## Built-in Providers
+
+- **Anthropic** - Official Claude API
+- **Ollama** - Run Qwen and other models locally
+- **Custom** - Add any OpenAI-compatible API
+
+## Add Custom Providers
+
+Easily add any AI service:
 
 ```bash
-# 交互式选择
-bun run cli
-# 选择 "切换配置"
+# Interactive setup
+swixter providers add
 
-# 或直接使用命令
-bun run cli switch anthropic-prod
+# Or use flags
+swixter providers add \
+  --id openrouter \
+  --name "OpenRouter" \
+  --base-url "https://openrouter.ai/api/v1" \
+  --auth-type bearer
 ```
 
-### 3. 导出配置（用于团队共享）
+Supports OpenRouter, DeepSeek, MiniMax, and any OpenAI-compatible API.
+
+## Features
+
+✨ **Simple** - Minimal commands, maximum productivity
+🚀 **Fast** - Built with Bun for instant operations
+🎨 **Beautiful** - Clean, modern CLI interface
+🔒 **Secure** - Keys stored locally, optional sanitization for sharing
+🔧 **Flexible** - Works with any OpenAI-compatible API
+📦 **Lightweight** - Small package size, zero bloat
+
+## Commands
+
+### For Claude Code
 
 ```bash
-# 导出并脱敏API Key（安全分享）
-bun run cli
-# 选择 "导出配置"
-# 输入文件路径: ./team-config.json
-# 选择 "是" 脱敏API Key
-
-# 或使用命令（不脱敏，完整导出）
-bun run cli export ./backup.json
+swixter claude create          # Create new profile
+swixter claude list             # List all profiles
+swixter claude switch <name>    # Switch active profile
+swixter claude apply            # Apply to Claude Code
+swixter claude delete <name>    # Delete profile
 ```
 
-### 4. 导入配置
+### For Qwen (or other coders)
 
 ```bash
-# 从文件导入
-bun run cli import ./team-config.json
-# 如果存在同名配置，会询问是否覆盖
+swixter qwen create
+swixter qwen list
+swixter qwen switch <name>
 ```
 
-## 🗂️ 配置文件位置
+### Provider Management
 
-配置文件存储在：`~/.config/swixter/config.json`
+```bash
+swixter providers list          # List available providers
+swixter providers add           # Add custom provider
+swixter providers remove <id>   # Remove provider
+```
 
-配置结构示例：
+### Configuration
+
+```bash
+swixter export config.json      # Export configs
+swixter import config.json      # Import configs
+swixter completion bash         # Shell completion
+```
+
+## Configuration File
+
+Configs are stored at `~/.config/swixter/config.json`
 
 ```json
 {
-  "activeProfile": "my-config",
   "profiles": {
-    "my-config": {
-      "name": "my-config",
+    "my-profile": {
+      "name": "my-profile",
       "providerId": "anthropic",
       "apiKey": "sk-ant-...",
-      "model": "claude-3-5-sonnet-20241022",
-      "baseURL": "https://api.anthropic.com",
-      "createdAt": "2025-01-15T10:30:00.000Z",
-      "updatedAt": "2025-01-15T10:30:00.000Z"
+      "model": "claude-sonnet-4-20250514"
     }
   },
-  "version": "1.0.0"
+  "coders": {
+    "claude": {
+      "activeProfile": "my-profile"
+    }
+  }
 }
 ```
 
-## 🔧 开发
+## Examples
+
+### Example 1: Switch between work and personal
 
 ```bash
-# 运行开发模式（支持热重载）
-bun run cli:dev
+# Setup work profile
+swixter claude create --name work --provider anthropic --api-key sk-ant-work-xxx
 
-# 运行测试
+# Setup personal profile
+swixter claude create --name personal --provider anthropic --api-key sk-ant-personal-xxx
+
+# Switch to work
+swixter claude switch work && swixter claude apply
+
+# Switch to personal
+swixter claude switch personal && swixter claude apply
+```
+
+### Example 2: Try Qwen locally
+
+```bash
+# Add Ollama profile
+swixter qwen create \
+  --name local \
+  --provider ollama \
+  --base-url http://localhost:11434
+
+# Switch and use
+swixter qwen switch local
+```
+
+### Example 3: Add OpenRouter
+
+```bash
+# Add OpenRouter as custom provider
+swixter providers add \
+  --id openrouter \
+  --base-url "https://openrouter.ai/api/v1" \
+  --auth-type bearer
+
+# Create profile using OpenRouter
+swixter claude create \
+  --name openrouter-profile \
+  --provider openrouter \
+  --api-key sk-or-v1-xxx
+```
+
+## Shell Completion
+
+Enable auto-completion for faster typing:
+
+```bash
+# Bash
+swixter completion bash > ~/.local/share/bash-completion/completions/swixter
+
+# Zsh
+swixter completion zsh > ~/.zfunc/_swixter
+
+# Fish
+swixter completion fish > ~/.config/fish/completions/swixter.fish
+```
+
+## Command Aliases
+
+Save keystrokes with short aliases:
+
+```bash
+swixter claude ls              # list
+swixter claude sw my-profile   # switch
+swixter claude rm old-profile  # delete
+swixter claude new             # create
+```
+
+## Help & Documentation
+
+```bash
+swixter --help                 # Global help
+swixter claude --help          # Claude commands help
+swixter providers --help       # Provider commands help
+```
+
+## Development
+
+Built with modern tools for a great developer experience:
+
+```bash
+# Clone repo
+git clone https://github.com/dawnswwwww/swixter.git
+cd swixter
+
+# Install dependencies
+bun install
+
+# Run in dev mode
+bun run cli
+
+# Run tests
 bun test
 ```
 
-## 📝 技术栈
+## Tech Stack
 
-- **运行时**: Bun
-- **CLI框架**: @clack/prompts
-- **颜色输出**: picocolors
-- **数据验证**: Zod
-- **语言**: TypeScript
+- **Bun** - Fast JavaScript runtime
+- **TypeScript** - Type safety
+- **@clack/prompts** - Beautiful CLI prompts
+- **Zod** - Schema validation
 
-## 🤝 贡献
+## Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Contributions are welcome! Feel free to:
 
-## 📄 许可证
+- 🐛 Report bugs
+- 💡 Suggest features
+- 🔧 Submit pull requests
 
-MIT License
+## License
 
-## 🙏 致谢
+MIT License - see [LICENSE](LICENSE)
 
-- [Bun](https://bun.sh/) - 快速的JavaScript运行时
-- [@clack/prompts](https://github.com/natemoo-re/clack) - 优雅的CLI提示工具
-- [Anthropic](https://www.anthropic.com/) - Claude AI
+## Links
+
+- [GitHub](https://github.com/dawnswwwww/swixter)
+- [npm](https://www.npmjs.com/package/swixter)
+- [Issues](https://github.com/dawnswwwww/swixter/issues)
 
 ---
 
-**注意**: 请妥善保管您的API密钥，不要将包含明文密钥的配置文件提交到公共仓库。
+**Made with ❤️ to make AI coding tools more accessible**

@@ -1,117 +1,119 @@
 #!/bin/bash
-# Swixter E2E Docker 测试脚本
-# 在隔离的Docker容器中测试CLI所有功能
+# Swixter E2E Docker Test Script
+# Tests all CLI functionality in an isolated Docker container
 
 set -e
 
-# 颜色定义
+# Color definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# 项目根目录
+# Project root directory
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}   Swixter E2E Docker 测试${NC}"
+echo -e "${BLUE}   Swixter E2E Docker Tests${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# 步骤 1: 构建 Docker 镜像
-echo -e "${YELLOW}[1/5]${NC} 构建 Docker 测试镜像..."
+# Step 1: Build project
+echo -e "${YELLOW}[1/5]${NC} Building project..."
+bun run build > /dev/null 2>&1
+echo -e "${GREEN}✓${NC} Project build successful"
+echo ""
+
+# Step 2: Build Docker image
+echo -e "${YELLOW}[2/5]${NC} Building Docker test image..."
 docker build -t swixter-test -f test/docker/Dockerfile . > /dev/null 2>&1
-echo -e "${GREEN}✓${NC} Docker 镜像构建成功"
+echo -e "${GREEN}✓${NC} Docker image build successful"
 echo ""
 
-# 步骤 2: 启动测试容器
-echo -e "${YELLOW}[2/5]${NC} 启动测试容器..."
+# Step 3: Start test container
+echo -e "${YELLOW}[3/5]${NC} Starting test container..."
 CONTAINER_ID=$(docker run -d swixter-test sleep 300)
-echo -e "${GREEN}✓${NC} 容器已启动: ${CONTAINER_ID:0:12}"
+echo -e "${GREEN}✓${NC} Container started: ${CONTAINER_ID:0:12}"
 echo ""
 
-# 清理函数
+# Cleanup function
 cleanup() {
     echo ""
-    echo -e "${YELLOW}清理资源...${NC}"
+    echo -e "${YELLOW}Cleaning up resources...${NC}"
     docker rm -f "$CONTAINER_ID" > /dev/null 2>&1 || true
-    echo -e "${GREEN}✓ 清理完成${NC}"
+    echo -e "${GREEN}✓ Cleanup complete${NC}"
 }
 
-# 注册清理函数
+# Register cleanup function
 trap cleanup EXIT INT TERM
 
-# 步骤 3: 复制源代码到容器
-echo -e "${YELLOW}[3/5]${NC} 复制源代码到容器..."
-docker cp ./src "$CONTAINER_ID:/home/testuser/"
-docker cp ./package.json "$CONTAINER_ID:/home/testuser/"
-docker cp ./bun.lock "$CONTAINER_ID:/home/testuser/" 2>/dev/null || true
+# Step 4: Copy build artifacts and test scripts to container
+echo -e "${YELLOW}[4/5]${NC} Copying files to container..."
+docker cp ./dist "$CONTAINER_ID:/home/testuser/"
 docker cp test/scenarios "$CONTAINER_ID:/home/testuser/"
-echo -e "${GREEN}✓${NC} 文件复制成功"
+# Ensure test scripts have execute permissions (must run chmod and chown as root)
+docker exec -u root "$CONTAINER_ID" sh -c 'chmod +x /home/testuser/scenarios/*.sh && chown -R testuser:testuser /home/testuser/scenarios /home/testuser/dist'
+echo -e "${GREEN}✓${NC} Files copied successfully"
 echo ""
 
-# 步骤 4: 安装依赖
-echo -e "${YELLOW}[4/5]${NC} 安装依赖..."
-docker exec -u testuser "$CONTAINER_ID" sh -c 'cd /home/testuser && bun install > /dev/null 2>&1'
-echo -e "${GREEN}✓${NC} 依赖安装成功"
-echo ""
-
-# 步骤 5: 运行测试场景
-echo -e "${YELLOW}[5/5]${NC} 运行测试场景..."
+# Step 5: Run test scenarios
+echo -e "${YELLOW}[5/5]${NC} Running test scenarios..."
 echo ""
 
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-# 测试场景列表
+# Test scenario list
 SCENARIOS=(
     "test-create.sh"
     "test-switch.sh"
     "test-list.sh"
+    "test-apply.sh"
     "test-export-import.sh"
     "test-delete.sh"
+    "test-errors.sh"
 )
 
 for scenario in "${SCENARIOS[@]}"; do
     TEST_NAME=$(basename "$scenario" .sh | sed 's/test-//')
-    echo -e "${BLUE}▸${NC} 运行测试: ${YELLOW}${TEST_NAME}${NC}"
+    echo -e "${BLUE}▸${NC} Running test: ${YELLOW}${TEST_NAME}${NC}"
 
     if docker exec -u testuser "$CONTAINER_ID" bash "/home/testuser/scenarios/$scenario" 2>&1 | tee /tmp/test-output.log | grep -q "✅"; then
-        echo -e "${GREEN}  ✓ 通过${NC}"
+        echo -e "${GREEN}  ✓ Pass${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
-        echo -e "${RED}  ✗ 失败${NC}"
+        echo -e "${RED}  ✗ Fail${NC}"
         cat /tmp/test-output.log
         TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
     echo ""
 done
 
-# 步骤 6: 显示测试报告
+# Step 6: Display test report
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}   测试报告${NC}"
+echo -e "${BLUE}   Test Report${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "总测试数: ${BLUE}${#SCENARIOS[@]}${NC}"
-echo -e "通过: ${GREEN}${TESTS_PASSED}${NC}"
-echo -e "失败: ${RED}${TESTS_FAILED}${NC}"
+echo -e "Total tests: ${BLUE}${#SCENARIOS[@]}${NC}"
+echo -e "Passed: ${GREEN}${TESTS_PASSED}${NC}"
+echo -e "Failed: ${RED}${TESTS_FAILED}${NC}"
 echo ""
 
-# 如果有验证配置文件，显示最终配置
-echo -e "${YELLOW}最终配置状态:${NC}"
-docker exec -u testuser "$CONTAINER_ID" cat /home/testuser/.config/swixter/config.json | jq '.activeProfile, (.profiles | keys)'
+# If there's a config file to validate, display final configuration
+echo -e "${YELLOW}Final configuration state:${NC}"
+docker exec -u testuser "$CONTAINER_ID" cat /home/testuser/.config/swixter/config.json 2>/dev/null | jq '.coders, (.profiles | keys)' || echo "Configuration file does not exist"
 echo ""
 
 if [ $TESTS_FAILED -eq 0 ]; then
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}   ✓ 所有测试通过！${NC}"
+    echo -e "${GREEN}   ✓ All tests passed!${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     exit 0
 else
     echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${RED}   ✗ 有测试失败${NC}"
+    echo -e "${RED}   ✗ Some tests failed${NC}"
     echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     exit 1
 fi

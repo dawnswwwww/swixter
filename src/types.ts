@@ -1,84 +1,97 @@
 import { z } from "zod";
 
 /**
- * 认证类型
+ * Authentication type
  */
 export type AuthType = "bearer" | "api-key" | "custom";
 
 /**
- * 供应商预设配置
+ * API Key environment variable type
+ */
+export type ApiKeyEnvVar = "ANTHROPIC_API_KEY" | "ANTHROPIC_AUTH_TOKEN";
+
+/**
+ * Provider preset configuration
  */
 export interface ProviderPreset {
-  /** 供应商唯一ID */
+  /** Provider unique ID */
   id: string;
-  /** 供应商名称 */
+  /** Provider name */
   name: string;
-  /** 供应商显示名称（支持中文） */
+  /** Provider display name */
   displayName: string;
-  /** API基础URL */
+  /** API base URL */
   baseURL: string;
-  /** 默认支持的模型列表 */
+  /** Default supported model list */
   defaultModels: string[];
-  /** 认证类型 */
+  /** Authentication type */
   authType: AuthType;
-  /** 自定义请求头 */
+  /** Custom request headers */
   headers?: Record<string, string>;
-  /** 速率限制配置 */
+  /** Rate limit configuration */
   rateLimit?: {
     requestsPerMinute?: number;
     tokensPerMinute?: number;
   };
-  /** 文档链接 */
+  /** Documentation link */
   docs?: string;
-  /** 是否为国内服务 */
+  /** Whether it's a Chinese domestic service */
   isChinese?: boolean;
 }
 
 /**
- * Claude Code 配置 Profile
+ * Claude Code Profile
  */
 export interface ClaudeCodeProfile {
-  /** Profile名称 */
+  /** Profile name */
   name: string;
-  /** 供应商ID */
+  /** Provider ID */
   providerId: string;
-  /** API Key */
+  /** API Key (corresponds to ANTHROPIC_API_KEY) */
   apiKey: string;
-  /** 选择的模型 */
-  model: string;
-  /** API基础URL（可覆盖预设） */
+  /** Auth Token (corresponds to ANTHROPIC_AUTH_TOKEN) */
+  authToken?: string;
+  /** API base URL (can override preset) */
   baseURL?: string;
-  /** 自定义请求头（可扩展预设） */
+  /** Custom request headers (can extend preset) */
   headers?: Record<string, string>;
-  /** 创建时间 */
+  /** Creation time */
   createdAt: string;
-  /** 更新时间 */
+  /** Update time */
   updatedAt: string;
 }
 
 /**
- * 配置文件结构
+ * Coder configuration
+ */
+export interface CoderConfig {
+  /** Current active profile */
+  activeProfile: string;
+}
+
+/**
+ * Configuration file structure
  */
 export interface ConfigFile {
-  /** 当前激活的profile */
-  activeProfile: string;
-  /** 所有profiles */
+  /** All profiles */
   profiles: Record<string, ClaudeCodeProfile>;
-  /** 配置版本 */
+  /** Configuration for each coder */
+  coders: Record<string, CoderConfig>;
+  /** Configuration version */
   version: string;
 }
 
 /**
- * 导出配置结构
+ * Export configuration structure
  */
 export interface ExportConfig {
-  /** 导出的profiles */
+  /** Exported profiles */
   profiles: ClaudeCodeProfile[];
-  /** 导出时间 */
+  /** Export time */
   exportedAt: string;
-  /** 配置版本 */
+  /** Configuration version */
   version: string;
-  /** 是否脱敏API Key */
+  /** Whether API Key is sanitized */
   sanitized?: boolean;
 }
 
@@ -103,17 +116,21 @@ export const ProviderPresetSchema = z.object({
 export const ClaudeCodeProfileSchema = z.object({
   name: z.string().min(1),
   providerId: z.string(),
-  apiKey: z.string().min(1),
-  model: z.string().min(1),
+  apiKey: z.string(), // Allow empty string (local models like Ollama don't need key)
+  authToken: z.string().optional(),
   baseURL: z.string().url().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 
-export const ConfigFileSchema = z.object({
+export const CoderConfigSchema = z.object({
   activeProfile: z.string(),
+});
+
+export const ConfigFileSchema = z.object({
   profiles: z.record(z.string(), ClaudeCodeProfileSchema),
+  coders: z.record(z.string(), CoderConfigSchema),
   version: z.string(),
 });
 

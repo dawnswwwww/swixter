@@ -1,0 +1,43 @@
+# Source files
+src/
+*.ts
+!*.d.ts
+
+# Tests
+test/
+tests/
+*.test.ts
+*.spec.ts
+
+# Development files
+.claude/
+.git/
+.github/
+node_modules/
+
+# Build artifacts
+tsconfig.json
+bun.lock
+
+# Documentation (keep only README.md and LICENSE)
+CLAUDE.md
+CLI_IMPROVEMENTS.md
+PROVIDER_MANAGEMENT.md
+NPM_RELEASE.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+.DS_Store
+.env
+.env.*
+*.log
+
+# Docker
+Dockerfile
+docker-compose.yml
+test/docker/
