@@ -4,7 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Swixter is a CLI tool for managing Claude Code configurations across multiple AI providers. It allows users to easily switch between different providers (Anthropic, Ollama, custom) and manage API keys/configurations for AI coding assistants.
+Swixter is a CLI tool for managing configurations across multiple AI coding assistants. It allows users to easily switch between different AI providers (Anthropic, Ollama, custom) and manage API keys/configurations. Currently supports:
+- **Claude Code** (Anthropic) - JSON config at `~/.claude/settings.json`
+- **Codex** - TOML config at `~/.codex/config.toml` with env var support
+- **Continue.dev/Qwen** - YAML config at `~/.continue/config.yaml`
 
 ## Development Commands
 
@@ -21,11 +24,18 @@ bun run cli
 # Run all unit tests
 bun test
 
+# Run specific test file
+bun test tests/adapters/codex.test.ts
+
 # Run E2E tests (Docker-based)
 bun run test:e2e
 
 # Test package contents before publishing
 npm pack --dry-run
+
+# Test CLI commands manually (after build)
+node dist/cli/index.js claude list
+node dist/cli/index.js providers list
 ```
 
 ## Architecture Overview
@@ -52,7 +62,7 @@ npm pack --dry-run
 
 **CLI Layer** (`src/cli/`):
 - `index.ts` - Main entry point, routes commands to handlers
-- `claude.ts` / `qwen.ts` - Per-coder command handlers (create, switch, list, delete, apply)
+- `claude.ts` / `qwen.ts` / `codex.ts` - Per-coder command handlers (create, switch, list, delete, apply, run)
 - `providers.ts` - Provider management commands (add, remove, list, show)
 - `help.ts` - Detailed help system with command documentation
 - `completions.ts` - Shell completion generation (bash/zsh/fish)
@@ -72,13 +82,20 @@ npm pack --dry-run
 
 ### Important Design Patterns
 
-1. **Coder-agnostic design**: Most code works with any "coder" (claude/qwen). Coder-specific logic is in adapters and constants/coders.ts.
+1. **Coder-agnostic design**: Most code works with any "coder" (claude/qwen/codex). Coder-specific logic is in adapters and constants/coders.ts.
 
 2. **Profile = Configuration template**: A profile contains provider ID, API key, base URL, etc. Multiple profiles can exist; one is "active" per coder.
 
 3. **Apply flow**: `switch` changes active profile in swixter config → `apply` writes active profile to coder's config file (e.g., `~/.claude/settings.json`)
 
 4. **Validation timing**: Input validation happens at prompt time (immediate feedback) AND at save time (for non-interactive mode)
+
+5. **Adapter-specific behaviors**:
+   - **Claude adapter** (JSON): Direct key storage in settings.json with ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN
+   - **Continue adapter** (YAML): Modifies config.yaml with model/apiKey fields
+   - **Codex adapter** (TOML): Uses environment variable references (env_key) per official spec. Creates provider tables `[model_providers.swixter-<name>]` and profile tables `[profiles.swixter-<name>]`. API keys must be set as environment variables before running codex, or use `swixter codex run` for automatic setup.
+
+6. **Provider wire_api field**: Codex only supports `wire_api: "chat"` providers (OpenAI-compatible). Anthropic uses `wire_api: "responses"` and is filtered out in Codex CLI flows.
 
 ## Testing
 
@@ -101,11 +118,33 @@ npm pack --dry-run
 - Main config: `~/.config/swixter/config.json`
 - User providers: `~/.config/swixter/providers.json`
 - Claude Code settings: `~/.claude/settings.json`
-- Continue.dev config: `~/.continue/config.json`
+- Codex config: `~/.codex/config.toml`
+- Continue.dev config: `~/.continue/config.yaml`
 
 ## When Adding New Features
 
-- If adding a new coder: Create adapter in `src/adapters/`, add to `src/constants/coders.ts`, create CLI handler like `claude.ts`
-- If adding new provider: Users can add via CLI (`swixter providers add`), no code changes needed
-- If adding new commands: Update `src/cli/help.ts` with detailed help, add to completions, add command aliases to `src/constants/commands.ts`
-- All user-facing text must go into `src/constants/messages.ts`
+- **Adding a new coder**:
+  1. Create adapter in `src/adapters/` implementing CoderAdapter interface (apply, verify, remove methods)
+  2. Add entry to CODER_REGISTRY in `src/constants/coders.ts` with config paths, env var mappings, wire_api type
+  3. Create CLI handler in `src/cli/<coder>.ts` (copy claude.ts or codex.ts as template)
+  4. Export handler function in `src/cli/index.ts` and add routing logic
+  5. Add completion support in `src/cli/completions.ts`
+  6. Write unit tests in `tests/adapters/<coder>.test.ts`
+
+- **Adding a new provider**: Users can add via CLI (`swixter providers add`), no code changes needed. Built-in providers go in `src/providers/presets.ts` with wire_api field.
+
+- **Adding new commands**: Update `src/cli/help.ts` with detailed help, add to completions, add command aliases to `src/constants/commands.ts`
+
+- **All user-facing text** must go into `src/constants/messages.ts` for i18n support
+
+## Key Implementation Notes
+
+1. **TOML handling (Codex)**: Use `smol-toml` for parsing/stringifying. Always backup corrupted configs before overwriting.
+
+2. **Environment variables**: Codex adapter stores env_key references, not direct keys. The `getEnvExportCommands()` method generates shell export commands for users. The `run` command automates this by spawning codex with modified env.
+
+3. **Provider filtering**: When creating Codex profiles, filter providers by `wire_api === "chat"` to exclude incompatible ones (like Anthropic's responses API).
+
+4. **Profile naming**: Codex adapter prefixes all table names with `swixter-` to avoid conflicts with user's existing codex config.
+
+5. **Config merging**: Adapters must preserve existing config (MCP servers, approval policies, etc.) when applying profiles - never overwrite the entire file.

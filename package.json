@@ -1,7 +1,7 @@
 {
   "name": "swixter",
-  "version": "0.0.1-alpha",
-  "description": "Claude Code configuration manager - easily switch between AI providers (Anthropic, Ollama, custom providers)",
+  "version": "0.0.1",
+  "description": "CLI tool for managing AI coding assistant configurations - easily switch between providers (Claude Code, Codex, Continue) with Anthropic, Ollama, or custom APIs",
   "main": "dist/cli/index.js",
   "module": "dist/cli/index.js",
   "type": "module",
@@ -29,6 +29,8 @@
     "claude",
     "claude-code",
     "claude-ai",
+    "codex",
+    "continue",
     "ai",
     "llm",
     "config",
@@ -41,7 +43,11 @@
     "qwen",
     "provider",
     "switch",
-    "api-key"
+    "api-key",
+    "openai-compatible",
+    "ai-assistant",
+    "code-assistant",
+    "developer-tools"
   ],
   "author": "dawnswwwww",
   "license": "MIT",
@@ -58,7 +64,8 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/js-yaml": "^4.0.9"
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.10.1"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -67,6 +74,7 @@
     "@clack/prompts": "^0.11.0",
     "js-yaml": "^4.1.1",
     "picocolors": "^1.1.1",
+    "smol-toml": "^1.5.2",
     "zod": "^4.1.12"
   }
 }

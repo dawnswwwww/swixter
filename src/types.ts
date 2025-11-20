@@ -37,6 +37,10 @@ export interface ProviderPreset {
   docs?: string;
   /** Whether it's a Chinese domestic service */
   isChinese?: boolean;
+  /** API wire protocol type (for Codex) */
+  wire_api?: "chat" | "responses";
+  /** Environment variable name for API key (for Codex) */
+  env_key?: string;
 }
 
 /**
@@ -53,6 +57,8 @@ export interface ClaudeCodeProfile {
   authToken?: string;
   /** API base URL (can override preset) */
   baseURL?: string;
+  /** Model name (for providers that support multiple models) */
+  model?: string;
   /** Custom request headers (can extend preset) */
   headers?: Record<string, string>;
   /** Creation time */
@@ -119,6 +125,7 @@ export const ClaudeCodeProfileSchema = z.object({
   apiKey: z.string(), // Allow empty string (local models like Ollama don't need key)
   authToken: z.string().optional(),
   baseURL: z.string().url().optional(),
+  model: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),

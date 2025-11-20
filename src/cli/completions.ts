@@ -10,7 +10,7 @@ import { VALID_COMMANDS, GLOBAL_COMMANDS, COMMAND_ALIASES } from "../constants/c
  * 生成 Bash 补全脚本
  */
 export function generateBashCompletion(): string {
-  const coders = ["claude", "qwen"];
+  const coders = ["claude", "qwen", "codex"];
   const commands = [...VALID_COMMANDS];
   const globalCommands = [...GLOBAL_COMMANDS];
   const providers = allPresets.map((p) => p.id);
@@ -42,7 +42,7 @@ _swixter() {
     2)
       # Second argument: command name
       case "\${prev}" in
-        claude|qwen)
+        claude|qwen|codex)
           opts="${commands.join(" ")} ${aliases.join(" ")} --help"
           ;;
         export)
@@ -66,7 +66,7 @@ _swixter() {
       case "\${prev}" in
         --name|-n)
           # Autocomplete profile names
-          if [[ "\${coder}" =~ ^(claude|qwen)$ ]]; then
+          if [[ "\${coder}" =~ ^(claude|qwen|codex)$ ]]; then
             opts="\$(swixter \${coder} list --names-only 2>/dev/null || echo '')"
           fi
           ;;
@@ -134,7 +134,7 @@ complete -F _swixter swixter
  * 生成 Zsh 补全脚本
  */
 export function generateZshCompletion(): string {
-  const coders = ["claude", "qwen"];
+  const coders = ["claude", "qwen", "codex"];
   const commands = [...VALID_COMMANDS];
   const globalCommands = [...GLOBAL_COMMANDS];
   const providers = allPresets.map((p) => p.id);
@@ -168,7 +168,7 @@ _swixter() {
       ;;
     command)
       case "\${words[2]}" in
-        claude|qwen)
+        claude|qwen|codex)
           _describe 'commands' commands
           _arguments '--help[Show help]'
           ;;
@@ -274,7 +274,7 @@ _swixter() {
 # Helper function to complete profile names
 _swixter_profiles() {
   local coder="\${words[2]}"
-  if [[ "\${coder}" =~ ^(claude|qwen)$ ]]; then
+  if [[ "\${coder}" =~ ^(claude|qwen|codex)$ ]]; then
     local profiles
     profiles=("\${(@f)\$(swixter \${coder} list --names-only 2>/dev/null)}")
     _describe 'profiles' profiles
@@ -289,7 +289,7 @@ _swixter "\$@"
  * 生成 Fish 补全脚本
  */
 export function generateFishCompletion(): string {
-  const coders = ["claude", "qwen"];
+  const coders = ["claude", "qwen", "codex"];
   const commands = [...VALID_COMMANDS];
   const globalCommands = [...GLOBAL_COMMANDS];
   const providers = allPresets.map((p) => p.id);
@@ -349,8 +349,8 @@ complete -c swixter -n "__fish_seen_subcommand_from edit update" -s n -l name -d
 # List/ls command flags
 complete -c swixter -n "__fish_seen_subcommand_from list ls" -l names-only -d "Show names only"
 
-# Run command flags
-complete -c swixter -n "__fish_seen_subcommand_from run" -l profile -d "Profile name" -r
+# Run/r command flags
+complete -c swixter -n "__fish_seen_subcommand_from run r" -l profile -d "Profile name" -r
 
 # Export command flags
 complete -c swixter -n "__fish_seen_subcommand_from export" -s o -l output -d "Output file" -r

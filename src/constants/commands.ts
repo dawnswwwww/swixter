@@ -8,6 +8,7 @@
  */
 export const COMMAND_ALIASES = {
   // 常用命令缩写
+  r: "run",
   ls: "list",
   sw: "switch",
   rm: "delete",

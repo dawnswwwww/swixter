@@ -1,6 +1,7 @@
 import type { CoderAdapter } from "./base.js";
 import { ClaudeCodeAdapter } from "./claude.js";
 import { ContinueAdapter } from "./continue.js";
+import { CodexAdapter } from "./codex.js";
 
 /**
  * Get adapter for specified coder
@@ -11,6 +12,8 @@ export function getAdapter(coder: string): CoderAdapter {
       return new ClaudeCodeAdapter();
     case "qwen":
       return new ContinueAdapter();
+    case "codex":
+      return new CodexAdapter();
     default:
       throw new Error(`Unknown coder: ${coder}`);
   }
@@ -19,5 +22,5 @@ export function getAdapter(coder: string): CoderAdapter {
 /**
  * Export all adapters
  */
-export { ClaudeCodeAdapter, ContinueAdapter };
+export { ClaudeCodeAdapter, ContinueAdapter, CodexAdapter };
 export type { CoderAdapter };

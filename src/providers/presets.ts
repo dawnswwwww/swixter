@@ -20,6 +20,8 @@ export const anthropicPreset: ProviderPreset = {
     "anthropic-version": "2023-06-01",
   },
   docs: "https://docs.anthropic.com/",
+  wire_api: "responses",
+  env_key: "ANTHROPIC_API_KEY",
 };
 
 /**
@@ -39,6 +41,8 @@ export const ollamaPreset: ProviderPreset = {
   ],
   authType: "custom", // Ollama does not require authentication
   docs: "https://ollama.com/library",
+  wire_api: "chat",
+  env_key: "OLLAMA_API_KEY",
 };
 
 /**
@@ -52,6 +56,8 @@ export const customPreset: ProviderPreset = {
   defaultModels: [],
   authType: "bearer",
   docs: "",
+  wire_api: "chat",
+  env_key: "OPENAI_API_KEY",
 };
 
 /**

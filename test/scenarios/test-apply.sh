@@ -100,16 +100,16 @@ $CLI_CMD claude apply
 APPLIED_KEY=$(jq -r '.env.ANTHROPIC_API_KEY' "$CLAUDE_SETTINGS" 2>/dev/null || echo "")
 APPLIED_AUTH=$(jq -r '.env.ANTHROPIC_AUTH_TOKEN' "$CLAUDE_SETTINGS" 2>/dev/null || echo "")
 
-if [ "$APPLIED_KEY" != "sk-minimax-api" ]; then
+if [ "$APPLIED_KEY" != "sk-ant-api" ]; then
     echo "❌ Error: API Key application failed"
-    echo "   Expected: sk-minimax-api"
+    echo "   Expected: sk-ant-api"
     echo "   Got: $APPLIED_KEY"
     exit 1
 fi
 
-if [ "$APPLIED_AUTH" != "sk-minimax-auth" ]; then
+if [ "$APPLIED_AUTH" != "sk-ant-auth" ]; then
     echo "❌ Error: Auth Token application failed"
-    echo "   Expected: sk-minimax-auth"
+    echo "   Expected: sk-ant-auth"
     echo "   Got: $APPLIED_AUTH"
     exit 1
 fi

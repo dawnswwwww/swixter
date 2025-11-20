@@ -115,4 +115,36 @@ export class ContinueAdapter implements CoderAdapter {
       return false;
     }
   }
+
+  /**
+   * Remove profile from Continue configuration
+   * Removes the model entry with matching title from config.yaml
+   */
+  async remove(profileName: string): Promise<void> {
+    if (!existsSync(this.configPath)) {
+      return;
+    }
+
+    try {
+      const content = await readFile(this.configPath, "utf-8");
+      const config = yaml.load(content) as any;
+
+      if (!config.models || !Array.isArray(config.models)) {
+        return;
+      }
+
+      // Remove model with matching title
+      const initialLength = config.models.length;
+      config.models = config.models.filter((m: any) => m.title !== profileName);
+
+      // Only write if something was actually removed
+      if (config.models.length < initialLength) {
+        const yamlContent = yaml.dump(config);
+        await writeFile(this.configPath, yamlContent, "utf-8");
+      }
+    } catch (error) {
+      // Silently fail - config might be corrupted or in unexpected format
+      console.warn(`Failed to remove profile from Continue config: ${error}`);
+    }
+  }
 }

@@ -25,4 +25,10 @@ export interface CoderAdapter {
    * @param profile Swixter profile 配置
    */
   verify(profile: ClaudeCodeProfile): Promise<boolean>;
+
+  /**
+   * 从 coder 配置中删除 profile 相关的配置
+   * @param profileName Swixter profile 名称
+   */
+  remove(profileName: string): Promise<void>;
 }

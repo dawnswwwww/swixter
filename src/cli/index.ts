@@ -4,6 +4,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { handleClaudeCommand } from "./claude.js";
 import { handleQwenCommand } from "./qwen.js";
+import { handleCodexCommand } from "./codex.js";
 import { exportConfig, importConfig } from "../config/export.js";
 import { showGlobalHelp } from "./help.js";
 import { generateCompletion, showCompletionInstructions } from "./completions.js";
@@ -192,6 +193,11 @@ export async function main(): Promise<void> {
 
     if (firstArg === "qwen") {
       await handleQwenCommand(args.slice(1));
+      return;
+    }
+
+    if (firstArg === "codex") {
+      await handleCodexCommand(args.slice(1));
       return;
     }
 

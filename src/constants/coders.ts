@@ -72,6 +72,21 @@ export const CODER_REGISTRY: Record<string, CoderConfig> = {
     },
     supportsAuthToken: false,
   },
+  codex: {
+    id: "codex",
+    displayName: "Codex",
+    executable: "codex",
+    adapter: "codex",
+    envVarMapping: {
+      apiKey: "OPENAI_API_KEY",
+      baseURL: "OPENAI_BASE_URL",
+    },
+    configPath: {
+      dir: ".codex",
+      file: "config.toml",
+    },
+    supportsAuthToken: false,
+  },
 } as const;
 
 /**

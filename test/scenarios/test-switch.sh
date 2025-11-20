@@ -36,6 +36,21 @@ fi
 
 echo "✓ Test 2 passed"
 
+# Test 2b: Test 'sw' alias
+echo "Test 2b: Switch using 'sw' alias..."
+$CLI_CMD claude sw test-anthropic
+
+ACTIVE=$(jq -r '.coders.claude.activeProfile' "$CONFIG_FILE")
+if [ "$ACTIVE" != "test-anthropic" ]; then
+    echo "❌ Error: 'sw' alias failed, expected test-anthropic, got $ACTIVE"
+    exit 1
+fi
+
+# Switch back for consistency
+$CLI_CMD claude sw test-both-keys
+
+echo "✓ Test 2b passed (sw alias works)"
+
 # Test 3: Switch qwen configuration (shared profiles, but independent active state)
 echo "Test 3: Switch qwen to test-anthropic..."
 $CLI_CMD qwen switch test-anthropic

@@ -24,6 +24,18 @@ fi
 
 echo "✓ Test 1 passed"
 
+# Test 1b: Test 'ls' alias
+echo "Test 1b: List using 'ls' alias..."
+OUTPUT_ALIAS=$($CLI_CMD claude ls)
+
+# Verify alias produces same results
+if ! echo "$OUTPUT_ALIAS" | grep -q "test-anthropic"; then
+    echo "❌ Error: 'ls' alias output doesn't match"
+    exit 1
+fi
+
+echo "✓ Test 1b passed (ls alias works)"
+
 # Test 2: List configurations for qwen (should see the same profiles)
 echo "Test 2: List all configurations for qwen..."
 OUTPUT=$($CLI_CMD qwen list)

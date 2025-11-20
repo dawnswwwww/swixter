@@ -1,8 +1,12 @@
 # Swixter
 
+[![npm version](https://badge.fury.io/js/swixter.svg)](https://www.npmjs.com/package/swixter)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/node/v/swixter.svg)](https://nodejs.org)
+
 > Make AI coding tools effortlessly switchable
 
-A lightweight CLI tool that makes it easy to switch between AI providers for Claude Code and other AI coding assistants.
+A lightweight CLI tool that makes it easy to switch between AI providers for Claude Code, Codex, Continue, and other AI coding assistants.
 
 ## Why Swixter?
 
@@ -10,7 +14,9 @@ Working with AI coding tools shouldn't be complicated. Swixter lets you:
 
 - **Switch providers instantly** - Change between Anthropic, Ollama, or custom APIs with one command
 - **Manage multiple configs** - Keep separate profiles for work, personal, or experimental setups
-- **Add custom providers** - Easily integrate any AI service with a simple configuration
+- **Support multiple coders** - Works with Claude Code, Codex, Continue, and more
+- **Use command aliases** - Ultra-short commands (`r`, `ls`, `sw`) for maximum productivity
+- **Add custom providers** - Easily integrate any OpenAI-compatible AI service
 - **Stay in control** - All configs stored locally, no cloud dependencies
 
 ## Installation
@@ -80,18 +86,43 @@ Supports OpenRouter, DeepSeek, MiniMax, and any OpenAI-compatible API.
 
 ```bash
 swixter claude create          # Create new profile
-swixter claude list             # List all profiles
-swixter claude switch <name>    # Switch active profile
+swixter claude list             # List all profiles (alias: ls)
+swixter claude switch <name>    # Switch active profile (alias: sw)
 swixter claude apply            # Apply to Claude Code
-swixter claude delete <name>    # Delete profile
+swixter claude run              # Run Claude Code with current profile (alias: r)
+swixter claude delete <name>    # Delete profile (alias: rm)
 ```
 
-### For Qwen (or other coders)
+### For Codex
 
 ```bash
-swixter qwen create
-swixter qwen list
-swixter qwen switch <name>
+swixter codex create          # Create new profile
+swixter codex list             # List all profiles (alias: ls)
+swixter codex switch <name>    # Switch active profile (alias: sw)
+swixter codex apply            # Apply to Codex (writes ~/.codex/config.toml)
+swixter codex run              # Apply + set env + run codex (alias: r, all-in-one)
+swixter codex delete <name>    # Delete profile (alias: rm)
+```
+
+**Two ways to use Codex profiles**:
+
+1. **Quick way** (recommended): `swixter codex r` (or `swixter codex run`)
+   - Automatically applies profile to config.toml
+   - Sets environment variables
+   - Runs codex in one command
+
+2. **Manual way**: `swixter codex apply` → set env vars → `codex`
+   - Good for debugging or custom setups
+
+### For Qwen/Continue
+
+```bash
+swixter qwen create            # Create new profile
+swixter qwen list               # List all profiles (alias: ls)
+swixter qwen switch <name>      # Switch active profile (alias: sw)
+swixter qwen apply              # Apply to Continue
+swixter qwen run                # Run Qwen Code with current profile (alias: r)
+swixter qwen delete <name>      # Delete profile (alias: rm)
 ```
 
 ### Provider Management
@@ -143,11 +174,15 @@ swixter claude create --name work --provider anthropic --api-key sk-ant-work-xxx
 # Setup personal profile
 swixter claude create --name personal --provider anthropic --api-key sk-ant-personal-xxx
 
-# Switch to work
-swixter claude switch work && swixter claude apply
+# Switch to work (using short alias)
+swixter claude sw work && swixter claude apply
+
+# Quick run with work profile (using ultra-short alias)
+swixter claude r
 
 # Switch to personal
-swixter claude switch personal && swixter claude apply
+swixter claude sw personal && swixter claude apply
+swixter claude r
 ```
 
 ### Example 2: Try Qwen locally
@@ -159,11 +194,33 @@ swixter qwen create \
   --provider ollama \
   --base-url http://localhost:11434
 
-# Switch and use
-swixter qwen switch local
+# Switch and run (using aliases)
+swixter qwen sw local
+swixter qwen r
 ```
 
-### Example 3: Add OpenRouter
+### Example 3: Use Codex with local Ollama
+
+```bash
+# Create Codex profile for Ollama
+swixter codex create \
+  --name ollama-local \
+  --provider ollama \
+  --base-url http://localhost:11434
+
+# Quick way: All-in-one command (using ultra-short alias)
+swixter codex r
+
+# Or manual way:
+swixter codex apply
+export OLLAMA_API_KEY=""
+codex
+
+# Run with different profile temporarily
+swixter codex run --profile other-profile
+```
+
+### Example 4: Add OpenRouter
 
 ```bash
 # Add OpenRouter as custom provider
@@ -199,11 +256,19 @@ swixter completion fish > ~/.config/fish/completions/swixter.fish
 Save keystrokes with short aliases:
 
 ```bash
+swixter claude r               # run (ultra-short!)
 swixter claude ls              # list
 swixter claude sw my-profile   # switch
 swixter claude rm old-profile  # delete
 swixter claude new             # create
 ```
+
+Full command reference:
+- `r` → `run` - Execute the AI coder
+- `ls` → `list` - List all profiles
+- `sw` → `switch` - Switch profiles
+- `rm` → `delete` - Delete profiles
+- `new` → `create` - Create new profile
 
 ## Help & Documentation
 
@@ -246,6 +311,22 @@ Contributions are welcome! Feel free to:
 - 🐛 Report bugs
 - 💡 Suggest features
 - 🔧 Submit pull requests
+
+Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (if available).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.
+
+## Roadmap
+
+Future plans for Swixter:
+
+- [ ] Support for more AI coding assistants
+- [ ] Profile templates for common setups
+- [ ] Configuration validation and migration tools
+- [ ] Web UI for profile management
+- [ ] Cloud sync for profiles (optional)
 
 ## License
 

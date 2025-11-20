@@ -37,17 +37,17 @@ import {
 } from "../utils/ui.js";
 import { ProfileValidators } from "../utils/validation.js";
 
-const CODER_NAME = "claude";
+const CODER_NAME = "codex";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
 
 /**
- * Claude Code subcommand handler
+ * Codex subcommand handler
  */
-export async function handleClaudeCommand(args: string[]): Promise<void> {
+export async function handleCodexCommand(args: string[]): Promise<void> {
   const command = args[0];
 
   if (command === "--help" || command === "-h") {
-    showClaudeHelp();
+    showCodexHelp();
     return;
   }
 
@@ -99,9 +99,9 @@ export async function handleClaudeCommand(args: string[]): Promise<void> {
 }
 
 /**
- * Show Claude Code help
+ * Show Codex help
  */
-function showClaudeHelp(): void {
+function showCodexHelp(): void {
   console.log(`
 ${pc.bold(pc.cyan(`Swixter - ${CODER_CONFIG.displayName} Configuration Management`))}
 
@@ -123,14 +123,17 @@ ${pc.bold("Create profile (interactive):")}
   ${pc.green(`swixter ${CODER_NAME} create`)}
 
 ${pc.bold("Create profile (non-interactive):")}
-  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--apply]`)}
+  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--model <model>] [--apply]`)}
 
 ${pc.bold("Examples:")}
   ${pc.dim("# Interactive profile creation")}
   ${pc.green(`swixter ${CODER_NAME} create`)}
 
-  ${pc.dim("# Non-interactive profile creation")}
-  ${pc.green(`swixter ${CODER_NAME} create --quiet --name my-config --provider anthropic --api-key sk-ant-xxx`)}
+  ${pc.dim("# Create Ollama local profile")}
+  ${pc.green(`swixter ${CODER_NAME} create --quiet --name local --provider ollama --base-url http://localhost:11434`)}
+
+  ${pc.dim("# Create custom provider profile")}
+  ${pc.green(`swixter ${CODER_NAME} create --quiet --name my-config --provider custom --api-key your-key --base-url https://api.example.com`)}
 
   ${pc.dim("# Switch profile (short alias: sw)")}
   ${pc.green(`swixter ${CODER_NAME} sw my-config`)}
@@ -138,17 +141,14 @@ ${pc.bold("Examples:")}
   ${pc.dim("# List all profiles (short alias: ls)")}
   ${pc.green(`swixter ${CODER_NAME} ls`)}
 
-  ${pc.dim(`# Apply profile to ${CODER_CONFIG.displayName}`)}
+  ${pc.dim(`# Apply profile to ${CODER_CONFIG.displayName} (writes config.toml)`)}
   ${pc.green(`swixter ${CODER_NAME} apply`)}
 
   ${pc.dim(`# Run ${CODER_CONFIG.displayName} with current profile (ultra-short alias: r)`)}
   ${pc.green(`swixter ${CODER_NAME} r`)}
 
-  ${pc.dim(`# Run ${CODER_CONFIG.displayName} with specified profile (no switch needed)`)}
+  ${pc.dim(`# Run ${CODER_CONFIG.displayName} with specific profile`)}
   ${pc.green(`swixter ${CODER_NAME} run --profile my-config`)}
-
-  ${pc.dim(`# Run ${CODER_CONFIG.displayName} and pass other arguments`)}
-  ${pc.green(`swixter ${CODER_NAME} r --print "What is 2+2?"`)}
 `);
 }
 
@@ -201,7 +201,8 @@ async function cmdCreateInteractive(): Promise<void> {
   console.log();
 
   const { allPresets } = await import("../providers/presets.js");
-  const presets = allPresets;
+  // Filter out Anthropic provider - Codex only supports OpenAI-compatible (chat API) providers
+  const presets = allPresets.filter(preset => preset.wire_api === 'chat');
 
   // 1. Enter profile name
   const name = await p.text({
@@ -234,8 +235,12 @@ async function cmdCreateInteractive(): Promise<void> {
 
   // 3. Enter API Key
   const apiKey = await p.text({
-    message: "API Key (corresponds to ANTHROPIC_API_KEY, optional)",
-    placeholder: preset?.id === "anthropic" ? "sk-ant-..." : "Enter your API Key",
+    message: "API Key (optional for Ollama)",
+    placeholder: preset?.id === "ollama" ? "Leave empty for Ollama" : "Enter your API Key",
+    validate: (value) => {
+      if (!value && preset?.id !== "ollama") return "API Key cannot be empty (except for Ollama)";
+      return;
+    },
   });
 
   if (p.isCancel(apiKey)) {
@@ -243,18 +248,7 @@ async function cmdCreateInteractive(): Promise<void> {
     process.exit(EXIT_CODES.userCancelled);
   }
 
-  // 4. Enter Auth Token
-  const authToken = await p.text({
-    message: "Auth Token (corresponds to ANTHROPIC_AUTH_TOKEN, optional)",
-    placeholder: "Enter your Auth Token",
-  });
-
-  if (p.isCancel(authToken)) {
-    p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
-  }
-
-  // 5. Custom Base URL (optional)
+  // 4. Custom Base URL (optional)
   const customBaseURL = await p.text({
     message: "Base URL (optional, leave empty for default)",
     placeholder: preset?.baseURL || "https://api.example.com",
@@ -273,9 +267,66 @@ async function cmdCreateInteractive(): Promise<void> {
     process.exit(EXIT_CODES.userCancelled);
   }
 
+  // 5. Model selection
+  let modelName: string | symbol = "";
+
+  if (preset && preset.defaultModels && preset.defaultModels.length > 0) {
+    // Provider has default models - show selection
+    modelName = await p.select({
+      message: "Select model",
+      options: [
+        ...preset.defaultModels.map((model) => ({
+          value: model,
+          label: model,
+        })),
+        {
+          value: "__custom__",
+          label: "Enter custom model name",
+        },
+      ],
+    });
+
+    if (p.isCancel(modelName)) {
+      p.cancel(ERRORS.cancelled);
+      process.exit(EXIT_CODES.userCancelled);
+    }
+
+    // If user selected custom, ask for input
+    if (modelName === "__custom__") {
+      modelName = await p.text({
+        message: "Enter model name",
+        placeholder: "gpt-4",
+        validate: (value) => {
+          if (!value || value.trim() === "") return "Model name cannot be empty";
+          return;
+        },
+      });
+
+      if (p.isCancel(modelName)) {
+        p.cancel(ERRORS.cancelled);
+        process.exit(EXIT_CODES.userCancelled);
+      }
+    }
+  } else {
+    // No default models - ask for input
+    modelName = await p.text({
+      message: "Model name (optional)",
+      placeholder: "e.g., gpt-4, claude-3-5-sonnet",
+      validate: (value) => {
+        // Model is optional, so empty is allowed
+        return;
+      },
+    });
+
+    if (p.isCancel(modelName)) {
+      p.cancel(ERRORS.cancelled);
+      process.exit(EXIT_CODES.userCancelled);
+    }
+  }
+
   // 6. Apply immediately?
   const shouldApply = await p.confirm({
-    message: "Apply this profile to Claude Code now?",
+    message: `Apply this profile to ${CODER_CONFIG.displayName} now?`,
     initialValue: true,
   });
 
@@ -290,6 +341,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   try {
     const finalBaseURL = (customBaseURL as string) || preset?.baseURL;
+    const finalModel = modelName as string;
 
     const profile: ClaudeCodeProfile = {
       name: name as string,
@@ -299,13 +351,12 @@ async function cmdCreateInteractive(): Promise<void> {
       updatedAt: new Date().toISOString(),
     };
 
-    // Add authToken (if provided)
-    if (authToken) {
-      profile.authToken = authToken as string;
-    }
-
     if (finalBaseURL) {
       profile.baseURL = finalBaseURL;
+    }
+
+    if (finalModel) {
+      profile.model = finalModel;
     }
 
     await upsertProfile(profile, CODER_NAME);
@@ -315,6 +366,9 @@ async function cmdCreateInteractive(): Promise<void> {
     console.log(`  Profile name: ${pc.cyan(profile.name)}`);
     console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(finalBaseURL || "Default")}`);
+    if (finalModel) {
+      console.log(`  Model: ${pc.green(finalModel)}`);
+    }
     console.log();
 
     // If apply immediately selected
@@ -335,7 +389,7 @@ async function cmdCreateInteractive(): Promise<void> {
 async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise<void> {
   if (!params.name || !params.provider) {
     console.log(pc.red("Error: Missing required parameters"));
-    console.log(pc.dim("Usage: swixter claude create --quiet --name <name> --provider <id> [--api-key <key>] [--auth-token <token>] [--base-url <url>] [--apply]"));
+    console.log(pc.dim(`Usage: swixter ${CODER_NAME} create --quiet --name <name> --provider <id> [--api-key <key>] [--base-url <url>] [--model <model>] [--apply]`));
     process.exit(1);
   }
 
@@ -346,8 +400,23 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
     process.exit(1);
   }
 
+  // Codex only supports OpenAI-compatible (chat API) providers
+  if (preset.wire_api !== 'chat') {
+    console.log(pc.red(`Error: Provider "${preset.displayName}" is not compatible with ${CODER_CONFIG.displayName}`));
+    console.log(pc.dim(`${CODER_CONFIG.displayName} only supports OpenAI-compatible providers (chat API).`));
+    console.log(pc.dim("Use 'ollama' or 'custom' provider instead."));
+    process.exit(1);
+  }
+
+  // Ollama doesn't require API key
+  if (params.provider !== "ollama" && !params["api-key"]) {
+    console.log(pc.red("Error: This provider requires --api-key parameter"));
+    process.exit(1);
+  }
+
   try {
     const finalBaseURL = (params["base-url"] as string) || preset.baseURL;
+    const finalModel = params.model as string;
 
     const profile: ClaudeCodeProfile = {
       name: params.name as string,
@@ -357,13 +426,12 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
       updatedAt: new Date().toISOString(),
     };
 
-    // Add authToken (if provided)
-    if (params["auth-token"]) {
-      profile.authToken = params["auth-token"] as string;
-    }
-
     if (finalBaseURL) {
       profile.baseURL = finalBaseURL;
+    }
+
+    if (finalModel) {
+      profile.model = finalModel;
     }
 
     await upsertProfile(profile, CODER_NAME);
@@ -374,17 +442,17 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
     console.log(`  Profile name: ${pc.cyan(profile.name)}`);
     console.log(`  Provider: ${pc.yellow(preset.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(finalBaseURL || "Default")}`);
+    if (finalModel) {
+      console.log(`  Model: ${pc.green(finalModel)}`);
+    }
     if (profile.apiKey) {
       console.log(`  API Key: ${pc.dim(profile.apiKey.slice(0, 10) + "...")}`);
-    }
-    if (profile.authToken) {
-      console.log(`  Auth Token: ${pc.dim(profile.authToken.slice(0, 10) + "...")}`);
     }
     console.log();
 
     // If --apply specified, apply profile immediately
     if (params.apply) {
-      console.log(pc.dim("Applying profile to Claude Code..."));
+      console.log(pc.dim(`Applying profile to ${CODER_CONFIG.displayName}...`));
       // First switch to the newly created profile
       await setActiveProfileForCoder(CODER_NAME, profile.name);
       await cmdApply();
@@ -438,7 +506,7 @@ async function cmdList(): Promise<void> {
 async function cmdSwitch(profileName: string): Promise<void> {
   if (!profileName) {
     console.log(pc.red("Error: Please specify profile name"));
-    console.log(pc.dim("Usage: swixter claude switch <name>"));
+    console.log(pc.dim(`Usage: swixter ${CODER_NAME} switch <name>`));
     process.exit(1);
   }
 
@@ -455,7 +523,7 @@ async function cmdSwitch(profileName: string): Promise<void> {
     console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(baseUrl)}`);
     console.log();
-    console.log(pc.dim("Tip: Run 'swixter claude apply' to apply profile to Claude Code"));
+    console.log(pc.dim(`Tip: Run 'swixter ${CODER_NAME} apply' to apply profile to ${CODER_CONFIG.displayName}`));
   } catch (error) {
     console.log();
     console.log(pc.red(`✗ Switch failed: ${error}`));
@@ -470,7 +538,7 @@ async function cmdSwitch(profileName: string): Promise<void> {
 async function cmdDelete(profileName: string): Promise<void> {
   if (!profileName) {
     console.log(pc.red("Error: Please specify profile name"));
-    console.log(pc.dim("Usage: swixter claude delete <name>"));
+    console.log(pc.dim(`Usage: swixter ${CODER_NAME} delete <name>`));
     process.exit(1);
   }
 
@@ -498,7 +566,7 @@ async function cmdEdit(profileName?: string): Promise<void> {
 
     if (profiles.length === 0) {
       console.log(pc.yellow("No profiles yet"));
-      console.log(pc.dim("Run 'swixter claude create' to create a profile"));
+      console.log(pc.dim(`Run 'swixter ${CODER_NAME} create' to create a profile`));
       return;
     }
 
@@ -525,7 +593,7 @@ async function cmdEdit(profileName?: string): Promise<void> {
 
   if (!profile) {
     console.log(pc.red(`Error: Profile "${profileName}" not found`));
-    console.log(pc.dim("Run 'swixter claude list' to see all profiles"));
+    console.log(pc.dim(`Run 'swixter ${CODER_NAME} list' to see all profiles`));
     process.exit(1);
   }
 
@@ -534,7 +602,8 @@ async function cmdEdit(profileName?: string): Promise<void> {
   console.log();
 
   const { allPresets } = await import("../providers/presets.js");
-  const presets = allPresets;
+  // Filter out Anthropic provider - Codex only supports OpenAI-compatible (chat API) providers
+  const presets = allPresets.filter(preset => preset.wire_api === 'chat');
   const currentPreset = getPresetById(profile.providerId);
 
   // 1. Change provider?
@@ -572,7 +641,7 @@ async function cmdEdit(profileName?: string): Promise<void> {
 
   // 2. Edit API Key
   const newApiKey = await p.text({
-    message: "API Key (ANTHROPIC_API_KEY, leave empty to keep current)",
+    message: "API Key (leave empty to keep current, optional for Ollama)",
     placeholder: profile.apiKey ? profile.apiKey.slice(0, 10) + "..." : "None",
   });
 
@@ -581,18 +650,7 @@ async function cmdEdit(profileName?: string): Promise<void> {
     return;
   }
 
-  // 3. Edit Auth Token
-  const newAuthToken = await p.text({
-    message: "Auth Token (ANTHROPIC_AUTH_TOKEN, leave empty to keep current)",
-    placeholder: profile.authToken ? profile.authToken.slice(0, 10) + "..." : "None",
-  });
-
-  if (p.isCancel(newAuthToken)) {
-    p.cancel(ERRORS.cancelled);
-    return;
-  }
-
-  // 4. Edit Base URL
+  // 3. Edit Base URL
   const currentBaseURL = profile.baseURL || newPreset?.baseURL || "";
   const newBaseURL = await p.text({
     message: "Base URL (leave empty for default, enter 'clear' to remove custom URL)",
@@ -604,9 +662,71 @@ async function cmdEdit(profileName?: string): Promise<void> {
     return;
   }
 
+  // 4. Edit Model
+  const currentModel = profile.model || "";
+  let newModel: string | symbol = "";
+
+  if (newPreset && newPreset.defaultModels && newPreset.defaultModels.length > 0) {
+    // Provider has default models - show selection
+    newModel = await p.select({
+      message: `Model (current: ${currentModel || "none"})`,
+      options: [
+        {
+          value: "",
+          label: "Keep current",
+        },
+        ...newPreset.defaultModels.map((model) => ({
+          value: model,
+          label: model,
+        })),
+        {
+          value: "__custom__",
+          label: "Enter custom model name",
+        },
+        {
+          value: "__clear__",
+          label: "Clear model (use default)",
+        },
+      ],
+    });
+
+    if (p.isCancel(newModel)) {
+      p.cancel(ERRORS.cancelled);
+      return;
+    }
+
+    // If user selected custom, ask for input
+    if (newModel === "__custom__") {
+      newModel = await p.text({
+        message: "Enter model name",
+        placeholder: currentModel || "gpt-4",
+        validate: (value) => {
+          if (!value || value.trim() === "") return "Model name cannot be empty";
+          return;
+        },
+      });
+
+      if (p.isCancel(newModel)) {
+        p.cancel(ERRORS.cancelled);
+        return;
+      }
+    }
+  } else {
+    // No default models - ask for text input
+    newModel = await p.text({
+      message: `Model (leave empty to keep current: ${currentModel || "none"})`,
+      placeholder: currentModel || "e.g., gpt-4, claude-3-5-sonnet",
+    });
+
+    if (p.isCancel(newModel)) {
+      p.cancel(ERRORS.cancelled);
+      return;
+    }
+  }
+
   // 5. Apply immediately?
   const shouldApply = await p.confirm({
-    message: "Apply this profile to Claude Code now?",
+    message: `Apply this profile to ${CODER_CONFIG.displayName} now?`,
     initialValue: false,
   });
 
@@ -629,13 +749,6 @@ async function cmdEdit(profileName?: string): Promise<void> {
       updatedAt: new Date().toISOString(),
     };
 
-    // Handle Auth Token
-    if (newAuthToken) {
-      updatedProfile.authToken = newAuthToken as string;
-    } else if (profile.authToken) {
-      updatedProfile.authToken = profile.authToken;
-    }
-
     // Handle Base URL
     if (newBaseURL === "clear") {
       // Clear custom URL, use default
@@ -650,6 +763,20 @@ async function cmdEdit(profileName?: string): Promise<void> {
       }
     }
 
+    // Handle Model
+    if (newModel === "__clear__") {
+      // Clear model, don't set it
+      // updatedProfile.model remains undefined
+    } else if (newModel && newModel !== "") {
+      // Use new model
+      updatedProfile.model = newModel as string;
+    } else {
+      // Keep existing model
+      if (profile.model) {
+        updatedProfile.model = profile.model;
+      }
+    }
+
     const finalBaseURL = updatedProfile.baseURL || newPreset?.baseURL || "";
 
     await upsertProfile(updatedProfile, CODER_NAME);
@@ -659,6 +786,9 @@ async function cmdEdit(profileName?: string): Promise<void> {
     console.log(`  Profile name: ${pc.cyan(updatedProfile.name)}`);
     console.log(`  Provider: ${pc.yellow(newPreset?.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(finalBaseURL || "Default")}`);
+    if (updatedProfile.model) {
+      console.log(`  Model: ${pc.green(updatedProfile.model)}`);
+    }
     console.log();
 
     // If apply immediately selected
@@ -703,6 +833,21 @@ async function cmdApply(): Promise<void> {
       console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
       console.log(`  Config file: ${pc.dim(adapter.configPath)}`);
       console.log();
+
+      // Show environment variable export commands
+      if (adapter.name === "codex" && "getEnvExportCommands" in adapter) {
+        const envCommands = (adapter as any).getEnvExportCommands(profile);
+        if (envCommands.length > 0) {
+          console.log(pc.bold("To use this profile, set environment variables:"));
+          console.log();
+          envCommands.forEach(cmd => {
+            console.log(`  ${pc.green(cmd)}`);
+          });
+          console.log();
+          console.log(pc.dim(`Then run: ${pc.cyan("codex")}`));
+          console.log();
+        }
+      }
     } else {
       console.log(pc.yellow("⚠  Profile written, but verification failed"));
       console.log(pc.dim("Please check config file format"));
@@ -745,18 +890,18 @@ async function cmdCurrent(): Promise<void> {
  */
 async function cmdMainMenu(): Promise<void> {
   console.log();
-  console.log(pc.bold(pc.cyan("Claude Code Configuration Management")));
+  console.log(pc.bold(pc.cyan(`${CODER_CONFIG.displayName} Configuration Management`)));
   console.log();
 
   const action = await p.select({
     message: "Select operation",
     options: [
-      { value: "run", label: "Run Claude Code now", hint: "Execute with current profile" },
+      { value: "run", label: "Run Codex now", hint: "Execute with current profile" },
       { value: "create", label: "Create new profile", hint: "Interactive profile creation" },
       { value: "list", label: "List all profiles", hint: "View existing profiles" },
       { value: "switch", label: "Switch profile", hint: "Switch to another profile" },
       { value: "edit", label: "Edit profile", hint: "Edit existing profile" },
-      { value: "apply", label: "Apply profile", hint: "Apply current profile to Claude Code" },
+      { value: "apply", label: "Apply profile", hint: `Apply current profile to ${CODER_CONFIG.displayName}` },
       { value: "current", label: "Show current profile", hint: "View active profile" },
       { value: "delete", label: "Delete profile", hint: "Delete specified profile" },
       { value: "exit", label: "Exit", hint: "Exit program" },
@@ -871,8 +1016,12 @@ async function cmdDeleteInteractive(): Promise<void> {
 }
 
 /**
- * Run Claude Code
- * Run Claude Code CLI with current or specified profile
+ * Run Codex with current or specified profile
+ *
+ * This command:
+ * 1. Applies the profile to ~/.codex/config.toml (sets active profile)
+ * 2. Sets environment variables based on the profile's env_key
+ * 3. Spawns codex process with proper environment
  */
 async function cmdRun(args: string[]): Promise<void> {
   const params = parseArgs(args);
@@ -887,7 +1036,7 @@ async function cmdRun(args: string[]): Promise<void> {
 
     if (!profile) {
       console.log(pc.red(`Error: Profile "${params.profile}" not found`));
-      console.log(pc.dim("Run 'swixter claude list' to see all profiles"));
+      console.log(pc.dim(`Run 'swixter ${CODER_NAME} list' to see all profiles`));
       process.exit(1);
     }
   } else {
@@ -896,71 +1045,71 @@ async function cmdRun(args: string[]): Promise<void> {
 
     if (!profile) {
       console.log(pc.yellow("No active profile"));
-      console.log(pc.dim("Run 'swixter claude create' to create a profile, or use --profile to specify one"));
+      console.log(pc.dim(`Run 'swixter ${CODER_NAME} create' to create a profile, or use --profile to specify one`));
       process.exit(1);
     }
   }
 
-  // Get preset and baseURL
-  const preset = getPresetById(profile.providerId);
-  const baseURL = profile.baseURL || preset?.baseURL || "";
+  try {
+    // Step 1: Apply profile to config.toml (sets active profile)
+    const adapter = getAdapter(CODER_NAME);
+    await adapter.apply(profile);
 
-  // Build environment variables
-  const env = {
-    ...process.env,
-  };
+    // Step 2: Get preset to determine env_key
+    const preset = getPresetById(profile.providerId);
+    const envKey = preset?.env_key || "OPENAI_API_KEY";
 
-  // Set API Key (if available)
-  if (profile.apiKey) {
-    env.ANTHROPIC_API_KEY = profile.apiKey;
-  }
+    // Step 3: Build environment variables
+    const env = {
+      ...process.env,
+    };
 
-  // Set Auth Token (if available)
-  if (profile.authToken) {
-    env.ANTHROPIC_AUTH_TOKEN = profile.authToken;
-  }
-
-  // Set Base URL
-  if (baseURL) {
-    env.ANTHROPIC_BASE_URL = baseURL;
-  }
-
-  // Filter out --profile parameter, pass other arguments to claude
-  const claudeArgs = args.filter((arg, idx) => {
-    if (arg === "--profile") {
-      // Skip --profile and its value
-      return false;
+    // Set the API key using the correct env_key name
+    if (profile.apiKey) {
+      env[envKey] = profile.apiKey;
     }
-    if (idx > 0 && args[idx - 1] === "--profile") {
-      // Skip --profile value
-      return false;
-    }
-    return true;
-  });
 
-  // Show profile being used
-  console.log();
-  console.log(pc.dim(`Using profile: ${pc.cyan(profile.name)} (${preset?.displayName})`));
-  console.log(pc.dim(`Base URL: ${pc.yellow(baseURL || "Default")}`));
-  console.log();
+    // Step 4: Filter out --profile parameter, build codex arguments
+    const codexArgs = args.filter((arg, idx) => {
+      if (arg === "--profile" || arg === "-p") {
+        return false;
+      }
+      if (idx > 0 && (args[idx - 1] === "--profile" || args[idx - 1] === "-p")) {
+        return false;
+      }
+      return true;
+    });
 
-  // Run claude command
-  const { spawn } = await import("node:child_process");
-  const claude = spawn("claude", claudeArgs, {
-    env,
-    stdio: "inherit", // Inherit stdio directly for interaction
-  });
-
-  // Handle exit
-  claude.on("exit", (code) => {
-    process.exit(code || 0);
-  });
-
-  claude.on("error", (error) => {
+    // Show what we're doing
     console.log();
-    console.log(pc.red(`✗ Run failed: ${error.message}`));
-    console.log(pc.dim("Please ensure Claude Code CLI is installed"));
+    console.log(pc.dim(`Using profile: ${pc.cyan(profile.name)} (${preset?.displayName})`));
+    console.log(pc.dim(`Environment: ${pc.yellow(envKey)}=${profile.apiKey ? "***" : "not set"}`));
+    console.log(pc.dim(`Config: ${adapter.configPath}`));
+    console.log();
+
+    // Step 5: Run codex command
+    const { spawn } = await import("node:child_process");
+    const codex = spawn("codex", codexArgs, {
+      env,
+      stdio: "inherit", // Inherit stdio for interaction
+    });
+
+    // Handle exit
+    codex.on("exit", (code) => {
+      process.exit(code || 0);
+    });
+
+    codex.on("error", (error) => {
+      console.log();
+      console.log(pc.red(`✗ Failed to run ${CODER_CONFIG.displayName}: ${error.message}`));
+      console.log(pc.dim(`Please ensure ${CODER_CONFIG.displayName} CLI is installed`));
+      console.log();
+      process.exit(1);
+    });
+  } catch (error) {
+    console.log();
+    console.log(pc.red(`✗ Failed to start ${CODER_CONFIG.displayName}: ${error}`));
     console.log();
     process.exit(1);
-  });
+  }
 }

@@ -528,6 +528,7 @@ ${pc.bold("Usage:")}
 
 ${pc.bold("Supported Coders:")}
   ${pc.cyan("claude")}              ${pc.dim("Claude Code configuration management")}
+  ${pc.cyan("codex")}               ${pc.dim("Codex configuration management")}
   ${pc.cyan("qwen")}                ${pc.dim("Continue/Qwen configuration management")}
 
 ${pc.bold("Global Commands:")}

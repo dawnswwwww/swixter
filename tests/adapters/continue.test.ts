@@ -358,4 +358,164 @@ describe("ContinueAdapter", () => {
       expect(result).toBe(true);
     });
   });
+
+  describe("remove", () => {
+    test("should remove model from config", async () => {
+      // First apply a profile
+      const profile: ClaudeCodeProfile = {
+        name: "test-profile",
+        providerId: "anthropic",
+        apiKey: "sk-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      // Verify it was created
+      let file = Bun.file(TEST_CONFIG_PATH);
+      let content = await file.text();
+      let config = yaml.load(content) as any;
+      expect(config.models).toHaveLength(1);
+      expect(config.models[0].title).toBe("test-profile");
+
+      // Remove it
+      await adapter.remove("test-profile");
+
+      // Verify it was removed
+      file = Bun.file(TEST_CONFIG_PATH);
+      content = await file.text();
+      config = yaml.load(content) as any;
+      expect(config.models).toHaveLength(0);
+    });
+
+    test("should preserve other models when removing one", async () => {
+      // Create config with two models
+      const config = {
+        models: [
+          {
+            title: "model1",
+            provider: "anthropic",
+            apiBase: "https://api.anthropic.com",
+            apiKey: "key1",
+            roles: ["chat", "edit", "apply"],
+          },
+          {
+            title: "model2",
+            provider: "openai",
+            apiBase: "https://api.openai.com/v1",
+            apiKey: "key2",
+            roles: ["chat"],
+          },
+        ],
+      };
+
+      await Bun.write(TEST_CONFIG_PATH, yaml.dump(config));
+
+      // Remove model1
+      await adapter.remove("model1");
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const content = await file.text();
+      const updatedConfig = yaml.load(content) as any;
+
+      // model1 should be gone
+      expect(updatedConfig.models).toHaveLength(1);
+      expect(updatedConfig.models[0].title).toBe("model2");
+    });
+
+    test("should do nothing if config file doesn't exist", async () => {
+      // Should not throw error
+      await expect(adapter.remove("test")).resolves.toBeUndefined();
+    });
+
+    test("should do nothing if models array is missing", async () => {
+      const config = { other: "field" };
+      await Bun.write(TEST_CONFIG_PATH, yaml.dump(config));
+
+      // Should not throw error
+      await expect(adapter.remove("test")).resolves.toBeUndefined();
+
+      // Config should remain unchanged
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const content = await file.text();
+      const updatedConfig = yaml.load(content) as any;
+      expect(updatedConfig.other).toBe("field");
+    });
+
+    test("should do nothing if profile doesn't exist", async () => {
+      const config = {
+        models: [
+          {
+            title: "existing-model",
+            provider: "anthropic",
+            apiBase: "https://api.anthropic.com",
+            apiKey: "key",
+            roles: ["chat"],
+          },
+        ],
+      };
+
+      await Bun.write(TEST_CONFIG_PATH, yaml.dump(config));
+
+      // Should not throw error
+      await adapter.remove("nonexistent");
+
+      // Config should remain unchanged
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const content = await file.text();
+      const updatedConfig = yaml.load(content) as any;
+      expect(updatedConfig.models).toHaveLength(1);
+      expect(updatedConfig.models[0].title).toBe("existing-model");
+    });
+
+    test("should preserve other fields in config", async () => {
+      const config = {
+        models: [
+          {
+            title: "test-model",
+            provider: "anthropic",
+            apiBase: "https://api.anthropic.com",
+            apiKey: "key",
+            roles: ["chat"],
+          },
+        ],
+        tabAutocompleteModel: {
+          title: "Tab Autocomplete",
+          provider: "ollama",
+          model: "qwen2.5-coder:7b",
+        },
+        customCommands: [
+          {
+            name: "test",
+            prompt: "test prompt",
+          },
+        ],
+      };
+
+      await Bun.write(TEST_CONFIG_PATH, yaml.dump(config));
+
+      await adapter.remove("test-model");
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const content = await file.text();
+      const updatedConfig = yaml.load(content) as any;
+
+      // Model should be removed
+      expect(updatedConfig.models).toHaveLength(0);
+
+      // Other fields should be preserved
+      expect(updatedConfig.tabAutocompleteModel).toBeDefined();
+      expect(updatedConfig.tabAutocompleteModel.title).toBe("Tab Autocomplete");
+      expect(updatedConfig.customCommands).toBeDefined();
+      expect(updatedConfig.customCommands).toHaveLength(1);
+    });
+
+    test("should handle corrupted config gracefully", async () => {
+      await Bun.write(TEST_CONFIG_PATH, "invalid: yaml: {{{{");
+
+      // Should not throw error, just log warning
+      await expect(adapter.remove("test")).resolves.toBeUndefined();
+    });
+  });
 });

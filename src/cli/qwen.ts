@@ -60,12 +60,15 @@ export async function handleQwenCommand(args: string[]): Promise<void> {
   switch (command) {
     case "create":
     case "create-profile": // Backward compatibility
+    case "new": // Short alias
       await cmdCreate(args.slice(1));
       break;
     case "list":
+    case "ls": // Short alias
       await cmdList();
       break;
     case "switch":
+    case "sw": // Short alias
       await cmdSwitch(args[1]);
       break;
     case "edit":
@@ -74,6 +77,7 @@ export async function handleQwenCommand(args: string[]): Promise<void> {
       break;
     case "delete":
     case "delete-profile": // Backward compatibility
+    case "rm": // Short alias
       await cmdDelete(args[1]);
       break;
     case "apply":
@@ -83,6 +87,7 @@ export async function handleQwenCommand(args: string[]): Promise<void> {
       await cmdCurrent();
       break;
     case "run":
+    case "r": // Ultra-short alias
       await cmdRun(args.slice(1));
       break;
     default:
@@ -104,14 +109,14 @@ ${pc.bold("Usage:")}
   ${pc.green("swixter qwen <command> [options]")}
 
 ${pc.bold("Commands:")}
+  ${pc.cyan("run, r")}              Run Qwen Code with current profile
   ${pc.cyan("create")}              Create new profile (interactive, use --quiet for non-interactive)
-  ${pc.cyan("list")}                List all profiles
-  ${pc.cyan("switch <name>")}       Switch to specified profile
+  ${pc.cyan("list, ls")}            List all profiles
+  ${pc.cyan("switch, sw")} <name>   Switch to specified profile
   ${pc.cyan("edit [name]")}         Edit profile (interactive)
   ${pc.cyan("apply")}               Apply current profile to Continue
   ${pc.cyan("current")}             Show current active profile
-  ${pc.cyan("delete <name>")}       Delete specified profile
-  ${pc.cyan("run [options]")}       Run Qwen Code with current profile
+  ${pc.cyan("delete, rm")} <name>   Delete specified profile
   ${pc.cyan("--help, -h")}          Show this help message
 
 ${pc.bold("Create profile (interactive):")}
@@ -124,17 +129,23 @@ ${pc.bold("Examples:")}
   ${pc.dim("# Create Ollama local profile")}
   ${pc.green('swixter qwen create --quiet --name qwen-local --provider ollama --base-url http://localhost:11434')}
 
-  ${pc.dim("# Create profile and apply immediately")}
-  ${pc.green('swixter qwen create --quiet --name my-config --provider anthropic --api-key sk-ant-xxx --apply')}
+  ${pc.dim("# Create custom provider profile and apply immediately")}
+  ${pc.green('swixter qwen create --quiet --name my-config --provider custom --api-key your-api-key --base-url https://api.example.com --apply')}
 
-  ${pc.dim("# Run Qwen Code with current profile")}
-  ${pc.green("swixter qwen run")}
+  ${pc.dim("# Switch profile (short alias: sw)")}
+  ${pc.green("swixter qwen sw my-config")}
+
+  ${pc.dim("# List all profiles (short alias: ls)")}
+  ${pc.green("swixter qwen ls")}
+
+  ${pc.dim("# Run Qwen Code with current profile (ultra-short alias: r)")}
+  ${pc.green("swixter qwen r")}
 
   ${pc.dim("# Run Qwen Code with specified profile (no switch needed)")}
   ${pc.green("swixter qwen run --profile my-config")}
 
   ${pc.dim("# Run Qwen Code and pass other arguments")}
-  ${pc.green("swixter qwen run --prompt \"What is 2+2?\"")}
+  ${pc.green("swixter qwen r --prompt \"What is 2+2?\"")}
 `);
 }
 
@@ -186,7 +197,8 @@ async function cmdCreateInteractive(): Promise<void> {
   console.log();
 
   const { allPresets } = await import("../providers/presets.js");
-  const presets = allPresets;
+  // Filter out Anthropic provider as it's not compatible with OpenAI API format
+  const presets = allPresets.filter(preset => preset.id !== 'anthropic');
 
   // 1. Enter profile name
   const name = await p.text({
@@ -320,6 +332,13 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
   if (!preset) {
     console.log(pc.red(`Error: Unknown provider ID: ${params.provider}`));
     console.log(pc.dim("Run 'swixter providers' to see all supported providers"));
+    process.exit(1);
+  }
+
+  // Anthropic provider is not compatible with OpenAI API format
+  if (preset.id === 'anthropic') {
+    console.log(pc.red("Error: Anthropic provider is not compatible with Continue/Qwen"));
+    console.log(pc.dim("Continue/Qwen uses OpenAI API format. Use 'ollama' or 'custom' provider instead."));
     process.exit(1);
   }
 
@@ -505,7 +524,8 @@ async function cmdEdit(profileName?: string): Promise<void> {
   console.log();
 
   const { allPresets } = await import("../providers/presets.js");
-  const presets = allPresets;
+  // Filter out Anthropic provider as it's not compatible with OpenAI API format
+  const presets = allPresets.filter(preset => preset.id !== 'anthropic');
   const currentPreset = getPresetById(profile.providerId);
 
   // 1. Change provider?
@@ -710,6 +730,7 @@ async function cmdMainMenu(): Promise<void> {
   const action = await p.select({
     message: "Select operation",
     options: [
+      { value: "run", label: "Run Qwen Code now", hint: "Execute with current profile" },
       { value: "create", label: "Create new profile", hint: "Interactive profile creation" },
       { value: "list", label: "List all profiles", hint: "View existing profiles" },
       { value: "switch", label: "Switch profile", hint: "Switch to another profile" },
@@ -729,6 +750,9 @@ async function cmdMainMenu(): Promise<void> {
   console.log();
 
   switch (action) {
+    case "run":
+      await cmdRun([]);
+      break;
     case "create":
       await cmdCreate([]);
       break;

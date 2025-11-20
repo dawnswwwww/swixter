@@ -5,6 +5,7 @@ import type { ConfigFile, ClaudeCodeProfile } from "../types.js";
 import { ConfigFileSchema } from "../types.js";
 import { CONFIG_VERSION, SERIALIZATION } from "../constants/index.js";
 import { getConfigPath as getSwixterConfigPath } from "../constants/paths.js";
+import { getAdapter } from "../adapters/index.js";
 
 /**
  * Get configuration file path
@@ -179,6 +180,21 @@ export async function deleteProfile(profileName: string): Promise<void> {
 
   if (!config.profiles[profileName]) {
     throw new Error(`Profile "${profileName}" does not exist`);
+  }
+
+  // Clean up adapter configurations for ALL coders
+  // A profile may have been applied to a coder in the past even if it's not currently active
+  // We need to clean up adapter configs BEFORE deleting from swixter config
+  const allCoders = ["claude", "qwen", "codex"];
+
+  for (const coder of allCoders) {
+    try {
+      const adapter = getAdapter(coder);
+      await adapter.remove(profileName);
+    } catch (error) {
+      // Don't fail the entire deletion if adapter cleanup fails
+      console.warn(`Warning: Failed to cleanup ${coder} adapter configuration: ${error}`);
+    }
   }
 
   delete config.profiles[profileName];

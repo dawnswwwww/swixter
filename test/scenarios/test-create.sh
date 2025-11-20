@@ -122,8 +122,32 @@ fi
 
 echo "✓ Test 4 passed"
 
-# Test 5: Create and apply configuration using --apply flag
-echo "Test 5: Create configuration with --apply flag..."
+# Test 5: Create configuration with auth token only
+echo "Test 5: Create configuration with auth token only..."
+$CLI_CMD claude create \
+  --quiet \
+  --name test-auth-only \
+  --provider anthropic \
+  --auth-token sk-ant-auth-only
+
+# Verify configuration exists
+if ! jq -e '.profiles["test-auth-only"]' "$CONFIG_FILE" > /dev/null; then
+    echo "❌ Error: Configuration test-auth-only does not exist"
+    exit 1
+fi
+
+# Verify authToken exists
+AUTH_TOKEN=$(jq -r '.profiles["test-auth-only"].authToken' "$CONFIG_FILE")
+
+if [ "$AUTH_TOKEN" != "sk-ant-auth-only" ]; then
+    echo "❌ Error: authToken incorrect, expected sk-ant-auth-only, got $AUTH_TOKEN"
+    exit 1
+fi
+
+echo "✓ Test 5 passed"
+
+# Test 6: Create and apply configuration using --apply flag
+echo "Test 6: Create configuration with --apply flag..."
 $CLI_CMD claude create \
   --quiet \
   --name test-apply \
@@ -157,12 +181,12 @@ if [ -f "$CLAUDE_SETTINGS" ]; then
     fi
 fi
 
-echo "✓ Test 5 passed"
+echo "✓ Test 6 passed"
 
 # Verify configuration count
 PROFILE_COUNT=$(jq '.profiles | length' "$CONFIG_FILE")
-if [ "$PROFILE_COUNT" -lt "4" ]; then
-    echo "❌ Error: Configuration count incorrect, expected at least 4, got $PROFILE_COUNT"
+if [ "$PROFILE_COUNT" -lt "5" ]; then
+    echo "❌ Error: Configuration count incorrect, expected at least 5, got $PROFILE_COUNT"
     exit 1
 fi
 

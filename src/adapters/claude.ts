@@ -97,4 +97,19 @@ export class ClaudeCodeAdapter implements CoderAdapter {
       return false;
     }
   }
+
+  /**
+   * Remove profile from Claude Code configuration
+   * Note: Claude Code doesn't have profile-specific entries like Codex does.
+   * This is a no-op for Claude, but we implement it for interface consistency.
+   */
+  async remove(profileName: string): Promise<void> {
+    // Claude Code settings.json doesn't have profile-specific entries
+    // All configuration is global (env variables)
+    // When a profile is deleted from swixter, the user needs to manually
+    // apply another profile or the settings will remain as-is
+
+    // This is intentionally a no-op for Claude Code adapter
+    return Promise.resolve();
+  }
 }

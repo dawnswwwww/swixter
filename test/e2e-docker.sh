@@ -70,6 +70,7 @@ SCENARIOS=(
     "test-create.sh"
     "test-switch.sh"
     "test-list.sh"
+    "test-aliases.sh"
     "test-apply.sh"
     "test-export-import.sh"
     "test-delete.sh"
