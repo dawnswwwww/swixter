@@ -1,13 +1,34 @@
-import { homedir } from "node:os";
+import { homedir, platform } from "node:os";
 import { join } from "node:path";
+
+/**
+ * Get platform-specific Swixter config directory
+ *
+ * - Windows: ~/swixter (e.g., C:\Users\username\swixter)
+ * - Unix/Linux/macOS: ~/.config/swixter
+ *
+ * Note: Claude Code, Codex, and Continue all use ~/.tool-name format
+ * which works cross-platform via Node.js homedir(), so only Swixter
+ * needs special handling to follow platform conventions.
+ */
+function getSwixterConfigDir(): string {
+  if (platform() === "win32") {
+    // Windows: Use simple ~/swixter for consistency with AI coder tools
+    return "swixter";
+  }
+  // Unix/Linux/macOS: Follow XDG Base Directory specification
+  return ".config/swixter";
+}
 
 /**
  * Path configuration
  * Centralized management of all config file paths
+ *
+ * All paths are relative to homedir() and will be resolved by getConfigPath()
  */
 export const PATH_CONFIG = {
   swixter: {
-    dir: ".config/swixter",
+    dir: getSwixterConfigDir(),
     file: "config.json",
   },
   claude: {

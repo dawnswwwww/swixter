@@ -901,4 +901,141 @@ model_provider = "swixter-test"
       await expect(adapter.remove("test")).resolves.toBeUndefined();
     });
   });
+
+  describe("custom env_key handling", () => {
+    test("should use custom env_key from profile when provided", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "test-key",
+        envKey: "MY_CUSTOM_API_KEY",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = parseToml(await file.text());
+
+      expect(config.model_providers["swixter-test"].env_key).toBe("MY_CUSTOM_API_KEY");
+    });
+
+    test("should fall back to preset env_key when profile env_key is not provided", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "ollama",
+        apiKey: "test-key",
+        // No envKey field
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = parseToml(await file.text());
+
+      expect(config.model_providers["swixter-test"].env_key).toBe("OLLAMA_API_KEY");
+    });
+
+    test("should fall back to OPENAI_API_KEY when env_key is empty string", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "test-key",
+        envKey: "",  // Empty string should use default
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = parseToml(await file.text());
+
+      // Empty string falls back to preset, which for custom is OPENAI_API_KEY
+      expect(config.model_providers["swixter-test"].env_key).toBe("OPENAI_API_KEY");
+    });
+
+    test("getEnvExportCommands should use custom env_key", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "ollama",
+        apiKey: "test-key",
+        envKey: "MY_CUSTOM_ENV",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const commands = adapter.getEnvExportCommands(profile);
+
+      expect(commands).toEqual(['export MY_CUSTOM_ENV="test-key"']);
+    });
+
+    test("getEnvExportCommands should fall back to preset env_key", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "ollama",
+        apiKey: "test-key",
+        // No custom envKey
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const commands = adapter.getEnvExportCommands(profile);
+
+      expect(commands).toEqual(['export OLLAMA_API_KEY="test-key"']);
+    });
+
+    test("should handle custom env_key with special characters", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "test-key",
+        envKey: "MY_API_KEY_2024",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = parseToml(await file.text());
+
+      expect(config.model_providers["swixter-test"].env_key).toBe("MY_API_KEY_2024");
+    });
+
+    test("should preserve custom env_key when updating other profile fields", async () => {
+      // First create profile with custom env_key
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "original-key",
+        envKey: "MY_CUSTOM_KEY",
+        baseURL: "https://api.example.com",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      // Update profile with different base URL but same env_key
+      const updatedProfile: ClaudeCodeProfile = {
+        ...profile,
+        baseURL: "https://api2.example.com",
+        apiKey: "new-key",
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(updatedProfile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = parseToml(await file.text());
+
+      // env_key should be preserved
+      expect(config.model_providers["swixter-test"].env_key).toBe("MY_CUSTOM_KEY");
+      expect(config.model_providers["swixter-test"].base_url).toBe("https://api2.example.com");
+    });
+  });
 });

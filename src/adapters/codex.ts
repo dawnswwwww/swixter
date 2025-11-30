@@ -151,9 +151,9 @@ export class CodexAdapter implements CoderAdapter {
       wire_api: preset.wire_api || "chat",
     };
 
-    // Always use env_key reference (per official Codex specification)
-    // The api_key field does not exist in official Codex config format
-    const envKey = preset.env_key || "OPENAI_API_KEY";
+    // Use profile's custom env_key if provided, otherwise fall back to preset
+    // Priority: profile.envKey > preset.env_key > "OPENAI_API_KEY" (default)
+    const envKey = profile.envKey || preset.env_key || "OPENAI_API_KEY";
     providerTable.env_key = envKey;
 
     // Add headers if present
@@ -191,7 +191,9 @@ export class CodexAdapter implements CoderAdapter {
    */
   getEnvExportCommands(profile: ClaudeCodeProfile): string[] {
     const preset = getPresetById(profile.providerId);
-    const envKey = preset?.env_key || "OPENAI_API_KEY";
+    // Use profile's custom env_key if provided, otherwise use preset default
+    // Priority: profile.envKey > preset.env_key > "OPENAI_API_KEY"
+    const envKey = profile.envKey || preset?.env_key || "OPENAI_API_KEY";
     const commands: string[] = [];
 
     if (profile.apiKey) {
