@@ -123,7 +123,7 @@ ${pc.bold("Create profile (interactive):")}
   ${pc.green(`swixter ${CODER_NAME} create`)}
 
 ${pc.bold("Create profile (non-interactive):")}
-  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--model <model>] [--apply]`)}
+  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--model <model>] [--env-key <var>] [--apply]`)}
 
 ${pc.bold("Examples:")}
   ${pc.dim("# Interactive profile creation")}
@@ -134,6 +134,9 @@ ${pc.bold("Examples:")}
 
   ${pc.dim("# Create custom provider profile")}
   ${pc.green(`swixter ${CODER_NAME} create --quiet --name my-config --provider custom --api-key your-key --base-url https://api.example.com`)}
+
+  ${pc.dim("# Create custom provider profile with custom env var")}
+  ${pc.green(`swixter ${CODER_NAME} create --quiet --name my-config --provider custom --api-key your-key --base-url https://api.example.com --env-key MY_CUSTOM_API_KEY`)}
 
   ${pc.dim("# Switch profile (short alias: sw)")}
   ${pc.green(`swixter ${CODER_NAME} sw my-config`)}
@@ -324,7 +327,22 @@ async function cmdCreateInteractive(): Promise<void> {
     }
   }
 
-  // 6. Apply immediately?
+  // 6. Custom env_key (optional)
+  const customEnvKey = await p.text({
+    message: "Environment variable name (optional, leave empty for provider default)",
+    placeholder: preset?.env_key || "OPENAI_API_KEY",
+    validate: (value) => {
+      // No validation required - accept any input
+      return;
+    },
+  });
+
+  if (p.isCancel(customEnvKey)) {
+    p.cancel(ERRORS.cancelled);
+    process.exit(EXIT_CODES.userCancelled);
+  }
+
+  // 7. Apply immediately?
   const shouldApply = await p.confirm({
     message: `Apply this profile to ${CODER_CONFIG.displayName} now?`,
     initialValue: true,
@@ -359,6 +377,11 @@ async function cmdCreateInteractive(): Promise<void> {
       profile.model = finalModel;
     }
 
+    // Add custom env_key if provided and not empty
+    if (customEnvKey && (customEnvKey as string).trim() !== "") {
+      profile.envKey = (customEnvKey as string).trim();
+    }
+
     await upsertProfile(profile, CODER_NAME);
     spinner.stop("Profile created successfully!");
 
@@ -389,7 +412,7 @@ async function cmdCreateInteractive(): Promise<void> {
 async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise<void> {
   if (!params.name || !params.provider) {
     console.log(pc.red("Error: Missing required parameters"));
-    console.log(pc.dim(`Usage: swixter ${CODER_NAME} create --quiet --name <name> --provider <id> [--api-key <key>] [--base-url <url>] [--model <model>] [--apply]`));
+    console.log(pc.dim(`Usage: swixter ${CODER_NAME} create --quiet --name <name> --provider <id> [--api-key <key>] [--base-url <url>] [--model <model>] [--env-key <var>] [--apply]`));
     process.exit(1);
   }
 
@@ -432,6 +455,11 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
 
     if (finalModel) {
       profile.model = finalModel;
+    }
+
+    // Add custom env_key if provided
+    if (params["env-key"]) {
+      profile.envKey = params["env-key"] as string;
     }
 
     await upsertProfile(profile, CODER_NAME);
@@ -724,7 +752,23 @@ async function cmdEdit(profileName?: string): Promise<void> {
     }
   }
 
-  // 5. Apply immediately?
+  // 5. Edit env_key
+  const currentEnvKey = profile.envKey || newPreset?.env_key || "OPENAI_API_KEY";
+  const newEnvKey = await p.text({
+    message: `Environment variable name (leave empty to keep current, enter 'clear' to use provider default)`,
+    placeholder: currentEnvKey,
+    validate: (value) => {
+      // No validation required
+      return;
+    },
+  });
+
+  if (p.isCancel(newEnvKey)) {
+    p.cancel(ERRORS.cancelled);
+    return;
+  }
+
+  // 6. Apply immediately?
   const shouldApply = await p.confirm({
     message: `Apply this profile to ${CODER_CONFIG.displayName} now?`,
     initialValue: false,
@@ -774,6 +818,20 @@ async function cmdEdit(profileName?: string): Promise<void> {
       // Keep existing model
       if (profile.model) {
         updatedProfile.model = profile.model;
+      }
+    }
+
+    // Handle env_key
+    if (newEnvKey === "clear") {
+      // Clear custom env_key, will use provider default
+      // Don't set envKey field
+    } else if (newEnvKey && (newEnvKey as string).trim() !== "") {
+      // Use new custom env_key
+      updatedProfile.envKey = (newEnvKey as string).trim();
+    } else {
+      // Keep existing env_key
+      if (profile.envKey) {
+        updatedProfile.envKey = profile.envKey;
       }
     }
 
@@ -1057,7 +1115,8 @@ async function cmdRun(args: string[]): Promise<void> {
 
     // Step 2: Get preset to determine env_key
     const preset = getPresetById(profile.providerId);
-    const envKey = preset?.env_key || "OPENAI_API_KEY";
+    // Use profile's custom env_key if provided, otherwise use preset default
+    const envKey = profile.envKey || preset?.env_key || "OPENAI_API_KEY";
 
     // Step 3: Build environment variables
     const env = {

@@ -21,15 +21,25 @@ Working with AI coding tools shouldn't be complicated. Swixter lets you:
 
 ## Installation
 
+### npm (Recommended)
+
 ```bash
 npm install -g swixter
 ```
 
-Or use with npx (no install needed):
+### npx (No Install Needed)
 
 ```bash
 npx swixter --help
 ```
+
+### Platform Support
+
+- **Linux/macOS**: Full support
+- **Windows**: Full support (Windows 10/11, requires Node.js 18+)
+  - Config stored at `~/swixter/config.json` (e.g., `C:\Users\YourName\swixter\config.json`)
+  - Docker Desktop + WSL2 recommended for E2E tests
+  - See [docs/WINDOWS.md](docs/WINDOWS.md) for detailed Windows guide
 
 ## Quick Start
 

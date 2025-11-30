@@ -59,6 +59,8 @@ export interface ClaudeCodeProfile {
   baseURL?: string;
   /** Model name (for providers that support multiple models) */
   model?: string;
+  /** Custom environment variable name for API key (Codex only) */
+  envKey?: string;
   /** Custom request headers (can extend preset) */
   headers?: Record<string, string>;
   /** Creation time */
@@ -126,6 +128,7 @@ export const ClaudeCodeProfileSchema = z.object({
   authToken: z.string().optional(),
   baseURL: z.string().url().optional(),
   model: z.string().optional(),
+  envKey: z.string().optional(), // Custom env var name for Codex (no validation)
   headers: z.record(z.string(), z.string()).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),

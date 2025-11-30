@@ -2,12 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Status
+
+- **Current Version**: v0.0.2 (see CHANGELOG.md for details)
+- **Stability**: Early release, actively developed
+- **Platform Support**: Linux, macOS, Windows 10/11
+- **Package Manager**: npm (published as `swixter`)
+
 ## Project Overview
 
 Swixter is a CLI tool for managing configurations across multiple AI coding assistants. It allows users to easily switch between different AI providers (Anthropic, Ollama, custom) and manage API keys/configurations. Currently supports:
 - **Claude Code** (Anthropic) - JSON config at `~/.claude/settings.json`
 - **Codex** - TOML config at `~/.codex/config.toml` with env var support
-- **Continue.dev/Qwen** - YAML config at `~/.continue/config.yaml`
+- **Continue.dev** - YAML config at `~/.continue/config.yaml` (note: accessed via `swixter qwen` command for historical reasons, but targets Continue.dev VS Code extension, NOT Qwen Code CLI)
 
 ## Development Commands
 
@@ -18,7 +25,7 @@ bun run build
 # Run CLI in development mode (with hot reload)
 bun run cli:dev
 
-# Run CLI directly
+# Run CLI directly (without build)
 bun run cli
 
 # Run all unit tests
@@ -27,7 +34,7 @@ bun test
 # Run specific test file
 bun test tests/adapters/codex.test.ts
 
-# Run E2E tests (Docker-based)
+# Run E2E tests (Docker-based, requires Docker running)
 bun run test:e2e
 
 # Test package contents before publishing
@@ -36,6 +43,11 @@ npm pack --dry-run
 # Test CLI commands manually (after build)
 node dist/cli/index.js claude list
 node dist/cli/index.js providers list
+
+# Release commands (automated versioning + publish)
+bun run release:patch   # For bug fixes (0.0.1 -> 0.0.2)
+bun run release:minor   # For new features (0.0.x -> 0.1.0)
+bun run release:major   # For breaking changes (0.x.y -> 1.0.0)
 ```
 
 ## Architecture Overview
@@ -97,12 +109,38 @@ node dist/cli/index.js providers list
 
 6. **Provider wire_api field**: Codex only supports `wire_api: "chat"` providers (OpenAI-compatible). Anthropic uses `wire_api: "responses"` and is filtered out in Codex CLI flows.
 
+7. **Special "run" command pattern**: Each coder's `run` command behaves differently based on requirements:
+   - **Claude/Qwen**: Simple wrapper that spawns the coder CLI (e.g., `claude` or `qwen-code`)
+   - **Codex**: All-in-one command that applies profile → sets env vars → spawns codex in single operation, because Codex requires environment variables to be set before execution
+
+8. **Profile naming constraints**: Profile names must be alphanumeric with dashes/underscores only (validated in `src/utils/validation.ts`). No spaces, special chars, or starting with dash.
+
+9. **Custom env_key per profile** (Codex only): Codex profiles can override the provider's default env_key.
+   - **Priority**: `profile.envKey` > `preset.env_key` > `"OPENAI_API_KEY"` (fallback)
+   - Set during profile creation or editing via `--env-key` parameter or interactive prompt
+   - Empty/undefined means use provider preset default (e.g., `OLLAMA_API_KEY` for Ollama)
+   - Used consistently across: `createProviderTable()`, `getEnvExportCommands()`, and `cmdRun()`
+   - Allows flexibility for custom providers or non-standard environment setups
+
 ## Testing
 
-- Unit tests use Bun's built-in test runner (`bun:test`)
-- E2E tests run in Docker to ensure clean environment
-- Test structure mirrors src structure: `tests/` directory
-- All constants used in validation must be testable (exported from constants/)
+- **Unit tests**: Use Bun's built-in test runner (`bun:test`)
+  - Located in `tests/` directory, structure mirrors `src/`
+  - Run individual tests: `bun test tests/adapters/claude.test.ts`
+  - All constants used in validation must be testable (exported from constants/)
+
+- **E2E tests**: Docker-based for isolated environment
+  - Main script: `test/e2e-docker.sh`
+  - Test scenarios in `test/scenarios/` (create, switch, apply, delete, etc.)
+  - Requires Docker running; works on Linux/macOS/Windows (via Docker Desktop)
+  - Builds project → builds Docker image → runs all scenario tests → cleanup
+
+## Documentation
+
+- **README.md**: User-facing documentation (installation, quick start, examples)
+- **CHANGELOG.md**: Version history and release notes (follow Keep a Changelog format)
+- **CLAUDE.md**: This file - developer guidance for Claude Code
+- **docs/WINDOWS.md**: Comprehensive Windows compatibility guide (created in v0.0.2)
 
 ## Code Style Notes
 
@@ -115,11 +153,56 @@ node dist/cli/index.js providers list
 
 ## Configuration File Paths
 
-- Main config: `~/.config/swixter/config.json`
-- User providers: `~/.config/swixter/providers.json`
-- Claude Code settings: `~/.claude/settings.json`
-- Codex config: `~/.codex/config.toml`
-- Continue.dev config: `~/.continue/config.yaml`
+**Platform-Specific Paths:**
+
+| Platform | Swixter Config | User Providers | Claude Code | Codex | Continue.dev |
+|----------|---------------|----------------|-------------|-------|--------------|
+| **Linux/macOS** | `~/.config/swixter/config.json` | `~/.config/swixter/providers.json` | `~/.claude/settings.json` | `~/.codex/config.toml` | `~/.continue/config.yaml` |
+| **Windows** | `~/swixter/config.json`<br/>(e.g., `C:\Users\name\swixter\config.json`) | `~/swixter/providers.json` | `~/.claude/settings.json`<br/>(e.g., `C:\Users\name\.claude\settings.json`) | `~/.codex/config.toml` | `~/.continue/config.yaml` |
+
+**Platform Detection:** Implemented in `src/constants/paths.ts:getSwixterConfigDir()` using `os.platform()` check.
+
+**Key Insight:** Only Swixter's own config path is platform-specific. All AI coder tools use `~/.tool-name` format which works cross-platform via Node.js `os.homedir()`.
+
+## Windows Compatibility
+
+**Current Status:** ~90% Windows compatible (v0.0.2+)
+
+### Cross-Platform Design Principles
+
+1. **Path Handling:**
+   - ✅ Always use `os.homedir()` instead of `~`, `$HOME`, or `%USERPROFILE%`
+   - ✅ Always use `path.join()` instead of string concatenation with `/` or `\`
+   - ✅ Platform detection via `os.platform() === "win32"`
+   - ✅ All adapters already follow these patterns
+
+2. **File Operations:**
+   - ✅ All adapters use `fs/promises` which works identically on Windows
+   - ✅ TOML parsing (`smol-toml`) and YAML parsing (`js-yaml`) are pure JavaScript
+   - ✅ No native dependencies that could cause Windows issues
+
+3. **Configuration Paths:**
+   - Swixter: Platform-specific (`~/.config/swixter` on Unix vs `~/swixter` on Windows)
+   - AI Coders: Unified `~/.tool-name` works cross-platform via `os.homedir()`
+
+### Windows-Specific Considerations
+
+- **Config Location:** Windows uses `~/swixter/config.json` for simplicity and consistency with AI coder tools
+- **E2E Tests:** Docker-based tests work on Windows via Docker Desktop + WSL2 (no code changes needed)
+- **Shell Completions:** Bash/Zsh/Fish supported; PowerShell completion planned for v0.1.0
+- **Build Script:** `chmod +x` in package.json is harmless on Windows (command not found is expected and safe to ignore)
+
+### When Adding Windows-Sensitive Features
+
+If you're adding features that touch file paths or system-specific behavior:
+
+- [ ] Use `os.homedir()` instead of `~` or environment variables
+- [ ] Use `path.join()` instead of template literals with `/`
+- [ ] Use `path.sep` if you need to detect or use the path separator
+- [ ] Test on Windows if modifying `src/constants/paths.ts` or adapters
+- [ ] Update `docs/WINDOWS.md` if adding Windows-specific behavior
+
+**For comprehensive Windows support details, see [docs/WINDOWS.md](docs/WINDOWS.md)**
 
 ## When Adding New Features
 
