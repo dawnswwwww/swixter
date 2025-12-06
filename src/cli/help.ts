@@ -182,7 +182,7 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
       name: "switch",
       aliases: ["sw"],
       description: "Switch to a specified configuration",
-      usage: `swixter ${coderName} switch --name <name>`,
+      usage: `swixter ${coderName} switch --name <name> [--apply | --no-apply]`,
       args: [
         {
           name: "--name, -n",
@@ -190,11 +190,31 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
           required: true,
           type: "string",
         },
+        {
+          name: "--apply",
+          description: "Automatically apply the profile without prompting",
+          required: false,
+          type: "boolean",
+        },
+        {
+          name: "--no-apply",
+          description: "Skip apply prompt and don't apply the profile",
+          required: false,
+          type: "boolean",
+        },
       ],
       examples: [
         {
-          description: "Switch to specified configuration",
+          description: "Switch to specified configuration (prompts to apply)",
           command: `swixter ${coderName} switch --name prod`,
+        },
+        {
+          description: "Switch and apply immediately without prompting",
+          command: `swixter ${coderName} switch --name prod --apply`,
+        },
+        {
+          description: "Switch without applying (skip prompt)",
+          command: `swixter ${coderName} switch --name dev --no-apply`,
         },
         {
           description: "Use short option",
@@ -203,7 +223,9 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
       ],
       relatedCommands: ["list", "current", "apply"],
       notes: [
-        "Switching configuration does not auto-apply, you need to run 'apply' command",
+        "By default, you will be prompted to apply after switching",
+        "Use --apply to automatically apply without prompting",
+        "Use --no-apply to skip the prompt and apply manually later",
         "Use 'current' command to view the currently active configuration",
       ],
     },

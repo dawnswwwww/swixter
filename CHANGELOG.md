@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.4] - 2025-12-06
+
+### Added
+- **Interactive Apply Prompt for Switch Command**
+  - After switching profiles, users are now prompted "Apply this profile now?" (default: true)
+  - Consistent UX with `create` and `edit` commands which already had apply prompts
+  - New flags for non-interactive mode:
+    - `--apply`: Auto-apply without prompting
+    - `--no-apply`: Skip prompt entirely
+  - Applies to all three coders: Claude, Qwen (Continue), and Codex
+  - Updated help documentation with flag usage examples
+
+### Fixed
+- **Windows Compatibility Issue in Run Commands**
+  - Fixed "spawn ENOENT" error when running `swixter claude r` / `qwen r` / `codex r` on Windows
+  - Added `shell: true` option to all `spawn()` calls for proper `.cmd`/`.bat`/`.exe` resolution
+  - Affects `cmdRun()` in claude.ts, qwen.ts, and codex.ts
+  - Cross-platform compatibility maintained (Linux, macOS, Windows)
+
+### Changed
+- **Code Refactoring and Quality Improvements**
+  - Created `src/utils/process.ts` with `spawnCLI()` utility for unified process spawning
+  - Created `src/utils/commands.ts` with `handleApplyPrompt()` utility for shared apply logic
+  - Eliminated ~180 lines of duplicated code across three CLI files
+  - Improved maintainability: bug fixes and feature additions now centralized in utilities
+  - Enhanced code robustness through DRY principle and single source of truth
+  - All existing tests pass (153/153) after refactoring
+
+### Technical
+- New utility modules enable consistent behavior across all coders
+- Internal `parseArgs()` function in commands.ts for flag parsing
+- Updated imports to use new shared utilities
+- No breaking changes - all existing functionality preserved
+- Improved extensibility: future coders can reuse utilities without code duplication
+
 ## [0.0.3] - 2025-11-30
 
 ### Added
@@ -97,6 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test coverage (unit + E2E)
 - Docker-based E2E testing for reliability
 
-[Unreleased]: https://github.com/dawnswwwww/swixter/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/dawnswwwww/swixter/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/dawnswwwww/swixter/compare/v0.0.3...v0.0.4
+[0.0.3]: https://github.com/dawnswwwww/swixter/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/dawnswwwww/swixter/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/dawnswwwww/swixter/releases/tag/v0.0.1

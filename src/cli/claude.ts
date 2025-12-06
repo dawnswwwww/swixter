@@ -36,6 +36,8 @@ import {
   showProfileDetails,
 } from "../utils/ui.js";
 import { ProfileValidators } from "../utils/validation.js";
+import { handleApplyPrompt } from "../utils/commands.js";
+import { spawnCLI } from "../utils/process.js";
 
 const CODER_NAME = "claude";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
@@ -69,7 +71,7 @@ export async function handleClaudeCommand(args: string[]): Promise<void> {
       break;
     case "switch":
     case "sw": // Short alias
-      await cmdSwitch(args[1]);
+      await cmdSwitch(args[1], args.slice(2));
       break;
     case "edit":
     case "update":
@@ -435,7 +437,7 @@ async function cmdList(): Promise<void> {
 /**
  * Switch profile
  */
-async function cmdSwitch(profileName: string): Promise<void> {
+async function cmdSwitch(profileName: string, args: string[] = []): Promise<void> {
   if (!profileName) {
     console.log(pc.red("Error: Please specify profile name"));
     console.log(pc.dim("Usage: swixter claude switch <name>"));
@@ -455,7 +457,14 @@ async function cmdSwitch(profileName: string): Promise<void> {
     console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(baseUrl)}`);
     console.log();
-    console.log(pc.dim("Tip: Run 'swixter claude apply' to apply profile to Claude Code"));
+
+    // Use shared utility for apply prompt logic
+    await handleApplyPrompt({
+      args,
+      applyFn: cmdApply,
+      coderDisplayName: CODER_CONFIG.displayName,
+      coderName: CODER_NAME,
+    });
   } catch (error) {
     console.log();
     console.log(pc.red(`✗ Switch failed: ${error}`));
@@ -944,23 +953,11 @@ async function cmdRun(args: string[]): Promise<void> {
   console.log(pc.dim(`Base URL: ${pc.yellow(baseURL || "Default")}`));
   console.log();
 
-  // Run claude command
-  const { spawn } = await import("node:child_process");
-  const claude = spawn("claude", claudeArgs, {
+  // Use shared utility for spawning CLI
+  spawnCLI({
+    command: "claude",
+    args: claudeArgs,
     env,
-    stdio: "inherit", // Inherit stdio directly for interaction
-  });
-
-  // Handle exit
-  claude.on("exit", (code) => {
-    process.exit(code || 0);
-  });
-
-  claude.on("error", (error) => {
-    console.log();
-    console.log(pc.red(`✗ Run failed: ${error.message}`));
-    console.log(pc.dim("Please ensure Claude Code CLI is installed"));
-    console.log();
-    process.exit(1);
+    displayName: CODER_CONFIG.displayName,
   });
 }
