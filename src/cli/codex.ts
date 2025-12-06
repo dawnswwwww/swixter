@@ -36,6 +36,8 @@ import {
   showProfileDetails,
 } from "../utils/ui.js";
 import { ProfileValidators } from "../utils/validation.js";
+import { handleApplyPrompt } from "../utils/commands.js";
+import { spawnCLI } from "../utils/process.js";
 
 const CODER_NAME = "codex";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
@@ -69,7 +71,7 @@ export async function handleCodexCommand(args: string[]): Promise<void> {
       break;
     case "switch":
     case "sw": // Short alias
-      await cmdSwitch(args[1]);
+      await cmdSwitch(args[1], args.slice(2));
       break;
     case "edit":
     case "update":
@@ -531,7 +533,7 @@ async function cmdList(): Promise<void> {
 /**
  * Switch profile
  */
-async function cmdSwitch(profileName: string): Promise<void> {
+async function cmdSwitch(profileName: string, args: string[] = []): Promise<void> {
   if (!profileName) {
     console.log(pc.red("Error: Please specify profile name"));
     console.log(pc.dim(`Usage: swixter ${CODER_NAME} switch <name>`));
@@ -551,7 +553,14 @@ async function cmdSwitch(profileName: string): Promise<void> {
     console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(baseUrl)}`);
     console.log();
-    console.log(pc.dim(`Tip: Run 'swixter ${CODER_NAME} apply' to apply profile to ${CODER_CONFIG.displayName}`));
+
+    // Use shared utility for apply prompt logic
+    await handleApplyPrompt({
+      args,
+      applyFn: cmdApply,
+      coderDisplayName: CODER_CONFIG.displayName,
+      coderName: CODER_NAME,
+    });
   } catch (error) {
     console.log();
     console.log(pc.red(`✗ Switch failed: ${error}`));
@@ -1146,24 +1155,12 @@ async function cmdRun(args: string[]): Promise<void> {
     console.log(pc.dim(`Config: ${adapter.configPath}`));
     console.log();
 
-    // Step 5: Run codex command
-    const { spawn } = await import("node:child_process");
-    const codex = spawn("codex", codexArgs, {
+    // Use shared utility for spawning CLI
+    spawnCLI({
+      command: "codex",
+      args: codexArgs,
       env,
-      stdio: "inherit", // Inherit stdio for interaction
-    });
-
-    // Handle exit
-    codex.on("exit", (code) => {
-      process.exit(code || 0);
-    });
-
-    codex.on("error", (error) => {
-      console.log();
-      console.log(pc.red(`✗ Failed to run ${CODER_CONFIG.displayName}: ${error.message}`));
-      console.log(pc.dim(`Please ensure ${CODER_CONFIG.displayName} CLI is installed`));
-      console.log();
-      process.exit(1);
+      displayName: CODER_CONFIG.displayName,
     });
   } catch (error) {
     console.log();
