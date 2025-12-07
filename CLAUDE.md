@@ -103,7 +103,7 @@ bun run release:major   # For breaking changes (0.x.y -> 1.0.0)
 4. **Validation timing**: Input validation happens at prompt time (immediate feedback) AND at save time (for non-interactive mode)
 
 5. **Adapter-specific behaviors**:
-   - **Claude adapter** (JSON): Direct key storage in settings.json with ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN
+   - **Claude adapter** (JSON): Full replacement of API-related env vars in settings.json. When applying a profile, only fields present in the profile are written; undefined fields are removed to prevent stale configuration. Other sections (MCP servers, approval policies, etc.) are preserved.
    - **Continue adapter** (YAML): Modifies config.yaml with model/apiKey fields
    - **Codex adapter** (TOML): Uses environment variable references (env_key) per official spec. Creates provider tables `[model_providers.swixter-<name>]` and profile tables `[profiles.swixter-<name>]`. API keys must be set as environment variables before running codex, or use `swixter codex run` for automatic setup.
 

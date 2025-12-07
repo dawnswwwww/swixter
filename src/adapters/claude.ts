@@ -39,24 +39,26 @@ export class ClaudeCodeAdapter implements CoderAdapter {
     // Use configured environment variable names
     const envVars = this.coderConfig.envVarMapping;
 
-    // Smart merge: preserve existing config, only update API-related fields
-    const newConfig = {
-      ...existingConfig,
-      env: {
-        ...(existingConfig.env || {}),
-        [envVars.baseURL]: baseURL,
-      },
+    // Build fresh env object (full replacement strategy)
+    // This ensures undefined fields are removed when switching profiles
+    const newEnv: Record<string, string> = {
+      [envVars.baseURL]: baseURL,
     };
 
-    // Set API Key (if available)
+    // Add optional fields only if present
     if (profile.apiKey) {
-      newConfig.env[envVars.apiKey] = profile.apiKey;
+      newEnv[envVars.apiKey] = profile.apiKey;
     }
 
-    // Set Auth Token (if available)
     if (profile.authToken && envVars.authToken) {
-      newConfig.env[envVars.authToken] = profile.authToken;
+      newEnv[envVars.authToken] = profile.authToken;
     }
+
+    // Smart merge: preserve existing config, only replace env section
+    const newConfig = {
+      ...existingConfig,
+      env: newEnv,
+    };
 
     // Ensure config directory exists
     await mkdir(dirname(this.configPath), { recursive: true });
