@@ -1,6 +1,6 @@
 {
   "name": "swixter",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "CLI tool for managing AI coding assistant configurations - easily switch between providers (Claude Code, Codex, Continue) with Anthropic, Ollama, or custom APIs",
   "main": "dist/cli/index.js",
   "module": "dist/cli/index.js",
