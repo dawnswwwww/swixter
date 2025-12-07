@@ -9,6 +9,8 @@ import { exportConfig, importConfig } from "../config/export.js";
 import { showGlobalHelp } from "./help.js";
 import { generateCompletion, showCompletionInstructions } from "./completions.js";
 import { listProviders, addProvider, removeProvider, showProvider } from "./providers.js";
+import { APP_VERSION } from "../constants/meta.js";
+import { CONFIG_VERSION, EXPORT_VERSION } from "../constants/versions.js";
 
 /**
  * Execute providers command
@@ -172,6 +174,22 @@ async function cmdImport(filePath: string): Promise<void> {
 }
 
 /**
+ * Execute version command
+ */
+async function cmdVersion(): Promise<void> {
+  console.log();
+  console.log(pc.bold(pc.cyan("Swixter")) + pc.dim(" - AI Coder Configuration Manager"));
+  console.log();
+  console.log(`  ${pc.bold("Version:")}          ${pc.green(APP_VERSION)}`);
+  console.log(`  ${pc.bold("Config Version:")}   ${pc.cyan(CONFIG_VERSION)}`);
+  console.log(`  ${pc.bold("Export Version:")}   ${pc.cyan(EXPORT_VERSION)}`);
+  console.log();
+  console.log(pc.dim("  GitHub: https://github.com/dawnswwwww/swixter"));
+  console.log(pc.dim("  NPM:    https://www.npmjs.com/package/swixter"));
+  console.log();
+}
+
+/**
  * Main entry point
  */
 export async function main(): Promise<void> {
@@ -219,6 +237,11 @@ export async function main(): Promise<void> {
 
     if (firstArg === "completion") {
       await cmdCompletion(args[1]);
+      return;
+    }
+
+    if (firstArg === "version" || firstArg === "-v" || firstArg === "--version") {
+      await cmdVersion();
       return;
     }
 

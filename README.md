@@ -1,6 +1,8 @@
 # Swixter
 
 [![npm version](https://badge.fury.io/js/swixter.svg)](https://www.npmjs.com/package/swixter)
+[![Test Status](https://github.com/dawnswwwww/swixter/actions/workflows/test.yml/badge.svg)](https://github.com/dawnswwwww/swixter/actions/workflows/test.yml)
+[![Release Status](https://github.com/dawnswwwww/swixter/actions/workflows/release.yml/badge.svg)](https://github.com/dawnswwwww/swixter/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/node/v/swixter.svg)](https://nodejs.org)
 
@@ -337,6 +339,48 @@ Future plans for Swixter:
 - [ ] Configuration validation and migration tools
 - [ ] Web UI for profile management
 - [ ] Cloud sync for profiles (optional)
+
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/dawnswwwww/swixter.git
+cd swixter
+
+# Install dependencies
+bun install
+
+# Run in development mode
+bun run cli:dev
+
+# Run tests
+bun test
+
+# Build the project
+bun run build
+```
+
+### Release Process
+
+Swixter uses a semi-automated release process:
+
+1. **Update CHANGELOG.md** with your changes under `[Unreleased]`
+2. **Run release command**:
+   ```bash
+   bun run release:patch  # For bug fixes (0.0.4 → 0.0.5)
+   bun run release:minor  # For new features (0.0.4 → 0.1.0)
+   bun run release:major  # For breaking changes (0.0.4 → 1.0.0)
+   ```
+3. **GitHub Actions** automatically:
+   - Runs tests on Linux/macOS/Windows
+   - Publishes to npm
+   - Creates GitHub Release with changelog
+
+See [CLAUDE.md](CLAUDE.md) for detailed development documentation.
 
 ## License
 

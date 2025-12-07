@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-- **Current Version**: v0.0.2 (see CHANGELOG.md for details)
+- **Current Version**: v0.0.4 (see CHANGELOG.md for details)
 - **Stability**: Early release, actively developed
 - **Platform Support**: Linux, macOS, Windows 10/11
 - **Package Manager**: npm (published as `swixter`)
+- **CI/CD**: GitHub Actions (automated testing and releases)
 
 ## Project Overview
 
@@ -44,10 +45,13 @@ npm pack --dry-run
 node dist/cli/index.js claude list
 node dist/cli/index.js providers list
 
-# Release commands (automated versioning + publish)
-bun run release:patch   # For bug fixes (0.0.1 -> 0.0.2)
-bun run release:minor   # For new features (0.0.x -> 0.1.0)
-bun run release:major   # For breaking changes (0.x.y -> 1.0.0)
+# Check version
+bun run cli version
+
+# Release commands (semi-automated via GitHub Actions)
+bun run release:patch   # For bug fixes (0.0.4 -> 0.0.5)
+bun run release:minor   # For new features (0.0.4 -> 0.1.0)
+bun run release:major   # For breaking changes (0.0.4 -> 1.0.0)
 ```
 
 ## Architecture Overview
@@ -231,3 +235,135 @@ If you're adding features that touch file paths or system-specific behavior:
 4. **Profile naming**: Codex adapter prefixes all table names with `swixter-` to avoid conflicts with user's existing codex config.
 
 5. **Config merging**: Adapters must preserve existing config (MCP servers, approval policies, etc.) when applying profiles - never overwrite the entire file.
+
+## Release and Publishing
+
+### Semi-Automated Release Process
+
+Swixter uses a **semi-automated release workflow** powered by GitHub Actions. Developers control release timing and version numbers, while CI/CD handles testing, building, npm publishing, and GitHub Release creation.
+
+### Version Management
+
+**Version number locations:**
+- `package.json` - NPM official version (automatically updated by `npm version`)
+- `src/constants/meta.ts` - APP_VERSION constant (automatically synced via preversion hook)
+- `CHANGELOG.md` - Version history (manually maintained)
+
+**npm lifecycle hooks:**
+1. `preversion` - Runs tests + syncs APP_VERSION to package.json version
+2. `version` - Stages updated meta.ts file
+3. `postversion` - Pushes commits and tags to GitHub
+
+### How to Release a New Version
+
+**Step 1: Update CHANGELOG.md**
+
+Before releasing, manually update `CHANGELOG.md`:
+
+```markdown
+## [Unreleased]
+
+## [0.0.5] - 2025-12-07
+
+### Added
+- Feature description
+
+### Fixed
+- Bug fix description
+
+[0.0.5]: https://github.com/dawnswwwww/swixter/compare/v0.0.4...v0.0.5
+```
+
+**Step 2: Run release command**
+
+```bash
+# For bug fixes (0.0.4 → 0.0.5)
+bun run release:patch
+
+# For new features (0.0.4 → 0.1.0)
+bun run release:minor
+
+# For breaking changes (0.0.4 → 1.0.0)
+bun run release:major
+```
+
+**Step 3: Automated workflow**
+
+The release command automatically:
+1. ✅ Runs all tests (via preversion hook)
+2. ✅ Syncs APP_VERSION constant (via preversion hook)
+3. ✅ Updates package.json version number (npm version)
+4. ✅ Creates Git commit and tag (npm version)
+5. ✅ Stages meta.ts changes (via version hook)
+6. ✅ Pushes to GitHub (via postversion hook)
+7. ✅ Triggers GitHub Actions workflow
+
+**Step 4: GitHub Actions takes over**
+
+When GitHub detects a new tag (v*):
+1. ✅ Runs tests on Linux/macOS/Windows
+2. ✅ Builds the project
+3. ✅ Publishes to npm (using NPM_TOKEN secret)
+4. ✅ Extracts changelog for this version
+5. ✅ Creates GitHub Release with changelog content
+
+### Verification
+
+After releasing, check:
+- **GitHub Actions**: https://github.com/dawnswwwww/swixter/actions
+- **npm Package**: https://www.npmjs.com/package/swixter
+- **GitHub Releases**: https://github.com/dawnswwwww/swixter/releases
+
+### Required Secrets
+
+GitHub repository secrets (Settings → Secrets and variables → Actions):
+- `NPM_TOKEN` - npm publish token (get from https://www.npmjs.com/settings/tokens)
+
+### CI/CD Workflows
+
+**`.github/workflows/test.yml`** - Continuous Integration
+- Triggers: push to main, pull requests
+- Runs unit tests + E2E tests
+- Multi-platform testing (Linux/macOS/Windows)
+- Multiple Node versions (18.x, 20.x)
+
+**`.github/workflows/release.yml`** - Release Automation
+- Triggers: push tags matching `v*`
+- Runs tests before publishing
+- Publishes to npm
+- Creates GitHub Release
+
+### Helper Scripts
+
+**`scripts/sync-version.js`**
+- Reads version from package.json
+- Updates APP_VERSION in src/constants/meta.ts
+- Called during npm preversion hook
+
+**`scripts/extract-changelog.js`**
+- Parses CHANGELOG.md
+- Extracts content for specified version
+- Used by GitHub Actions to create Release notes
+
+### Troubleshooting
+
+**Release failed due to test failures:**
+- Fix the tests locally
+- Commit and push fixes
+- Run release command again
+
+**npm publish failed:**
+- Check NPM_TOKEN is valid and has publish permissions
+- Verify package name is not taken
+- Check npm registry status
+
+**GitHub Release not created:**
+- Verify CHANGELOG.md has entry for this version
+- Check GitHub Actions logs
+- Ensure version format matches: `## [X.Y.Z] - YYYY-MM-DD`
+
+**Version already published:**
+- Cannot republish same version to npm
+- Increment version and release again
+- Use `npm unpublish` within 24 hours if needed (not recommended)
+
