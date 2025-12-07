@@ -121,12 +121,12 @@ describe("ClaudeCodeAdapter", () => {
       expect(config.hooks).toEqual({ "user-prompt-submit-hook": "echo test" });
     });
 
-    test("should update existing API settings without touching other env vars", async () => {
+    test("should replace all env vars (full replacement strategy)", async () => {
       const initialConfig = {
         env: {
           ANTHROPIC_API_KEY: "old-key",
           ANTHROPIC_BASE_URL: "https://old.url.com",
-          OTHER_VAR: "keep-this",
+          OTHER_VAR: "this-will-be-removed",
         },
       };
       await Bun.write(TEST_CONFIG_PATH, JSON.stringify(initialConfig));
@@ -146,7 +146,8 @@ describe("ClaudeCodeAdapter", () => {
 
       expect(config.env.ANTHROPIC_API_KEY).toBe("new-key");
       expect(config.env.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
-      expect(config.env.OTHER_VAR).toBe("keep-this");
+      // Full replacement strategy: non-managed env vars are removed
+      expect(config.env.OTHER_VAR).toBeUndefined();
     });
 
     test("should handle profile with only apiKey", async () => {
@@ -164,6 +165,43 @@ describe("ClaudeCodeAdapter", () => {
       const config = JSON.parse(await file.text());
 
       expect(config.env.ANTHROPIC_API_KEY).toBe("sk-or-test");
+      expect(config.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    });
+
+    test("should remove undefined fields when switching profiles", async () => {
+      // First, apply profile with both apiKey and authToken
+      const profileA: ClaudeCodeProfile = {
+        name: "profile-a",
+        providerId: "anthropic",
+        apiKey: "sk-ant-old",
+        authToken: "tok-old",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profileA);
+      let file = Bun.file(TEST_CONFIG_PATH);
+      let config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-ant-old");
+      expect(config.env.ANTHROPIC_AUTH_TOKEN).toBe("tok-old");
+
+      // Then, apply profile with only apiKey (authToken undefined)
+      const profileB: ClaudeCodeProfile = {
+        name: "profile-b",
+        providerId: "anthropic",
+        apiKey: "sk-ant-new",
+        // authToken is undefined
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profileB);
+      file = Bun.file(TEST_CONFIG_PATH);
+      config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-ant-new");
+      // authToken should be removed (not preserved from previous profile)
       expect(config.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
     });
 
