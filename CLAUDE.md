@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-- **Current Version**: v0.0.4 (see CHANGELOG.md for details)
+- **Current Version**: v0.0.5 (see CHANGELOG.md for details)
 - **Stability**: Early release, actively developed
 - **Platform Support**: Linux, macOS, Windows 10/11
 - **Package Manager**: npm (published as `swixter`)
@@ -366,4 +366,3 @@ GitHub repository secrets (Settings → Secrets and variables → Actions):
 - Cannot republish same version to npm
 - Increment version and release again
 - Use `npm unpublish` within 24 hours if needed (not recommended)
-

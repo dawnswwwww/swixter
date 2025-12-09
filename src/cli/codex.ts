@@ -205,9 +205,9 @@ async function cmdCreateInteractive(): Promise<void> {
   console.log(pc.bold(pc.cyan(PROMPTS.createProfile(CODER_CONFIG.displayName))));
   console.log();
 
-  const { allPresets } = await import("../providers/presets.js");
-  // Filter out Anthropic provider - Codex only supports OpenAI-compatible (chat API) providers
-  const presets = allPresets.filter(preset => preset.wire_api === 'chat');
+  const { getProvidersByWireApi } = await import("../providers/presets.js");
+  // Codex only supports OpenAI-compatible (chat API) providers
+  const presets = await getProvidersByWireApi('chat');
 
   // 1. Enter profile name
   const name = await p.text({
@@ -638,9 +638,9 @@ async function cmdEdit(profileName?: string): Promise<void> {
   console.log(pc.bold(pc.cyan(`Edit profile: ${profileName}`)));
   console.log();
 
-  const { allPresets } = await import("../providers/presets.js");
-  // Filter out Anthropic provider - Codex only supports OpenAI-compatible (chat API) providers
-  const presets = allPresets.filter(preset => preset.wire_api === 'chat');
+  const { getProvidersByWireApi } = await import("../providers/presets.js");
+  // Codex only supports OpenAI-compatible (chat API) providers
+  const presets = await getProvidersByWireApi('chat');
   const currentPreset = getPresetById(profile.providerId);
 
   // 1. Change provider?
@@ -1135,6 +1135,11 @@ async function cmdRun(args: string[]): Promise<void> {
     // Set the API key using the correct env_key name
     if (profile.apiKey) {
       env[envKey] = profile.apiKey;
+    }
+
+    // Set model if available
+    if (profile.model || profile.openaiModel) {
+      env["OPENAI_MODEL"] = profile.model || profile.openaiModel;
     }
 
     // Step 4: Filter out --profile parameter, build codex arguments

@@ -88,6 +88,30 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
           type: "string",
         },
         {
+          name: "--anthropic-model",
+          description: "Default model (ANTHROPIC_MODEL)",
+          required: false,
+          type: "string",
+        },
+        {
+          name: "--default-haiku-model",
+          description: "Default Haiku model (ANTHROPIC_DEFAULT_HAIKU_MODEL)",
+          required: false,
+          type: "string",
+        },
+        {
+          name: "--default-opus-model",
+          description: "Default Opus model (ANTHROPIC_DEFAULT_OPUS_MODEL)",
+          required: false,
+          type: "string",
+        },
+        {
+          name: "--default-sonnet-model",
+          description: "Default Sonnet model (ANTHROPIC_DEFAULT_SONNET_MODEL)",
+          required: false,
+          type: "string",
+        },
+        {
           name: "--apply, -a",
           description: "Apply this configuration immediately after creation",
           required: false,

@@ -122,6 +122,41 @@ export async function getStandardPresets(): Promise<ProviderPreset[]> {
 }
 
 /**
+ * Get providers by wire API type
+ * Filters providers based on their wire_api compatibility
+ *
+ * @param wireApi The wire API type to filter by ('chat' | 'responses')
+ * @param includeUserProviders Whether to include user-defined providers (default: true)
+ * @returns Array of providers matching the specified wire API type
+ */
+export async function getProvidersByWireApi(
+  wireApi: 'chat' | 'responses',
+  includeUserProviders: boolean = true
+): Promise<ProviderPreset[]> {
+  const allPresets = includeUserProviders ? await getAllPresets() : builtInPresets;
+
+  return allPresets.filter(preset => {
+    // If wire_api is not specified, assume 'chat' for backward compatibility
+    const presetWireApi = preset.wire_api || 'chat';
+    return presetWireApi === wireApi;
+  });
+}
+
+/**
+ * Get providers by wire API type (synchronous version - only built-in presets)
+ *
+ * @param wireApi The wire API type to filter by ('chat' | 'responses')
+ * @returns Array of built-in providers matching the specified wire API type
+ */
+export function getBuiltInProvidersByWireApi(wireApi: 'chat' | 'responses'): ProviderPreset[] {
+  return builtInPresets.filter(preset => {
+    // If wire_api is not specified, assume 'chat' for backward compatibility
+    const presetWireApi = preset.wire_api || 'chat';
+    return presetWireApi === wireApi;
+  });
+}
+
+/**
  * Alias for synchronous built-in access
  */
 export function getBuiltInPresets(): ProviderPreset[] {

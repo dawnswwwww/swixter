@@ -7,6 +7,7 @@ import type { ClaudeCodeProfile } from "../types.js";
 import { getPresetById } from "../providers/presets.js";
 import { getConfigPath } from "../constants/paths.js";
 import { SERIALIZATION } from "../constants/index.js";
+import { getOpenAIModel } from "../utils/model-helper.js";
 
 /**
  * Provider ID to Continue provider type mapping
@@ -48,10 +49,12 @@ export class ContinueAdapter implements CoderAdapter {
     }
 
     // Build new model configuration
+    const modelValue = getOpenAIModel(profile);
     const newModel = {
       title: profile.name,
       provider: continueProvider,
       apiBase: baseURL,
+      ...(modelValue && { model: modelValue }), // Only add model field if available
       ...(profile.apiKey && { apiKey: profile.apiKey }), // Only add apiKey when present
       roles: ["chat", "edit", "apply"],
     };
@@ -109,8 +112,19 @@ export class ContinueAdapter implements CoderAdapter {
 
       const preset = getPresetById(profile.providerId);
       const expectedBaseURL = profile.baseURL || preset?.baseURL || "";
+      const expectedModel = getOpenAIModel(profile);
 
-      return model.apiBase === expectedBaseURL;
+      // Check base URL and model (if specified)
+      if (model.apiBase !== expectedBaseURL) {
+        return false;
+      }
+
+      // If model is specified in profile, check it matches
+      if (expectedModel && model.model !== expectedModel) {
+        return false;
+      }
+
+      return true;
     } catch (error) {
       return false;
     }

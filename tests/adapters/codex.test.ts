@@ -1006,6 +1006,77 @@ model_provider = "swixter-test"
       expect(config.model_providers["swixter-test"].env_key).toBe("MY_API_KEY_2024");
     });
 
+    test("getEnvExportCommands should include OPENAI_MODEL when model is set", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "openai",
+        apiKey: "sk-test",
+        model: "gpt-4",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const commands = adapter.getEnvExportCommands(profile);
+
+      expect(commands).toEqual([
+        'export OPENAI_API_KEY="sk-test"',
+        'export OPENAI_MODEL="gpt-4"'
+      ]);
+    });
+
+    test("getEnvExportCommands should include OPENAI_MODEL when openaiModel is set", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "openrouter",
+        apiKey: "sk-or-test",
+        openaiModel: "claude-3-5-sonnet-20241022",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const commands = adapter.getEnvExportCommands(profile);
+
+      expect(commands).toEqual([
+        'export OPENAI_API_KEY="sk-or-test"',
+        'export OPENAI_MODEL="claude-3-5-sonnet-20241022"'
+      ]);
+    });
+
+    test("getEnvExportCommands should prefer model over openaiModel", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "openai",
+        apiKey: "sk-test",
+        model: "gpt-4",
+        openaiModel: "gpt-3.5-turbo", // Should be ignored
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const commands = adapter.getEnvExportCommands(profile);
+
+      expect(commands).toEqual([
+        'export OPENAI_API_KEY="sk-test"',
+        'export OPENAI_MODEL="gpt-4"'
+      ]);
+    });
+
+    test("getEnvExportCommands should not include OPENAI_MODEL when no model is set", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "openai",
+        apiKey: "sk-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const commands = adapter.getEnvExportCommands(profile);
+
+      expect(commands).toEqual([
+        'export OPENAI_API_KEY="sk-test"'
+      ]);
+    });
+
     test("should preserve custom env_key when updating other profile fields", async () => {
       // First create profile with custom env_key
       const profile: ClaudeCodeProfile = {

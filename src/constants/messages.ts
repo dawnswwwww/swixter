@@ -47,6 +47,16 @@ export const PROMPTS = {
   apiKeyOllama: "API Key (optional, not required for Ollama)",
   authToken: "Auth Token (for ANTHROPIC_AUTH_TOKEN, optional)",
   baseUrl: "Base URL (optional, leave empty for default)",
+  // Model configuration prompts
+  configureModels: "Would you like to configure model settings?",
+  anthropicModel: "Default model (ANTHROPIC_MODEL, optional)",
+  defaultHaikuModel: "Default Haiku model (ANTHROPIC_DEFAULT_HAIKU_MODEL, optional)",
+  defaultOpusModel: "Default Opus model (ANTHROPIC_DEFAULT_OPUS_MODEL, optional)",
+  defaultSonnetModel: "Default Sonnet model (ANTHROPIC_DEFAULT_SONNET_MODEL, optional)",
+  // Qwen and Codex model prompts
+  qwenModel: "Model name (e.g., gpt-4, claude-3-5-sonnet-20241022)",
+  enterQwenModel: "Please enter the model name for qwen:",
+  codexModelNote: "Note: Model is stored in profile and also available as OPENAI_MODEL environment variable",
   confirmApply: (app: string) => `Apply this configuration to ${app} now?`,
   selectToSwitch: "Select profile to switch to",
   selectToEdit: "Select profile to edit",

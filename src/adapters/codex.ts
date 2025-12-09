@@ -6,6 +6,8 @@ import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 import type { CoderAdapter } from "./base.js";
 import type { ClaudeCodeProfile } from "../types.js";
 import { getPresetById } from "../providers/presets.js";
+import { getOpenAIModel } from "../utils/model-helper.js";
+import { getEnvKey, getEnvExportCommands as getEnvExports } from "../utils/env-key-helper.js";
 
 /**
  * Codex configuration adapter
@@ -151,10 +153,8 @@ export class CodexAdapter implements CoderAdapter {
       wire_api: preset.wire_api || "chat",
     };
 
-    // Use profile's custom env_key if provided, otherwise fall back to preset
-    // Priority: profile.envKey > preset.env_key > "OPENAI_API_KEY" (default)
-    const envKey = profile.envKey || preset.env_key || "OPENAI_API_KEY";
-    providerTable.env_key = envKey;
+    // Use centralized env_key logic
+    providerTable.env_key = getEnvKey(profile);
 
     // Add headers if present
     if (preset.headers) {
@@ -172,9 +172,10 @@ export class CodexAdapter implements CoderAdapter {
       model_provider: providerName,
     };
 
-    // Use model from profile if specified
-    if (profile.model) {
-      profileTable.model = profile.model;
+    // Use model from profile if specified (with backward compatibility)
+    const modelValue = getOpenAIModel(profile);
+    if (modelValue) {
+      profileTable.model = modelValue;
     } else {
       // Fallback to first default model from preset
       const preset = getPresetById(profile.providerId);
@@ -190,14 +191,12 @@ export class CodexAdapter implements CoderAdapter {
    * Get environment variable export commands for the user
    */
   getEnvExportCommands(profile: ClaudeCodeProfile): string[] {
-    const preset = getPresetById(profile.providerId);
-    // Use profile's custom env_key if provided, otherwise use preset default
-    // Priority: profile.envKey > preset.env_key > "OPENAI_API_KEY"
-    const envKey = profile.envKey || preset?.env_key || "OPENAI_API_KEY";
-    const commands: string[] = [];
+    const commands = getEnvExports(profile);
 
-    if (profile.apiKey) {
-      commands.push(`export ${envKey}="${profile.apiKey}"`);
+    // Add model environment variable export (with backward compatibility)
+    const modelValue = getOpenAIModel(profile);
+    if (modelValue) {
+      commands.push(`export OPENAI_MODEL="${modelValue}"`);
     }
 
     return commands;
