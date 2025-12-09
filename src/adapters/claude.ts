@@ -54,6 +54,22 @@ export class ClaudeCodeAdapter implements CoderAdapter {
       newEnv[envVars.authToken] = profile.authToken;
     }
 
+    // Add model environment variables if configured
+    if (profile.models) {
+      if (profile.models.anthropicModel && envVars.anthropicModel) {
+        newEnv[envVars.anthropicModel] = profile.models.anthropicModel;
+      }
+      if (profile.models.defaultHaikuModel && envVars.defaultHaikuModel) {
+        newEnv[envVars.defaultHaikuModel] = profile.models.defaultHaikuModel;
+      }
+      if (profile.models.defaultOpusModel && envVars.defaultOpusModel) {
+        newEnv[envVars.defaultOpusModel] = profile.models.defaultOpusModel;
+      }
+      if (profile.models.defaultSonnetModel && envVars.defaultSonnetModel) {
+        newEnv[envVars.defaultSonnetModel] = profile.models.defaultSonnetModel;
+      }
+    }
+
     // Smart merge: preserve existing config, only replace env section
     const newConfig = {
       ...existingConfig,
@@ -91,9 +107,31 @@ export class ClaudeCodeAdapter implements CoderAdapter {
       const hasAuthToken = profile.authToken && envVars.authToken &&
                           config.env?.[envVars.authToken] === profile.authToken;
 
+      // Verify model configurations if present
+      let hasMatchingModels = true;
+      if (profile.models) {
+        if (profile.models.anthropicModel && envVars.anthropicModel) {
+          hasMatchingModels = hasMatchingModels &&
+            config.env?.[envVars.anthropicModel] === profile.models.anthropicModel;
+        }
+        if (profile.models.defaultHaikuModel && envVars.defaultHaikuModel) {
+          hasMatchingModels = hasMatchingModels &&
+            config.env?.[envVars.defaultHaikuModel] === profile.models.defaultHaikuModel;
+        }
+        if (profile.models.defaultOpusModel && envVars.defaultOpusModel) {
+          hasMatchingModels = hasMatchingModels &&
+            config.env?.[envVars.defaultOpusModel] === profile.models.defaultOpusModel;
+        }
+        if (profile.models.defaultSonnetModel && envVars.defaultSonnetModel) {
+          hasMatchingModels = hasMatchingModels &&
+            config.env?.[envVars.defaultSonnetModel] === profile.models.defaultSonnetModel;
+        }
+      }
+
       return (
         (hasApiKey || hasAuthToken) &&
-        config.env?.[envVars.baseURL] === expectedBaseURL
+        config.env?.[envVars.baseURL] === expectedBaseURL &&
+        hasMatchingModels
       );
     } catch (error) {
       return false;

@@ -26,6 +26,13 @@ export interface CoderConfig {
     apiKey: string;
     authToken?: string;
     baseURL: string;
+    // Model environment variables for Claude Code
+    anthropicModel?: string;
+    defaultHaikuModel?: string;
+    defaultOpusModel?: string;
+    defaultSonnetModel?: string;
+    // OpenAI model environment variable for Qwen and Codex
+    openaiModel?: string;
   };
   /** Configuration file path */
   configPath: {
@@ -50,6 +57,11 @@ export const CODER_REGISTRY: Record<string, CoderConfig> = {
       apiKey: "ANTHROPIC_API_KEY",
       authToken: "ANTHROPIC_AUTH_TOKEN",
       baseURL: "ANTHROPIC_BASE_URL",
+      // Model environment variables
+      anthropicModel: "ANTHROPIC_MODEL",
+      defaultHaikuModel: "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+      defaultOpusModel: "ANTHROPIC_DEFAULT_OPUS_MODEL",
+      defaultSonnetModel: "ANTHROPIC_DEFAULT_SONNET_MODEL",
     },
     configPath: {
       dir: ".claude",
@@ -65,6 +77,7 @@ export const CODER_REGISTRY: Record<string, CoderConfig> = {
     envVarMapping: {
       apiKey: "OPENAI_API_KEY",
       baseURL: "OPENAI_BASE_URL",
+      openaiModel: "OPENAI_MODEL",
     },
     configPath: {
       dir: ".continue",
@@ -80,6 +93,7 @@ export const CODER_REGISTRY: Record<string, CoderConfig> = {
     envVarMapping: {
       apiKey: "OPENAI_API_KEY",
       baseURL: "OPENAI_BASE_URL",
+      openaiModel: "OPENAI_MODEL",
     },
     configPath: {
       dir: ".codex",

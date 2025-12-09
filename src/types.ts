@@ -45,6 +45,19 @@ export interface ProviderPreset {
 
 /**
  * Claude Code Profile
+ *
+ * Model Field Usage Guide:
+ * - `models`: Object structure for Claude Code-specific model configuration
+ *   - anthropicModel: Main model (ANTHROPIC_MODEL env var)
+ *   - defaultHaikuModel: Default Haiku model (ANTHROPIC_DEFAULT_HAIKU_MODEL)
+ *   - defaultOpusModel: Default Opus model (ANTHROPIC_DEFAULT_OPUS_MODEL)
+ *   - defaultSonnetModel: Default Sonnet model (ANTHROPIC_DEFAULT_SONNET_MODEL)
+ * - `model`: Generic model field for OpenAI-compatible providers (Codex, Continue)
+ *   - Used for OpenAI API format models
+ *   - Maps to OPENAI_MODEL environment variable
+ * - `openaiModel`: Legacy field for backward compatibility
+ *   - Deprecated in favor of `model`
+ *   - Will be removed in a future major version
  */
 export interface ClaudeCodeProfile {
   /** Profile name */
@@ -57,8 +70,33 @@ export interface ClaudeCodeProfile {
   authToken?: string;
   /** API base URL (can override preset) */
   baseURL?: string;
-  /** Model name (for providers that support multiple models) */
+  /**
+   * Generic model name for OpenAI-compatible providers
+   * Used by: Codex, Continue.dev
+   * Maps to: OPENAI_MODEL environment variable
+   */
   model?: string;
+  /**
+   * Legacy OpenAI model name (deprecated)
+   * Use `model` field instead for new configurations
+   * @deprecated Use `model` field instead
+   */
+  openaiModel?: string;
+  /**
+   * Claude Code-specific model configuration
+   * Used by: Claude Code adapter only
+   * Maps to: ANTHROPIC_MODEL_* environment variables
+   */
+  models?: {
+    /** Default model (ANTHROPIC_MODEL) */
+    anthropicModel?: string;
+    /** Default Haiku model (ANTHROPIC_DEFAULT_HAIKU_MODEL) */
+    defaultHaikuModel?: string;
+    /** Default Opus model (ANTHROPIC_DEFAULT_OPUS_MODEL) */
+    defaultOpusModel?: string;
+    /** Default Sonnet model (ANTHROPIC_DEFAULT_SONNET_MODEL) */
+    defaultSonnetModel?: string;
+  };
   /** Custom environment variable name for API key (Codex only) */
   envKey?: string;
   /** Custom request headers (can extend preset) */
@@ -128,6 +166,13 @@ export const ClaudeCodeProfileSchema = z.object({
   authToken: z.string().optional(),
   baseURL: z.string().url().optional(),
   model: z.string().optional(),
+  openaiModel: z.string().optional(),
+  models: z.object({
+    anthropicModel: z.string().optional(),
+    defaultHaikuModel: z.string().optional(),
+    defaultOpusModel: z.string().optional(),
+    defaultSonnetModel: z.string().optional(),
+  }).optional(),
   envKey: z.string().optional(), // Custom env var name for Codex (no validation)
   headers: z.record(z.string(), z.string()).optional(),
   createdAt: z.string(),

@@ -105,6 +105,7 @@ $CLI_CMD qwen create \
   --quiet \
   --name test-ollama \
   --provider ollama \
+  --model qwen2.5-coder:7b \
   --base-url http://localhost:11434
 
 # Verify qwen's configuration
@@ -183,10 +184,49 @@ fi
 
 echo "✓ Test 6 passed"
 
+# Test 7: Create configuration with model settings
+echo "Test 7: Create configuration with model settings..."
+$CLI_CMD claude create \
+  --quiet \
+  --name test-models \
+  --provider anthropic \
+  --api-key sk-ant-models \
+  --anthropic-model claude-3-5-sonnet-20241022 \
+  --default-haiku-model claude-3-5-haiku-20241022 \
+  --default-opus-model claude-3-opus-20240229
+
+# Verify configuration exists
+if ! jq -e '.profiles["test-models"]' "$CONFIG_FILE" > /dev/null; then
+    echo "❌ Error: Configuration test-models does not exist"
+    exit 1
+fi
+
+# Verify model configuration
+ANTHROPIC_MODEL=$(jq -r '.profiles["test-models"].models.anthropicModel' "$CONFIG_FILE")
+HAIKU_MODEL=$(jq -r '.profiles["test-models"].models.defaultHaikuModel' "$CONFIG_FILE")
+OPUS_MODEL=$(jq -r '.profiles["test-models"].models.defaultOpusModel' "$CONFIG_FILE")
+
+if [ "$ANTHROPIC_MODEL" != "claude-3-5-sonnet-20241022" ]; then
+    echo "❌ Error: anthropicModel incorrect, expected claude-3-5-sonnet-20241022, got $ANTHROPIC_MODEL"
+    exit 1
+fi
+
+if [ "$HAIKU_MODEL" != "claude-3-5-haiku-20241022" ]; then
+    echo "❌ Error: defaultHaikuModel incorrect, expected claude-3-5-haiku-20241022, got $HAIKU_MODEL"
+    exit 1
+fi
+
+if [ "$OPUS_MODEL" != "claude-3-opus-20240229" ]; then
+    echo "❌ Error: defaultOpusModel incorrect, expected claude-3-opus-20240229, got $OPUS_MODEL"
+    exit 1
+fi
+
+echo "✓ Test 7 passed"
+
 # Verify configuration count
 PROFILE_COUNT=$(jq '.profiles | length' "$CONFIG_FILE")
-if [ "$PROFILE_COUNT" -lt "5" ]; then
-    echo "❌ Error: Configuration count incorrect, expected at least 5, got $PROFILE_COUNT"
+if [ "$PROFILE_COUNT" -lt "6" ]; then
+    echo "❌ Error: Configuration count incorrect, expected at least 6, got $PROFILE_COUNT"
     exit 1
 fi
 

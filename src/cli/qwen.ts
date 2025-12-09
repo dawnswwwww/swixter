@@ -198,9 +198,9 @@ async function cmdCreateInteractive(): Promise<void> {
   console.log(pc.bold(pc.cyan("Create Continue/Qwen Profile")));
   console.log();
 
-  const { allPresets } = await import("../providers/presets.js");
-  // Filter out Anthropic provider as it's not compatible with OpenAI API format
-  const presets = allPresets.filter(preset => preset.id !== 'anthropic');
+  const { getProvidersByWireApi } = await import("../providers/presets.js");
+  // Qwen only supports OpenAI-compatible (chat API) providers
+  const presets = await getProvidersByWireApi('chat');
 
   // 1. Enter profile name
   const name = await p.text({
@@ -269,7 +269,22 @@ async function cmdCreateInteractive(): Promise<void> {
     process.exit(EXIT_CODES.userCancelled);
   }
 
-  // 5. Apply immediately?
+  // 5. Enter model name
+  const modelName = await p.text({
+    message: PROMPTS.enterQwenModel,
+    placeholder: "e.g., gpt-4",
+    validate: (value) => {
+      if (!value || value.trim() === "") return "Model name is required";
+      return undefined;
+    },
+  });
+
+  if (p.isCancel(modelName)) {
+    p.cancel(ERRORS.cancelled);
+    process.exit(EXIT_CODES.userCancelled);
+  }
+
+  // 6. Apply immediately?
   const shouldApply = await p.confirm({
     message: "Apply this profile to Continue now?",
     initialValue: true,
@@ -291,6 +306,8 @@ async function cmdCreateInteractive(): Promise<void> {
       name: name as string,
       providerId: providerId as string,
       apiKey: (apiKey as string) || "",
+      model: modelName as string,
+      openaiModel: modelName as string, // Set both for compatibility
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -306,6 +323,7 @@ async function cmdCreateInteractive(): Promise<void> {
     console.log(`  Profile name: ${pc.cyan(profile.name)}`);
     console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(finalBaseURL || "Default")}`);
+    console.log(`  Model: ${pc.yellow(modelName as string)}`);
     console.log();
 
     // If apply immediately selected
@@ -324,9 +342,9 @@ async function cmdCreateInteractive(): Promise<void> {
  * Non-interactive profile creation
  */
 async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise<void> {
-  if (!params.name || !params.provider) {
+  if (!params.name || !params.provider || !params.model) {
     console.log(pc.red("Error: Missing required parameters"));
-    console.log(pc.dim("Usage: swixter qwen create --quiet --name <name> --provider <id> [--api-key <key>] [--base-url <url>]"));
+    console.log(pc.dim("Usage: swixter qwen create --quiet --name <name> --provider <id> --model <model> [--api-key <key>] [--base-url <url>]"));
     process.exit(1);
   }
 
@@ -357,6 +375,8 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
       name: params.name as string,
       providerId: params.provider as string,
       apiKey: (params["api-key"] as string) || "",
+      model: params.model as string,
+      openaiModel: params.model as string, // Set both for compatibility
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -373,6 +393,7 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
     console.log(`  Profile name: ${pc.cyan(profile.name)}`);
     console.log(`  Provider: ${pc.yellow(preset.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(finalBaseURL || "Default")}`);
+    console.log(`  Model: ${pc.yellow(params.model as string)}`);
     console.log();
 
     if (params.apply) {
@@ -532,9 +553,9 @@ async function cmdEdit(profileName?: string): Promise<void> {
   console.log(pc.bold(pc.cyan(`Edit profile: ${profileName}`)));
   console.log();
 
-  const { allPresets } = await import("../providers/presets.js");
-  // Filter out Anthropic provider as it's not compatible with OpenAI API format
-  const presets = allPresets.filter(preset => preset.id !== 'anthropic');
+  const { getProvidersByWireApi } = await import("../providers/presets.js");
+  // Qwen only supports OpenAI-compatible (chat API) providers
+  const presets = await getProvidersByWireApi('chat');
   const currentPreset = getPresetById(profile.providerId);
 
   // 1. Change provider?
@@ -905,6 +926,10 @@ async function cmdRun(args: string[]): Promise<void> {
   if (baseURL) {
     env.OPENAI_BASE_URL = baseURL;
   }
+  // Set OPENAI_MODEL if model is configured
+  if (profile.model || profile.openaiModel) {
+    env.OPENAI_MODEL = profile.model || profile.openaiModel;
+  }
 
   // Filter out --profile parameter, build qwen arguments
   const qwenArgs = [];
@@ -919,6 +944,11 @@ async function cmdRun(args: string[]): Promise<void> {
     qwenArgs.push("--openai-base-url", baseURL);
   }
 
+  // Add model to arguments if available
+  if (profile.model || profile.openaiModel) {
+    qwenArgs.push("--model", profile.model || profile.openaiModel);
+  }
+
   // Add other user-provided arguments (excluding --profile)
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--profile") {
@@ -930,9 +960,13 @@ async function cmdRun(args: string[]): Promise<void> {
   }
 
   // Show profile being used
+  const modelToUse = profile.model || profile.openaiModel;
   console.log();
   console.log(pc.dim(`Using profile: ${pc.cyan(profile.name)} (${preset?.displayName})`));
   console.log(pc.dim(`Base URL: ${pc.yellow(baseURL || "Default")}`));
+  if (modelToUse) {
+    console.log(pc.dim(`Model: ${pc.yellow(modelToUse)}`));
+  }
   console.log();
 
   // Use shared utility for spawning CLI

@@ -222,6 +222,60 @@ describe("ContinueAdapter", () => {
       expect(config.models.length).toBe(1);
     });
 
+    test("should include model field when specified", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test-with-model",
+        providerId: "openai",
+        apiKey: "sk-test",
+        model: "gpt-4",
+        openaiModel: "gpt-4",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = yaml.load(await file.text()) as any;
+
+      expect(config.models[0].model).toBe("gpt-4");
+    });
+
+    test("should use openaiModel when model is not set", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test-with-openai-model",
+        providerId: "openrouter",
+        apiKey: "sk-or-test",
+        openaiModel: "claude-3-5-sonnet-20241022",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = yaml.load(await file.text()) as any;
+
+      expect(config.models[0].model).toBe("claude-3-5-sonnet-20241022");
+    });
+
+    test("should not include model field when not specified", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test-without-model",
+        providerId: "anthropic",
+        apiKey: "sk-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = yaml.load(await file.text()) as any;
+
+      expect(config.models[0].model).toBeUndefined();
+    });
+
     test("should create directory if it doesn't exist", async () => {
       const deepPath = "/tmp/swixter-test-deep-continue/nested/dir/config.yaml";
       (adapter as any).configPath = deepPath;
@@ -349,6 +403,57 @@ describe("ContinueAdapter", () => {
         providerId: "ollama",
         apiKey: "",
         baseURL: "http://localhost:11434",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+      const result = await adapter.verify(profile);
+      expect(result).toBe(true);
+    });
+
+    test("should verify model field", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test-model",
+        providerId: "openai",
+        apiKey: "sk-test",
+        model: "gpt-4",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+      const result = await adapter.verify(profile);
+      expect(result).toBe(true);
+    });
+
+    test("should return false if model doesn't match", async () => {
+      const profile1: ClaudeCodeProfile = {
+        name: "test-model-mismatch",
+        providerId: "openai",
+        apiKey: "sk-test",
+        model: "gpt-4",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile1);
+
+      const profile2: ClaudeCodeProfile = {
+        ...profile1,
+        model: "gpt-3.5-turbo", // Different model
+      };
+
+      const result = await adapter.verify(profile2);
+      expect(result).toBe(false);
+    });
+
+    test("should verify openaiModel field", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test-openai-model",
+        providerId: "openrouter",
+        apiKey: "sk-or-test",
+        openaiModel: "claude-3-5-sonnet-20241022",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

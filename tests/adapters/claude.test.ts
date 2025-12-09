@@ -225,6 +225,84 @@ describe("ClaudeCodeAdapter", () => {
       expect(config.env.ANTHROPIC_API_KEY).toBeUndefined();
     });
 
+    test("should create config with model configuration", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "anthropic",
+        apiKey: "sk-test-key",
+        models: {
+          anthropicModel: "claude-3-5-sonnet-20241022",
+          defaultHaikuModel: "claude-3-5-haiku-20241022",
+          defaultOpusModel: "claude-3-opus-20240229",
+          defaultSonnetModel: "claude-3-5-sonnet-20241022",
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-test-key");
+      expect(config.env.ANTHROPIC_MODEL).toBe("claude-3-5-sonnet-20241022");
+      expect(config.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe("claude-3-5-haiku-20241022");
+      expect(config.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("claude-3-opus-20240229");
+      expect(config.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("claude-3-5-sonnet-20241022");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
+    });
+
+    test("should create config with partial model configuration", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "anthropic",
+        apiKey: "sk-test-key",
+        models: {
+          anthropicModel: "claude-3-5-sonnet-20241022",
+          // Only some models configured
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-test-key");
+      expect(config.env.ANTHROPIC_MODEL).toBe("claude-3-5-sonnet-20241022");
+      // Unconfigured models should not be set
+      expect(config.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBeUndefined();
+      expect(config.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBeUndefined();
+      expect(config.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBeUndefined();
+    });
+
+    test("should create config without models (backward compatibility)", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "anthropic",
+        apiKey: "sk-test-key",
+        // No models field - should work fine
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-test-key");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
+      // Model env vars should not be set
+      expect(config.env.ANTHROPIC_MODEL).toBeUndefined();
+      expect(config.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBeUndefined();
+      expect(config.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBeUndefined();
+      expect(config.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBeUndefined();
+    });
+
     test("should create directory if it doesn't exist", async () => {
       const deepPath = "/tmp/swixter-test-deep/nested/dir/settings.json";
       (adapter as any).configPath = deepPath;
@@ -374,6 +452,64 @@ describe("ClaudeCodeAdapter", () => {
 
       const result = await adapter.verify(profile);
       expect(result).toBeFalsy();
+    });
+
+    test("should verify model configuration correctly", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "anthropic",
+        apiKey: "sk-test-key",
+        models: {
+          anthropicModel: "claude-3-5-sonnet-20241022",
+          defaultHaikuModel: "claude-3-5-haiku-20241022",
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+      const result = await adapter.verify(profile);
+      expect(result).toBe(true);
+    });
+
+    test("should return false if model configuration doesn't match", async () => {
+      const profile1: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "anthropic",
+        apiKey: "sk-test-key",
+        models: {
+          anthropicModel: "claude-3-5-sonnet-20241022",
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile1);
+
+      const profile2: ClaudeCodeProfile = {
+        ...profile1,
+        models: {
+          anthropicModel: "claude-3-opus-20240229", // Different model
+        },
+      };
+
+      const result = await adapter.verify(profile2);
+      expect(result).toBe(false);
+    });
+
+    test("should verify profile without models (backward compatibility)", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "anthropic",
+        apiKey: "sk-test-key",
+        // No models field
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+      const result = await adapter.verify(profile);
+      expect(result).toBe(true);
     });
   });
 });

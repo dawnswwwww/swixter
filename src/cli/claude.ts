@@ -125,7 +125,7 @@ ${pc.bold("Create profile (interactive):")}
   ${pc.green(`swixter ${CODER_NAME} create`)}
 
 ${pc.bold("Create profile (non-interactive):")}
-  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--apply]`)}
+  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--anthropic-model <model>] [--default-haiku-model <model>] [--default-opus-model <model>] [--default-sonnet-model <model>] [--apply]`)}
 
 ${pc.bold("Examples:")}
   ${pc.dim("# Interactive profile creation")}
@@ -275,7 +275,72 @@ async function cmdCreateInteractive(): Promise<void> {
     process.exit(EXIT_CODES.userCancelled);
   }
 
-  // 6. Apply immediately?
+  // 6. Configure models? (for all Claude Code profiles)
+  let models: ClaudeCodeProfile["models"] = undefined;
+  if (true) { // Ask for model configuration for all providers
+    const configureModels = await p.confirm({
+      message: PROMPTS.configureModels,
+      initialValue: false,
+    });
+
+    if (p.isCancel(configureModels)) {
+      p.cancel(ERRORS.cancelled);
+      process.exit(EXIT_CODES.userCancelled);
+    }
+
+    if (configureModels) {
+      // Ask for each model configuration
+      const anthropicModel = await p.text({
+        message: PROMPTS.anthropicModel,
+        placeholder: "claude-3-5-sonnet-20241022",
+      });
+
+      if (p.isCancel(anthropicModel)) {
+        p.cancel(ERRORS.cancelled);
+        process.exit(EXIT_CODES.userCancelled);
+      }
+
+      const defaultHaikuModel = await p.text({
+        message: PROMPTS.defaultHaikuModel,
+        placeholder: "claude-3-5-haiku-20241022",
+      });
+
+      if (p.isCancel(defaultHaikuModel)) {
+        p.cancel(ERRORS.cancelled);
+        process.exit(EXIT_CODES.userCancelled);
+      }
+
+      const defaultOpusModel = await p.text({
+        message: PROMPTS.defaultOpusModel,
+        placeholder: "claude-3-opus-20240229",
+      });
+
+      if (p.isCancel(defaultOpusModel)) {
+        p.cancel(ERRORS.cancelled);
+        process.exit(EXIT_CODES.userCancelled);
+      }
+
+      const defaultSonnetModel = await p.text({
+        message: PROMPTS.defaultSonnetModel,
+        placeholder: "claude-3-5-sonnet-20241022",
+      });
+
+      if (p.isCancel(defaultSonnetModel)) {
+        p.cancel(ERRORS.cancelled);
+        process.exit(EXIT_CODES.userCancelled);
+      }
+
+      // Only add non-empty models
+      models = {
+        ...(anthropicModel && { anthropicModel }),
+        ...(defaultHaikuModel && { defaultHaikuModel }),
+        ...(defaultOpusModel && { defaultOpusModel }),
+        ...(defaultSonnetModel && { defaultSonnetModel }),
+      };
+    }
+  }
+
+  // 7. Apply immediately?
   const shouldApply = await p.confirm({
     message: "Apply this profile to Claude Code now?",
     initialValue: true,
@@ -310,6 +375,11 @@ async function cmdCreateInteractive(): Promise<void> {
       profile.baseURL = finalBaseURL;
     }
 
+    // Add models configuration (if provided)
+    if (models) {
+      profile.models = models;
+    }
+
     await upsertProfile(profile, CODER_NAME);
     spinner.stop("Profile created successfully!");
 
@@ -337,7 +407,7 @@ async function cmdCreateInteractive(): Promise<void> {
 async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise<void> {
   if (!params.name || !params.provider) {
     console.log(pc.red("Error: Missing required parameters"));
-    console.log(pc.dim("Usage: swixter claude create --quiet --name <name> --provider <id> [--api-key <key>] [--auth-token <token>] [--base-url <url>] [--apply]"));
+    console.log(pc.dim("Usage: swixter claude create --quiet --name <name> --provider <id> [--api-key <key>] [--auth-token <token>] [--base-url <url>] [--anthropic-model <model>] [--default-haiku-model <model>] [--default-opus-model <model>] [--default-sonnet-model <model>] [--apply]"));
     process.exit(1);
   }
 
@@ -366,6 +436,21 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
 
     if (finalBaseURL) {
       profile.baseURL = finalBaseURL;
+    }
+
+    // Add models configuration (if provided)
+    const anthropicModel = params["anthropic-model"] as string;
+    const defaultHaikuModel = params["default-haiku-model"] as string;
+    const defaultOpusModel = params["default-opus-model"] as string;
+    const defaultSonnetModel = params["default-sonnet-model"] as string;
+
+    if (anthropicModel || defaultHaikuModel || defaultOpusModel || defaultSonnetModel) {
+      profile.models = {
+        ...(anthropicModel && { anthropicModel }),
+        ...(defaultHaikuModel && { defaultHaikuModel }),
+        ...(defaultOpusModel && { defaultOpusModel }),
+        ...(defaultSonnetModel && { defaultSonnetModel }),
+      };
     }
 
     await upsertProfile(profile, CODER_NAME);

@@ -9,6 +9,18 @@ CONFIG_FILE="$HOME/.config/swixter/config.json"
 echo "=== Test: Delete Configuration ==="
 
 # Prerequisite: Have test-auth-only configuration
+echo "Creating test-auth-only configuration..."
+$CLI_CMD claude create \
+  --quiet \
+  --name test-auth-only \
+  --provider anthropic \
+  --auth-token sk-ant-auth-only
+
+# Verify configuration exists
+if ! jq -e '.profiles["test-auth-only"]' "$CONFIG_FILE" > /dev/null; then
+    echo "❌ Error: test-auth-only configuration not created"
+    exit 1
+fi
 
 # Record initial configuration count
 INITIAL_COUNT=$(jq '.profiles | length' "$CONFIG_FILE")
