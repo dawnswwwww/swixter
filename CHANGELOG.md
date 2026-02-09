@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7] - 2025-02-09
+
+### Added
+- **Install and Update Commands for All Coders**
+  - `swixter <coder> install` - Interactive CLI installation with platform-specific methods
+  - `swixter <coder> update-cli` / `upgrade` - Update CLI to latest version
+  - Automatic installation detection and method inference
+  - Support for curl, Homebrew, npm, WinGet, and custom installation methods
+  - Platform-specific recommendations (curl for Unix, PowerShell for Windows)
+  - Non-interactive mode with `--method` parameter
+  - Reinstall confirmation when CLI already installed
+
+### Changed
+- **Code Refactoring: Eliminate Duplicate Install/Update Handlers**
+  - Created `src/utils/install-commands.ts` with shared `handleInstallCommand()` and `handleUpdateCommand()`
+  - Simplified claude.ts, codex.ts, qwen.ts: ~220 lines → ~20 lines per file
+  - Removed ~660 lines of duplicate code across three coder files
+  - Improved maintainability: single source of truth for install/update logic
+
+### Improved
+- **Version Detection with semver Library**
+  - Migrated from custom regex parsing to industry-standard semver library
+  - Support for pre-release versions (e.g., 1.0.0-alpha, 2.0.0-beta.1)
+  - More robust version parsing and comparison
+  - New `isValidVersion()` utility function
+
+### Improved
+- **Update Command Fallback Logic**
+  - Interactive mode: prompts user to select installation method when auto-detection fails
+  - Non-interactive mode: uses recommended method with clear warning messages
+  - Prevents incorrect update commands when installation method is ambiguous
+
+### Added
+- **Comprehensive Test Coverage**
+  - New test file: `tests/utils/cli-version.test.ts` (19 tests, all passing)
+  - New test file: `tests/utils/install.test.ts` (42 tests, all passing)
+  - New E2E scenarios: install-detection, install-command, update-command (all passing)
+  - Total: 215 unit tests + 11 E2E tests = 226 tests passing
+
+### Technical
+- Added `semver` as production dependency
+- Created `src/constants/install.ts` with platform-specific installation configurations
+- Enhanced `src/utils/install.ts` with installation method detection
+- All tests passing (215 unit + 11 E2E)
+- Fully backward compatible - no breaking changes
+
+[0.0.7]: https://github.com/dawnswwwww/swixter/compare/v0.0.6...v0.0.7
+
+## [0.0.6] - 2025-02-XX
+
+### Added
+- **Comprehensive Model Configuration Support for All Coders**
+  - Configure model selection per profile for Claude Code, Qwen, and Codex
+  - Claude Code: separate models for Sonnet, Opus, Haiku, and default
+  - Codex and Qwen: configurable OpenAI-compatible model parameter
+  - Environment variable mapping for model configuration
+  - Interactive prompts during profile creation and editing
+
+[0.0.6]: https://github.com/dawnswwwww/swixter/compare/v0.0.5...v0.0.6
+
+## [0.0.5] - 2025-12-07
+
+### Added
+- Initial stable release with multi-coder support
+- Support for Claude Code, Codex, and Continue/Qwen
+- Profile management (create, switch, list, delete, apply)
+- Custom provider configuration
+- Command aliases
+
+[0.0.5]: https://github.com/dawnswwwww/swixter/compare/v0.0.4...v0.0.5
+
 ## [0.0.4] - 2025-12-06
 
 ### Added

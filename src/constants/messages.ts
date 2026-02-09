@@ -180,4 +180,21 @@ export const PROGRESS = {
   applying: "Applying profile...",
   exporting: "Exporting configuration...",
   importing: "Importing configuration...",
+  installing: (name: string) => `Installing ${name}...`,
+} as const;
+
+/**
+ * Installation-related messages
+ */
+export const INSTALL = {
+  cliNotInstalled: (name: string) => `${name} CLI is not installed`,
+  confirmInstall: (name: string) => `Would you like to install ${name}?`,
+  selectMethod: "Select installation method",
+  installing: (name: string) => `Installing ${name}...`,
+  installSuccess: (name: string) => `${name} installed successfully!`,
+  installFailed: (name: string) => `Failed to install ${name}`,
+  installManualHint: (name: string) => `Please install ${name} manually and try again`,
+  verifyingInstall: "Verifying installation...",
+  restartTerminalHint: "You may need to restart your terminal for the command to be available",
+  skipInstall: "Skipping installation",
 } as const;

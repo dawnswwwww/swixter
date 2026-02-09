@@ -67,6 +67,9 @@ TESTS_FAILED=0
 
 # Test scenario list
 SCENARIOS=(
+    "test-install-detection.sh"
+    "test-install-command.sh"
+    "test-update-command.sh"
     "test-create.sh"
     "test-switch.sh"
     "test-list.sh"

@@ -60,6 +60,9 @@ export const VALID_COMMANDS = [
   "current",
   "delete",
   "run",
+  "install",
+  "update-cli",
+  "upgrade",
   "doctor",
 ] as const;
 

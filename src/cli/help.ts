@@ -447,6 +447,60 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
         "Tests network connectivity",
       ],
     },
+
+    install: {
+      name: "install",
+      description: "Install the target CLI tool",
+      usage: `swixter ${coderName} install [--method <index>]`,
+      args: [
+        {
+          name: "--method, -m",
+          description: "Installation method index (1-based, non-interactive mode)",
+          required: false,
+          type: "number",
+        },
+      ],
+      examples: [
+        {
+          description: "Install interactively (select method)",
+          command: `swixter ${coderName} install`,
+        },
+        {
+          description: "Install using first method (non-interactive)",
+          command: `swixter ${coderName} install --method 1`,
+        },
+      ],
+      relatedCommands: ["update-cli", "run"],
+      notes: [
+        "Shows available installation methods for your platform",
+        "If CLI is already installed, prompts to reinstall",
+        "Use --method to skip interactive selection",
+      ],
+    },
+
+    "update-cli": {
+      name: "update-cli",
+      aliases: ["upgrade"],
+      description: "Update the target CLI tool to latest version",
+      usage: `swixter ${coderName} update-cli`,
+      args: [],
+      examples: [
+        {
+          description: "Update to latest version",
+          command: `swixter ${coderName} update-cli`,
+        },
+        {
+          description: "Use alias",
+          command: `swixter ${coderName} upgrade`,
+        },
+      ],
+      relatedCommands: ["install"],
+      notes: [
+        "Requires CLI to be already installed",
+        "Uses the recommended installation method to update",
+        "Shows version before and after update",
+      ],
+    },
   };
 }
 
@@ -531,6 +585,8 @@ ${pc.bold("Management Commands:")}
   ${pc.cyan("delete")}              ${pc.dim("Delete specified configuration")}
 
 ${pc.bold("Utility Commands:")}
+  ${pc.cyan("install")}             ${pc.dim("Install target CLI tool")}
+  ${pc.cyan("update-cli, upgrade")} ${pc.dim("Update target CLI tool")}
   ${pc.cyan("doctor")}              ${pc.dim("Diagnose configuration issues")}
 
 ${pc.bold("Command Aliases:")}

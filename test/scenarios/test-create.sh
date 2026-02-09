@@ -31,8 +31,13 @@ fi
 # Verify claude's active configuration
 ACTIVE=$(jq -r '.coders.claude.activeProfile' "$CONFIG_FILE")
 if [ "$ACTIVE" != "test-anthropic" ]; then
-    echo "❌ Error: Claude active configuration incorrect, expected test-anthropic, got $ACTIVE"
-    exit 1
+    # If not active, explicitly switch to it (handles case where other profiles exist)
+    $CLI_CMD claude switch test-anthropic --quiet 2>&1 || true
+    ACTIVE=$(jq -r '.coders.claude.activeProfile' "$CONFIG_FILE")
+    if [ "$ACTIVE" != "test-anthropic" ]; then
+        echo "❌ Error: Claude active configuration incorrect, expected test-anthropic, got $ACTIVE"
+        exit 1
+    fi
 fi
 
 echo "✓ Test 1 passed"

@@ -27,6 +27,7 @@ import {
   MISC_DEFAULTS,
   MARKERS,
   EXIT_CODES,
+  INSTALL,
 } from "../constants/index.js";
 import {
   withSpinner,
@@ -38,6 +39,8 @@ import {
 import { ProfileValidators } from "../utils/validation.js";
 import { handleApplyPrompt } from "../utils/commands.js";
 import { spawnCLI } from "../utils/process.js";
+import { ensureCliAvailable } from "../utils/install.js";
+import { handleInstallCommand, handleUpdateCommand } from "../utils/install-commands.js";
 
 const CODER_NAME = "codex";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
@@ -91,6 +94,13 @@ export async function handleCodexCommand(args: string[]): Promise<void> {
     case "run":
     case "r": // Ultra-short alias
       await cmdRun(args.slice(1));
+      break;
+    case "install":
+      await cmdInstall(args.slice(1));
+      break;
+    case "update-cli":
+    case "upgrade":
+      await cmdUpdate(args.slice(1));
       break;
     default:
       showError(
@@ -971,6 +981,8 @@ async function cmdMainMenu(): Promise<void> {
       { value: "apply", label: "Apply profile", hint: `Apply current profile to ${CODER_CONFIG.displayName}` },
       { value: "current", label: "Show current profile", hint: "View active profile" },
       { value: "delete", label: "Delete profile", hint: "Delete specified profile" },
+      { value: "install", label: "Install Codex CLI", hint: "Install or reinstall Codex CLI" },
+      { value: "update-cli", label: "Update Codex CLI", hint: "Update Codex CLI to latest version" },
       { value: "exit", label: "Exit", hint: "Exit program" },
     ],
   });
@@ -1006,6 +1018,12 @@ async function cmdMainMenu(): Promise<void> {
       break;
     case "delete":
       await cmdDeleteInteractive();
+      break;
+    case "install":
+      await cmdInstall([]);
+      break;
+    case "update-cli":
+      await cmdUpdate([]);
       break;
     case "exit":
       console.log(pc.green("Goodbye!"));
@@ -1091,6 +1109,14 @@ async function cmdDeleteInteractive(): Promise<void> {
  * 3. Spawns codex process with proper environment
  */
 async function cmdRun(args: string[]): Promise<void> {
+  if (!CODER_CONFIG) {
+    console.log(pc.red("Error: Invalid coder configuration"));
+    process.exit(EXIT_CODES.generalError);
+  }
+
+  // Ensure Codex CLI is installed before proceeding
+  await ensureCliAvailable(CODER_NAME, CODER_CONFIG);
+
   const params = parseArgs(args);
 
   // Get profile to use
@@ -1128,9 +1154,14 @@ async function cmdRun(args: string[]): Promise<void> {
     const envKey = profile.envKey || preset?.env_key || "OPENAI_API_KEY";
 
     // Step 3: Build environment variables
-    const env = {
-      ...process.env,
-    };
+    const env: Record<string, string> = {};
+
+    // Copy process.env, filtering out undefined values
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined) {
+        env[key] = value;
+      }
+    }
 
     // Set the API key using the correct env_key name
     if (profile.apiKey) {
@@ -1173,4 +1204,26 @@ async function cmdRun(args: string[]): Promise<void> {
     console.log();
     process.exit(1);
   }
+}
+
+/**
+ * Install Codex CLI
+ */
+async function cmdInstall(args: string[]): Promise<void> {
+  if (!CODER_CONFIG) {
+    console.log(pc.red("Error: Invalid coder configuration"));
+    process.exit(EXIT_CODES.generalError);
+  }
+  await handleInstallCommand(CODER_NAME, CODER_CONFIG, args);
+}
+
+/**
+ * Update Codex CLI to latest version
+ */
+async function cmdUpdate(args: string[]): Promise<void> {
+  if (!CODER_CONFIG) {
+    console.log(pc.red("Error: Invalid coder configuration"));
+    process.exit(EXIT_CODES.generalError);
+  }
+  await handleUpdateCommand(CODER_NAME, CODER_CONFIG, args);
 }

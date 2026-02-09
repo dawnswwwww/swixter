@@ -27,6 +27,7 @@ import {
   MISC_DEFAULTS,
   MARKERS,
   EXIT_CODES,
+  INSTALL,
 } from "../constants/index.js";
 import {
   withSpinner,
@@ -38,6 +39,8 @@ import {
 import { ProfileValidators } from "../utils/validation.js";
 import { handleApplyPrompt } from "../utils/commands.js";
 import { spawnCLI } from "../utils/process.js";
+import { ensureCliAvailable } from "../utils/install.js";
+import { handleInstallCommand, handleUpdateCommand } from "../utils/install-commands.js";
 
 const CODER_NAME = "qwen";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
@@ -91,6 +94,13 @@ export async function handleQwenCommand(args: string[]): Promise<void> {
     case "run":
     case "r": // Ultra-short alias
       await cmdRun(args.slice(1));
+      break;
+    case "install":
+      await cmdInstall(args.slice(1));
+      break;
+    case "update-cli":
+    case "upgrade":
+      await cmdUpdate(args.slice(1));
       break;
     default:
       showError(
@@ -768,6 +778,8 @@ async function cmdMainMenu(): Promise<void> {
       { value: "apply", label: "Apply profile", hint: "Apply current profile to Continue" },
       { value: "current", label: "Show current profile", hint: "View active profile" },
       { value: "delete", label: "Delete profile", hint: "Delete specified profile" },
+      { value: "install", label: "Install Qwen CLI", hint: "Install or reinstall Qwen CLI" },
+      { value: "update-cli", label: "Update Qwen CLI", hint: "Update Qwen CLI to latest version" },
       { value: "exit", label: "Exit", hint: "Exit program" },
     ],
   });
@@ -803,6 +815,12 @@ async function cmdMainMenu(): Promise<void> {
       break;
     case "delete":
       await cmdDeleteInteractive();
+      break;
+    case "install":
+      await cmdInstall([]);
+      break;
+    case "update-cli":
+      await cmdUpdate([]);
       break;
     case "exit":
       console.log(pc.green("Goodbye!"));
@@ -884,6 +902,14 @@ async function cmdDeleteInteractive(): Promise<void> {
  * Run Qwen Code CLI with current or specified profile
  */
 async function cmdRun(args: string[]): Promise<void> {
+  if (!CODER_CONFIG) {
+    console.log(pc.red("Error: Invalid coder configuration"));
+    process.exit(EXIT_CODES.generalError);
+  }
+
+  // Ensure Qwen CLI is installed before proceeding
+  await ensureCliAvailable(CODER_NAME, CODER_CONFIG);
+
   const params = parseArgs(args);
 
   // Get profile to use
@@ -915,9 +941,14 @@ async function cmdRun(args: string[]): Promise<void> {
   const baseURL = profile.baseURL || preset?.baseURL || "";
 
   // Build environment variables
-  const env = {
-    ...process.env,
-  };
+  const env: Record<string, string> = {};
+
+  // Copy process.env, filtering out undefined values
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
 
   // Set corresponding environment variables based on provider
   if (profile.apiKey) {
@@ -976,4 +1007,26 @@ async function cmdRun(args: string[]): Promise<void> {
     env,
     displayName: CODER_CONFIG.displayName,
   });
+}
+
+/**
+ * Install Qwen CLI
+ */
+async function cmdInstall(args: string[]): Promise<void> {
+  if (!CODER_CONFIG) {
+    console.log(pc.red("Error: Invalid coder configuration"));
+    process.exit(EXIT_CODES.generalError);
+  }
+  await handleInstallCommand(CODER_NAME, CODER_CONFIG, args);
+}
+
+/**
+ * Update Qwen CLI to latest version
+ */
+async function cmdUpdate(args: string[]): Promise<void> {
+  if (!CODER_CONFIG) {
+    console.log(pc.red("Error: Invalid coder configuration"));
+    process.exit(EXIT_CODES.generalError);
+  }
+  await handleUpdateCommand(CODER_NAME, CODER_CONFIG, args);
 }

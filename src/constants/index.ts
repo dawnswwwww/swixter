@@ -9,3 +9,4 @@ export * from "./formatting.js";
 export * from "./defaults.js";
 export * from "./versions.js";
 export * from "./meta.js";
+export * from "./install.js";
