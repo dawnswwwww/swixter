@@ -708,7 +708,77 @@ async function cmdEdit(profileName?: string): Promise<void> {
     return;
   }
 
-  // 5. Apply immediately?
+  // 5. Configure models?
+  let models: ClaudeCodeProfile["models"] = undefined;
+  let editedModels = false;
+
+  const currentModelsInfo = profile.models
+    ? `Current: ${Object.entries(profile.models).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(", ")}`
+    : "No models configured";
+
+  const configureModels = await p.confirm({
+    message: `Edit model settings? (${currentModelsInfo})`,
+    initialValue: false,
+  });
+
+  if (p.isCancel(configureModels)) {
+    p.cancel(ERRORS.cancelled);
+    return;
+  }
+
+  if (configureModels) {
+    editedModels = true;
+
+    const anthropicModel = await p.text({
+      message: PROMPTS.anthropicModel,
+      placeholder: profile.models?.anthropicModel || "claude-3-5-sonnet-20241022",
+    });
+
+    if (p.isCancel(anthropicModel)) {
+      p.cancel(ERRORS.cancelled);
+      return;
+    }
+
+    const defaultHaikuModel = await p.text({
+      message: PROMPTS.defaultHaikuModel,
+      placeholder: profile.models?.defaultHaikuModel || "claude-3-5-haiku-20241022",
+    });
+
+    if (p.isCancel(defaultHaikuModel)) {
+      p.cancel(ERRORS.cancelled);
+      return;
+    }
+
+    const defaultOpusModel = await p.text({
+      message: PROMPTS.defaultOpusModel,
+      placeholder: profile.models?.defaultOpusModel || "claude-3-opus-20240229",
+    });
+
+    if (p.isCancel(defaultOpusModel)) {
+      p.cancel(ERRORS.cancelled);
+      return;
+    }
+
+    const defaultSonnetModel = await p.text({
+      message: PROMPTS.defaultSonnetModel,
+      placeholder: profile.models?.defaultSonnetModel || "claude-3-5-sonnet-20241022",
+    });
+
+    if (p.isCancel(defaultSonnetModel)) {
+      p.cancel(ERRORS.cancelled);
+      return;
+    }
+
+    // Only add non-empty models
+    models = {
+      ...(anthropicModel && { anthropicModel }),
+      ...(defaultHaikuModel && { defaultHaikuModel }),
+      ...(defaultOpusModel && { defaultOpusModel }),
+      ...(defaultSonnetModel && { defaultSonnetModel }),
+    };
+  }
+
+  // 6. Apply immediately?
   const shouldApply = await p.confirm({
     message: "Apply this profile to Claude Code now?",
     initialValue: false,
@@ -752,6 +822,17 @@ async function cmdEdit(profileName?: string): Promise<void> {
       if (profile.baseURL) {
         updatedProfile.baseURL = profile.baseURL;
       }
+    }
+
+    // Handle Models
+    if (editedModels) {
+      if (models && Object.keys(models).length > 0) {
+        updatedProfile.models = models;
+      }
+      // If editedModels but models is empty, clear models (don't set)
+    } else if (profile.models) {
+      // Keep existing models
+      updatedProfile.models = profile.models;
     }
 
     const finalBaseURL = updatedProfile.baseURL || newPreset?.baseURL || "";

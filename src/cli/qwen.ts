@@ -628,7 +628,19 @@ async function cmdEdit(profileName?: string): Promise<void> {
     return;
   }
 
-  // 4. Apply immediately?
+  // 4. Edit model name
+  const currentModel = profile.model || profile.openaiModel || "";
+  const newModelName = await p.text({
+    message: `Model name (leave empty to keep current${currentModel ? `: ${currentModel}` : ""}, enter 'clear' to remove)`,
+    placeholder: currentModel || "e.g., gpt-4",
+  });
+
+  if (p.isCancel(newModelName)) {
+    p.cancel(ERRORS.cancelled);
+    return;
+  }
+
+  // 5. Apply immediately?
   const shouldApply = await p.confirm({
     message: "Apply this profile to Continue now?",
     initialValue: false,
@@ -667,7 +679,20 @@ async function cmdEdit(profileName?: string): Promise<void> {
       }
     }
 
+    // Handle Model
+    if (newModelName && (newModelName as string) === "clear") {
+      // Clear model (don't set)
+    } else if (newModelName) {
+      updatedProfile.model = newModelName as string;
+      updatedProfile.openaiModel = newModelName as string;
+    } else {
+      // Keep existing
+      if (profile.model) updatedProfile.model = profile.model;
+      if (profile.openaiModel) updatedProfile.openaiModel = profile.openaiModel;
+    }
+
     const finalBaseURL = updatedProfile.baseURL || newPreset?.baseURL || "";
+    const finalModel = updatedProfile.model || updatedProfile.openaiModel || "";
 
     await upsertProfile(updatedProfile, CODER_NAME);
     spinner.stop("Profile updated successfully!");
@@ -676,6 +701,7 @@ async function cmdEdit(profileName?: string): Promise<void> {
     console.log(`  Profile name: ${pc.cyan(updatedProfile.name)}`);
     console.log(`  Provider: ${pc.yellow(newPreset?.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(finalBaseURL || "Default")}`);
+    console.log(`  Model: ${pc.yellow(finalModel || "None")}`);
     console.log();
 
     // If apply immediately selected
