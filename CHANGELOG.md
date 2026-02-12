@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.8] - 2025-02-11
+
+### Fixed
+- **Edit profile now includes all fields from create**
+  - Claude edit: added model configuration (anthropicModel, defaultHaikuModel, defaultOpusModel, defaultSonnetModel)
+  - Qwen edit: added model name editing
+  - Previously these fields could only be set during creation, requiring delete & recreate to modify
+
 ## [0.0.7] - 2025-02-09
 
 ### Added
@@ -53,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All tests passing (215 unit + 11 E2E)
 - Fully backward compatible - no breaking changes
 
+[0.0.8]: https://github.com/dawnswwwww/swixter/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/dawnswwwww/swixter/compare/v0.0.6...v0.0.7
 
 ## [0.0.6] - 2025-02-XX
