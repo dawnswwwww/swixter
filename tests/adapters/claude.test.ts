@@ -146,8 +146,8 @@ describe("ClaudeCodeAdapter", () => {
 
       expect(config.env.ANTHROPIC_API_KEY).toBe("new-key");
       expect(config.env.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
-      // Full replacement strategy: non-managed env vars are removed
-      expect(config.env.OTHER_VAR).toBeUndefined();
+      // Smart merge: non-managed env vars are preserved
+      expect(config.env.OTHER_VAR).toBe("this-will-be-removed");
     });
 
     test("should handle profile with only apiKey", async () => {

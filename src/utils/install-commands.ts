@@ -18,6 +18,7 @@ import {
 import { getCliVersion } from "./cli-version.js";
 import { getInstallConfig, UPDATE_COMMANDS } from "../constants/install.js";
 import type { InstallMethod } from "../constants/install.js";
+import { parseFlags } from "../cli/commands/parsers.js";
 
 /**
  * Install command handler - works for any coder
@@ -66,7 +67,7 @@ export async function handleInstallCommand(
   let selectedMethod: InstallMethod;
 
   // Parse args for --method parameter
-  const params = parseArgs(args);
+  const params = parseFlags(args);
 
   if (params.method !== undefined) {
     const methodIndex = parseInt(params.method as string, 10) - 1;
@@ -247,27 +248,4 @@ export async function handleUpdateCommand(
   }
 
   console.log();
-}
-
-/**
- * Simple argument parser for --method parameter
- */
-function parseArgs(args: string[]): Record<string, string | boolean> {
-  const parsed: Record<string, string | boolean> = {};
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith("--")) {
-      const key = args[i].slice(2);
-      const value = args[i + 1];
-
-      if (!value || value.startsWith("--")) {
-        parsed[key] = true;
-      } else {
-        parsed[key] = value;
-        i++;
-      }
-    }
-  }
-
-  return parsed;
 }

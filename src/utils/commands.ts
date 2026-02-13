@@ -4,31 +4,7 @@
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-
-/**
- * Parse command line arguments into key-value pairs
- * @internal
- */
-function parseArgs(args: string[]): Record<string, string | boolean> {
-  const parsed: Record<string, string | boolean> = {};
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith("--")) {
-      const key = args[i].slice(2);
-      const value = args[i + 1];
-
-      // Check if it's a boolean flag
-      if (!value || value.startsWith("--")) {
-        parsed[key] = true;
-      } else {
-        parsed[key] = value;
-        i++;
-      }
-    }
-  }
-
-  return parsed;
-}
+import { parseFlags } from "../cli/commands/parsers.js";
 
 /**
  * Options for handling apply prompt after switch
@@ -58,7 +34,7 @@ export async function handleApplyPrompt(options: ApplyPromptOptions): Promise<vo
   const { args, applyFn, coderDisplayName, coderName } = options;
 
   // Parse args to check for --apply or --no-apply flags
-  const params = parseArgs(args);
+  const params = parseFlags(args);
   const shouldApply = params.apply;
   const noApply = params["no-apply"];
 

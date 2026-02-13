@@ -168,6 +168,7 @@ export const LABELS = {
   configFile: "Config File",
   createdAt: "Created At",
   updatedAt: "Updated At",
+  profileList: "Profiles",
 } as const;
 
 /**

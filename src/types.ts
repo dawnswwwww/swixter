@@ -157,6 +157,8 @@ export const ProviderPresetSchema = z.object({
   }).optional(),
   docs: z.string().url().optional(),
   isChinese: z.boolean().optional(),
+  wire_api: z.enum(["chat", "responses"]).optional(),
+  env_key: z.string().optional(),
 });
 
 export const ClaudeCodeProfileSchema = z.object({

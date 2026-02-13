@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { ConfigFile, ClaudeCodeProfile } from "../types.js";
 import { ConfigFileSchema } from "../types.js";
-import { CONFIG_VERSION, SERIALIZATION } from "../constants/index.js";
+import { CONFIG_VERSION, SERIALIZATION, CODER_REGISTRY } from "../constants/index.js";
 import { getConfigPath as getSwixterConfigPath } from "../constants/paths.js";
 import { getAdapter } from "../adapters/index.js";
 
@@ -185,7 +185,7 @@ export async function deleteProfile(profileName: string): Promise<void> {
   // Clean up adapter configurations for ALL coders
   // A profile may have been applied to a coder in the past even if it's not currently active
   // We need to clean up adapter configs BEFORE deleting from swixter config
-  const allCoders = ["claude", "qwen", "codex"];
+  const allCoders = Object.keys(CODER_REGISTRY);
 
   for (const coder of allCoders) {
     try {

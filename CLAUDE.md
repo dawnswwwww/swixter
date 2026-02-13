@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-- **Current Version**: v0.0.5 (see CHANGELOG.md for details)
+- **Current Version**: v0.0.8 (see CHANGELOG.md for details)
 - **Stability**: Early release, actively developed
 - **Platform Support**: Linux, macOS, Windows 10/11
 - **Package Manager**: npm (published as `swixter`)
@@ -78,7 +78,8 @@ bun run release:major   # For breaking changes (0.0.4 -> 1.0.0)
 
 **CLI Layer** (`src/cli/`):
 - `index.ts` - Main entry point, routes commands to handlers
-- `claude.ts` / `qwen.ts` / `codex.ts` - Per-coder command handlers (create, switch, list, delete, apply, run)
+- `claude.ts` / `qwen.ts` / `codex.ts` - Per-coder command handlers (create, switch, list, delete, apply, run, edit, install, update-cli)
+- `interactive.ts` - Interactive menu-driven UI (welcome screen, main menu)
 - `providers.ts` - Provider management commands (add, remove, list, show)
 - `help.ts` - Detailed help system with command documentation
 - `completions.ts` - Shell completion generation (bash/zsh/fish)
@@ -91,10 +92,16 @@ bun run release:major   # For breaking changes (0.0.4 -> 1.0.0)
 **Constants** (`src/constants/`):
 - Split into multiple files for organization (messages, formatting, defaults, etc.)
 - All UI text centralized in `src/constants/messages.ts` for i18n
+- `install.ts` - Platform-specific installation method definitions for each coder CLI
 
 **Utilities** (`src/utils/`):
 - `validation.ts` - Input validation (profile names, URLs, API keys)
 - `ui.ts` - Shared UI functions (spinners, formatters, error display)
+- `install-commands.ts` - Shared install/update command handlers for all coders
+- `install.ts` - CLI installation detection and guided installation utilities
+- `cli-version.ts` - CLI version detection and comparison using semver
+- `model-helper.ts` - Model field helper utilities for consistent model handling across adapters
+- `env-key-helper.ts` - Environment variable key priority logic for Codex adapter
 
 ### Important Design Patterns
 
@@ -107,7 +114,7 @@ bun run release:major   # For breaking changes (0.0.4 -> 1.0.0)
 4. **Validation timing**: Input validation happens at prompt time (immediate feedback) AND at save time (for non-interactive mode)
 
 5. **Adapter-specific behaviors**:
-   - **Claude adapter** (JSON): Full replacement of API-related env vars in settings.json. When applying a profile, only fields present in the profile are written; undefined fields are removed to prevent stale configuration. Other sections (MCP servers, approval policies, etc.) are preserved.
+   - **Claude adapter** (JSON): Full replacement of API-related env vars in settings.json. When applying a profile, only fields present in the profile are written; undefined fields are removed to prevent stale configuration. Also writes model environment variables (`ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`) when the profile has model configuration. Other sections (MCP servers, approval policies, etc.) are preserved.
    - **Continue adapter** (YAML): Modifies config.yaml with model/apiKey fields
    - **Codex adapter** (TOML): Uses environment variable references (env_key) per official spec. Creates provider tables `[model_providers.swixter-<name>]` and profile tables `[profiles.swixter-<name>]`. API keys must be set as environment variables before running codex, or use `swixter codex run` for automatic setup.
 
@@ -125,6 +132,14 @@ bun run release:major   # For breaking changes (0.0.4 -> 1.0.0)
    - Empty/undefined means use provider preset default (e.g., `OLLAMA_API_KEY` for Ollama)
    - Used consistently across: `createProviderTable()`, `getEnvExportCommands()`, and `cmdRun()`
    - Allows flexibility for custom providers or non-standard environment setups
+
+10. **Auth token support** (Claude only): Claude Code profiles support an optional `authToken` field mapped to `ANTHROPIC_AUTH_TOKEN` env var. Set via `--auth-token` / `-t` flag during create/edit. Other coders do not support auth tokens (`supportsAuthToken: false` in CODER_REGISTRY).
+
+11. **Model configuration**: Profiles support per-coder model configuration.
+    - **Claude Code**: Uses a `models` object with four fields (`anthropicModel`, `defaultHaikuModel`, `defaultOpusModel`, `defaultSonnetModel`) mapped to corresponding `ANTHROPIC_*` env vars. Helpers in `src/utils/model-helper.ts`.
+    - **Codex/Qwen**: Use a `model` field (with legacy `openaiModel` fallback) mapped to `OPENAI_MODEL`.
+
+12. **Install/Update commands**: `swixter <coder> install` and `swixter <coder> update-cli` (alias: `upgrade`) manage coder CLI installation. Shared handlers in `src/utils/install-commands.ts` use platform-specific method definitions from `src/constants/install.ts`. Version detection uses `semver` library via `src/utils/cli-version.ts`.
 
 ## Testing
 
@@ -246,12 +261,12 @@ Swixter uses a **semi-automated release workflow** powered by GitHub Actions. De
 
 **Version number locations:**
 - `package.json` - NPM official version (automatically updated by `npm version`)
-- `src/constants/meta.ts` - APP_VERSION constant (automatically synced via preversion hook)
+- `src/constants/meta.ts` - APP_VERSION constant (automatically synced via version hook)
 - `CHANGELOG.md` - Version history (manually maintained)
 
 **npm lifecycle hooks:**
-1. `preversion` - Runs tests + syncs APP_VERSION to package.json version
-2. `version` - Stages updated meta.ts file
+1. `preversion` - Runs tests
+2. `version` - Syncs APP_VERSION constant to match package.json version, then stages meta.ts
 3. `postversion` - Pushes commits and tags to GitHub
 
 ### How to Release a New Version
@@ -291,10 +306,10 @@ bun run release:major
 
 The release command automatically:
 1. ✅ Runs all tests (via preversion hook)
-2. ✅ Syncs APP_VERSION constant (via preversion hook)
-3. ✅ Updates package.json version number (npm version)
-4. ✅ Creates Git commit and tag (npm version)
-5. ✅ Stages meta.ts changes (via version hook)
+2. ✅ Updates package.json version number (npm version)
+3. ✅ Syncs APP_VERSION constant (via version hook)
+4. ✅ Stages meta.ts changes (via version hook)
+5. ✅ Creates Git commit and tag (npm version)
 6. ✅ Pushes to GitHub (via postversion hook)
 7. ✅ Triggers GitHub Actions workflow
 
@@ -338,7 +353,7 @@ GitHub repository secrets (Settings → Secrets and variables → Actions):
 **`scripts/sync-version.js`**
 - Reads version from package.json
 - Updates APP_VERSION in src/constants/meta.ts
-- Called during npm preversion hook
+- Called during npm version hook
 
 **`scripts/extract-changelog.js`**
 - Parses CHANGELOG.md

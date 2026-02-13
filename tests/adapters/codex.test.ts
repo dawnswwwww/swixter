@@ -968,7 +968,7 @@ model_provider = "swixter-test"
         updatedAt: new Date().toISOString(),
       };
 
-      const commands = adapter.getEnvExportCommands(profile);
+      const commands = await adapter.getEnvExportCommands(profile);
 
       expect(commands).toEqual(['export MY_CUSTOM_ENV="test-key"']);
     });
@@ -983,7 +983,7 @@ model_provider = "swixter-test"
         updatedAt: new Date().toISOString(),
       };
 
-      const commands = adapter.getEnvExportCommands(profile);
+      const commands = await adapter.getEnvExportCommands(profile);
 
       expect(commands).toEqual(['export OLLAMA_API_KEY="test-key"']);
     });
@@ -1016,7 +1016,7 @@ model_provider = "swixter-test"
         updatedAt: new Date().toISOString(),
       };
 
-      const commands = adapter.getEnvExportCommands(profile);
+      const commands = await adapter.getEnvExportCommands(profile);
 
       expect(commands).toEqual([
         'export OPENAI_API_KEY="sk-test"',
@@ -1034,7 +1034,7 @@ model_provider = "swixter-test"
         updatedAt: new Date().toISOString(),
       };
 
-      const commands = adapter.getEnvExportCommands(profile);
+      const commands = await adapter.getEnvExportCommands(profile);
 
       expect(commands).toEqual([
         'export OPENAI_API_KEY="sk-or-test"',
@@ -1053,7 +1053,7 @@ model_provider = "swixter-test"
         updatedAt: new Date().toISOString(),
       };
 
-      const commands = adapter.getEnvExportCommands(profile);
+      const commands = await adapter.getEnvExportCommands(profile);
 
       expect(commands).toEqual([
         'export OPENAI_API_KEY="sk-test"',
@@ -1070,7 +1070,7 @@ model_provider = "swixter-test"
         updatedAt: new Date().toISOString(),
       };
 
-      const commands = adapter.getEnvExportCommands(profile);
+      const commands = await adapter.getEnvExportCommands(profile);
 
       expect(commands).toEqual([
         'export OPENAI_API_KEY="sk-test"'

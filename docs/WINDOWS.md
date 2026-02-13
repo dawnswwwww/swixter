@@ -4,7 +4,7 @@ This document provides comprehensive information about Swixter's Windows support
 
 ## Current Status
 
-**Swixter v0.0.2+ is ~90% compatible with Windows out of the box.**
+**Swixter v0.0.8 is ~90% compatible with Windows out of the box.**
 
 ### ✅ What Works on Windows
 
@@ -250,10 +250,13 @@ const configPath = join(homedir(), ".config", "swixter", "config.json");
 
 ## Roadmap: Full Windows Support
 
-### v0.0.2 (Current) ✅
+### v0.0.2 - v0.0.8 (Completed) ✅
 - [x] Fix Swixter config path to use `~/swixter` on Windows
 - [x] Document Windows compatibility
 - [x] Verify all adapters work on Windows
+- [x] Install and update CLI commands with platform-specific methods (WinGet, PowerShell)
+- [x] Model configuration support for all coders
+- [x] Edit profile enhancements
 
 ### v0.1.0 (Next)
 - [ ] Add PowerShell completion generator
@@ -342,5 +345,5 @@ If you encounter Windows-specific issues:
 
 ---
 
-**Last Updated:** 2025-01-21 (v0.0.2)
+**Last Updated:** 2026-02-12 (v0.0.8)
 **Status:** Active development - Windows support improving with each release

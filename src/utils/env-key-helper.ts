@@ -4,7 +4,7 @@
  */
 
 import type { ClaudeCodeProfile } from "../types.js";
-import { getPresetById } from "../providers/presets.js";
+import { getPresetByIdAsync } from "../providers/presets.js";
 
 /**
  * Get the environment variable key for API key storage
@@ -13,8 +13,8 @@ import { getPresetById } from "../providers/presets.js";
  * @param profile The profile to get env key for
  * @returns The environment variable key name
  */
-export function getEnvKey(profile: ClaudeCodeProfile): string {
-  const preset = getPresetById(profile.providerId);
+export async function getEnvKey(profile: ClaudeCodeProfile): Promise<string> {
+  const preset = await getPresetByIdAsync(profile.providerId);
 
   // Priority: profile.envKey > preset.env_key > "OPENAI_API_KEY" (default)
   return profile.envKey || preset?.env_key || "OPENAI_API_KEY";
@@ -26,9 +26,9 @@ export function getEnvKey(profile: ClaudeCodeProfile): string {
  * @param profile The profile to generate exports for
  * @returns Array of export command strings
  */
-export function getEnvExportCommands(profile: ClaudeCodeProfile): string[] {
+export async function getEnvExportCommands(profile: ClaudeCodeProfile): Promise<string[]> {
   const commands: string[] = [];
-  const envKey = getEnvKey(profile);
+  const envKey = await getEnvKey(profile);
 
   // API key export
   if (profile.apiKey) {
@@ -44,8 +44,8 @@ export function getEnvExportCommands(profile: ClaudeCodeProfile): string[] {
  * @param profile The profile to check
  * @returns True if the profile has a custom env key
  */
-export function hasCustomEnvKey(profile: ClaudeCodeProfile): boolean {
-  const preset = getPresetById(profile.providerId);
+export async function hasCustomEnvKey(profile: ClaudeCodeProfile): Promise<boolean> {
+  const preset = await getPresetByIdAsync(profile.providerId);
   const presetEnvKey = preset?.env_key || "OPENAI_API_KEY";
 
   return profile.envKey !== undefined && profile.envKey !== presetEnvKey;
@@ -57,7 +57,7 @@ export function hasCustomEnvKey(profile: ClaudeCodeProfile): boolean {
  * @param providerId The provider ID
  * @returns The default environment variable key
  */
-export function getDefaultEnvKey(providerId: string): string {
-  const preset = getPresetById(providerId);
+export async function getDefaultEnvKey(providerId: string): Promise<string> {
+  const preset = await getPresetByIdAsync(providerId);
   return preset?.env_key || "OPENAI_API_KEY";
 }

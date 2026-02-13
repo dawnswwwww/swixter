@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import * as yaml from "js-yaml";
 import type { CoderAdapter } from "./base.js";
 import type { ClaudeCodeProfile } from "../types.js";
-import { getPresetById } from "../providers/presets.js";
+import { getPresetByIdAsync } from "../providers/presets.js";
 import { getConfigPath } from "../constants/paths.js";
 import { SERIALIZATION } from "../constants/index.js";
 import { getOpenAIModel } from "../utils/model-helper.js";
@@ -33,7 +33,7 @@ export class ContinueAdapter implements CoderAdapter {
    * Generate YAML format configuration
    */
   async apply(profile: ClaudeCodeProfile): Promise<void> {
-    const preset = getPresetById(profile.providerId);
+    const preset = await getPresetByIdAsync(profile.providerId);
     const baseURL = profile.baseURL || preset?.baseURL || "";
     const continueProvider = PROVIDER_MAP[profile.providerId] || "openai";
 
@@ -110,7 +110,7 @@ export class ContinueAdapter implements CoderAdapter {
         return false;
       }
 
-      const preset = getPresetById(profile.providerId);
+      const preset = await getPresetByIdAsync(profile.providerId);
       const expectedBaseURL = profile.baseURL || preset?.baseURL || "";
       const expectedModel = getOpenAIModel(profile);
 
@@ -153,7 +153,11 @@ export class ContinueAdapter implements CoderAdapter {
 
       // Only write if something was actually removed
       if (config.models.length < initialLength) {
-        const yamlContent = yaml.dump(config);
+        const yamlContent = yaml.dump(config, {
+          indent: SERIALIZATION.yamlIndent,
+          lineWidth: -1,
+          noRefs: true,
+        });
         await writeFile(this.configPath, yamlContent, "utf-8");
       }
     } catch (error) {

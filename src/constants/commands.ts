@@ -63,7 +63,6 @@ export const VALID_COMMANDS = [
   "install",
   "update-cli",
   "upgrade",
-  "doctor",
 ] as const;
 
 /**
@@ -74,7 +73,6 @@ export const GLOBAL_COMMANDS = [
   "export",
   "import",
   "completion",
-  "doctor",
   "help",
   "version",
 ] as const;

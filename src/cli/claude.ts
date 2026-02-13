@@ -13,16 +13,10 @@ import type { ClaudeCodeProfile } from "../types.js";
 import {
   CODER_REGISTRY,
   ERRORS,
-  SUCCESS,
   PROMPTS,
-  VALIDATION,
   USAGE,
   INFO,
-  PROGRESS,
   LABELS,
-  MENU,
-  MENU_HINTS,
-  PLACEHOLDERS,
   DEFAULT_PLACEHOLDERS,
   MISC_DEFAULTS,
   MARKERS,
@@ -30,14 +24,11 @@ import {
   INSTALL,
 } from "../constants/index.js";
 import {
-  withSpinner,
   showError,
-  showSuccess,
-  formatProfileListItem,
-  showProfileDetails,
 } from "../utils/ui.js";
 import { ProfileValidators } from "../utils/validation.js";
 import { handleApplyPrompt } from "../utils/commands.js";
+import { parseFlags } from "./commands/parsers.js";
 import { spawnCLI } from "../utils/process.js";
 import { ensureCliAvailable } from "../utils/install.js";
 import { handleInstallCommand, handleUpdateCommand } from "../utils/install-commands.js";
@@ -107,6 +98,7 @@ export async function handleClaudeCommand(args: string[]): Promise<void> {
         ERRORS.unknownCommand(command),
         USAGE.checkHelp(CODER_NAME)
       );
+      process.exit(EXIT_CODES.generalError);
   }
 }
 
@@ -165,34 +157,10 @@ ${pc.bold("Examples:")}
 }
 
 /**
- * Parse command line arguments
- */
-function parseArgs(args: string[]): Record<string, string | boolean> {
-  const parsed: Record<string, string | boolean> = {};
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith("--")) {
-      const key = args[i].slice(2);
-      const value = args[i + 1];
-
-      // Check if it's a boolean flag
-      if (!value || value.startsWith("--")) {
-        parsed[key] = true;
-      } else {
-        parsed[key] = value;
-        i++;
-      }
-    }
-  }
-
-  return parsed;
-}
-
-/**
  * Create profile (interactive or non-interactive)
  */
 async function cmdCreate(args: string[]): Promise<void> {
-  const params = parseArgs(args);
+  const params = parseFlags(args);
 
   // Check if non-interactive mode
   if (params.quiet) {
@@ -224,7 +192,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(name)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // 2. Select provider
@@ -239,7 +207,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(providerId)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   const preset = presets.find((p) => p.id === providerId);
@@ -252,7 +220,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(apiKey)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // 4. Enter Auth Token
@@ -263,7 +231,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(authToken)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // 5. Custom Base URL (optional)
@@ -282,72 +250,70 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(customBaseURL)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // 6. Configure models? (for all Claude Code profiles)
   let models: ClaudeCodeProfile["models"] = undefined;
-  if (true) { // Ask for model configuration for all providers
-    const configureModels = await p.confirm({
-      message: PROMPTS.configureModels,
-      initialValue: false,
+  const configureModels = await p.confirm({
+    message: PROMPTS.configureModels,
+    initialValue: false,
+  });
+
+  if (p.isCancel(configureModels)) {
+    p.cancel(ERRORS.cancelled);
+    process.exit(EXIT_CODES.cancelled);
+  }
+
+  if (configureModels) {
+    // Ask for each model configuration
+    const anthropicModel = await p.text({
+      message: PROMPTS.anthropicModel,
+      placeholder: "claude-3-5-sonnet-20241022",
     });
 
-    if (p.isCancel(configureModels)) {
+    if (p.isCancel(anthropicModel)) {
       p.cancel(ERRORS.cancelled);
-      process.exit(EXIT_CODES.userCancelled);
+      process.exit(EXIT_CODES.cancelled);
     }
 
-    if (configureModels) {
-      // Ask for each model configuration
-      const anthropicModel = await p.text({
-        message: PROMPTS.anthropicModel,
-        placeholder: "claude-3-5-sonnet-20241022",
-      });
+    const defaultHaikuModel = await p.text({
+      message: PROMPTS.defaultHaikuModel,
+      placeholder: "claude-3-5-haiku-20241022",
+    });
 
-      if (p.isCancel(anthropicModel)) {
-        p.cancel(ERRORS.cancelled);
-        process.exit(EXIT_CODES.userCancelled);
-      }
-
-      const defaultHaikuModel = await p.text({
-        message: PROMPTS.defaultHaikuModel,
-        placeholder: "claude-3-5-haiku-20241022",
-      });
-
-      if (p.isCancel(defaultHaikuModel)) {
-        p.cancel(ERRORS.cancelled);
-        process.exit(EXIT_CODES.userCancelled);
-      }
-
-      const defaultOpusModel = await p.text({
-        message: PROMPTS.defaultOpusModel,
-        placeholder: "claude-3-opus-20240229",
-      });
-
-      if (p.isCancel(defaultOpusModel)) {
-        p.cancel(ERRORS.cancelled);
-        process.exit(EXIT_CODES.userCancelled);
-      }
-
-      const defaultSonnetModel = await p.text({
-        message: PROMPTS.defaultSonnetModel,
-        placeholder: "claude-3-5-sonnet-20241022",
-      });
-
-      if (p.isCancel(defaultSonnetModel)) {
-        p.cancel(ERRORS.cancelled);
-        process.exit(EXIT_CODES.userCancelled);
-      }
-
-      // Only add non-empty models
-      models = {
-        ...(anthropicModel && { anthropicModel }),
-        ...(defaultHaikuModel && { defaultHaikuModel }),
-        ...(defaultOpusModel && { defaultOpusModel }),
-        ...(defaultSonnetModel && { defaultSonnetModel }),
-      };
+    if (p.isCancel(defaultHaikuModel)) {
+      p.cancel(ERRORS.cancelled);
+      process.exit(EXIT_CODES.cancelled);
     }
+
+    const defaultOpusModel = await p.text({
+      message: PROMPTS.defaultOpusModel,
+      placeholder: "claude-3-opus-20240229",
+    });
+
+    if (p.isCancel(defaultOpusModel)) {
+      p.cancel(ERRORS.cancelled);
+      process.exit(EXIT_CODES.cancelled);
+    }
+
+    const defaultSonnetModel = await p.text({
+      message: PROMPTS.defaultSonnetModel,
+      placeholder: "claude-3-5-sonnet-20241022",
+    });
+
+    if (p.isCancel(defaultSonnetModel)) {
+      p.cancel(ERRORS.cancelled);
+      process.exit(EXIT_CODES.cancelled);
+    }
+
+    // Only add non-empty models
+    models = {
+      ...(anthropicModel && { anthropicModel }),
+      ...(defaultHaikuModel && { defaultHaikuModel }),
+      ...(defaultOpusModel && { defaultOpusModel }),
+      ...(defaultSonnetModel && { defaultSonnetModel }),
+    };
   }
 
   // 7. Apply immediately?
@@ -358,7 +324,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(shouldApply)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // Create profile
@@ -515,7 +481,7 @@ async function cmdList(): Promise<void> {
     const preset = getPresetById(profile.providerId);
     const isCurrent = current?.name === profile.name;
     const marker = isCurrent ? pc.green(MARKERS.active) : pc.dim(MARKERS.inactive);
-    const baseUrl = profile.baseURL || preset?.baseURL || MISC_DEFAULTS.baseUrl;
+    const baseUrl = profile.baseURL || preset?.baseURL || MISC_DEFAULTS.baseUrlFallback;
     console.log(
       `${marker} ${pc.cyan(profile.name.padEnd(20))} ${pc.dim("|")} ${preset?.displayName.padEnd(25)} ${pc.dim("|")} ${pc.yellow(baseUrl)}`
     );
@@ -921,7 +887,9 @@ async function cmdCurrent(): Promise<void> {
   console.log(`  Name: ${pc.cyan(profile.name)}`);
   console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
   console.log(`  Base URL: ${pc.yellow(baseUrl)}`);
-  console.log(`  API Key: ${pc.dim(profile.apiKey.slice(0, 10) + "...")}`);
+  if (profile.apiKey) {
+    console.log(`  API Key: ${pc.dim(profile.apiKey.slice(0, 10) + "...")}`);
+  }
   console.log();
 }
 
@@ -952,7 +920,7 @@ async function cmdMainMenu(): Promise<void> {
 
   if (p.isCancel(action)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   console.log();
@@ -990,7 +958,7 @@ async function cmdMainMenu(): Promise<void> {
       break;
     case "exit":
       console.log(pc.green("Goodbye!"));
-      process.exit(EXIT_CODES.userCancelled);
+      process.exit(EXIT_CODES.cancelled);
   }
 }
 
@@ -1076,7 +1044,7 @@ async function cmdRun(args: string[]): Promise<void> {
   // Ensure Claude Code CLI is installed before proceeding
   await ensureCliAvailable(CODER_NAME, CODER_CONFIG);
 
-  const params = parseArgs(args);
+  const params = parseFlags(args);
 
   // Get profile to use
   let profile: ClaudeCodeProfile | null = null;

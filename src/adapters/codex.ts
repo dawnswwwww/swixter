@@ -5,7 +5,7 @@ import { join, dirname } from "node:path";
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 import type { CoderAdapter } from "./base.js";
 import type { ClaudeCodeProfile } from "../types.js";
-import { getPresetById } from "../providers/presets.js";
+import { getPresetByIdAsync } from "../providers/presets.js";
 import { getOpenAIModel } from "../utils/model-helper.js";
 import { getEnvKey, getEnvExportCommands as getEnvExports } from "../utils/env-key-helper.js";
 
@@ -64,7 +64,7 @@ export class CodexAdapter implements CoderAdapter {
       }
 
       // Get provider preset
-      const preset = getPresetById(profile.providerId);
+      const preset = await getPresetByIdAsync(profile.providerId);
       if (!preset) {
         throw new Error(`Unknown provider: ${profile.providerId}`);
       }
@@ -79,7 +79,7 @@ export class CodexAdapter implements CoderAdapter {
       }
 
       // Create/update provider table
-      config.model_providers[providerName] = this.createProviderTable(profile, preset);
+      config.model_providers[providerName] = await this.createProviderTable(profile, preset);
 
       // Initialize profiles table if not exists
       if (!config.profiles) {
@@ -87,7 +87,7 @@ export class CodexAdapter implements CoderAdapter {
       }
 
       // Create/update profile table
-      config.profiles[profileName] = this.createProfileTable(profile, providerName);
+      config.profiles[profileName] = await this.createProfileTable(profile, providerName);
 
       // Set active profile at root level
       config.profile = profileName;
@@ -146,7 +146,7 @@ export class CodexAdapter implements CoderAdapter {
    * Always uses env_key to reference environment variables (per official Codex spec)
    * API keys should be set as environment variables before running Codex
    */
-  private createProviderTable(profile: ClaudeCodeProfile, preset: any): any {
+  private async createProviderTable(profile: ClaudeCodeProfile, preset: any): Promise<any> {
     const providerTable: any = {
       name: preset.displayName,
       base_url: profile.baseURL || preset.baseURL,
@@ -154,7 +154,7 @@ export class CodexAdapter implements CoderAdapter {
     };
 
     // Use centralized env_key logic
-    providerTable.env_key = getEnvKey(profile);
+    providerTable.env_key = await getEnvKey(profile);
 
     // Add headers if present
     if (preset.headers) {
@@ -167,7 +167,7 @@ export class CodexAdapter implements CoderAdapter {
   /**
    * Create profile table configuration
    */
-  private createProfileTable(profile: ClaudeCodeProfile, providerName: string): any {
+  private async createProfileTable(profile: ClaudeCodeProfile, providerName: string): Promise<any> {
     const profileTable: any = {
       model_provider: providerName,
     };
@@ -178,7 +178,7 @@ export class CodexAdapter implements CoderAdapter {
       profileTable.model = modelValue;
     } else {
       // Fallback to first default model from preset
-      const preset = getPresetById(profile.providerId);
+      const preset = await getPresetByIdAsync(profile.providerId);
       if (preset && preset.defaultModels && preset.defaultModels.length > 0) {
         profileTable.model = preset.defaultModels[0];
       }
@@ -190,8 +190,8 @@ export class CodexAdapter implements CoderAdapter {
   /**
    * Get environment variable export commands for the user
    */
-  getEnvExportCommands(profile: ClaudeCodeProfile): string[] {
-    const commands = getEnvExports(profile);
+  async getEnvExportCommands(profile: ClaudeCodeProfile): Promise<string[]> {
+    const commands = await getEnvExports(profile);
 
     // Add model environment variable export (with backward compatibility)
     const modelValue = getOpenAIModel(profile);

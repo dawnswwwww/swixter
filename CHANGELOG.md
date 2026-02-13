@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9] - 2025-02-13
+
+### Fixed
+- **19 bug fixes and code quality improvements across the codebase**
+  - Fixed `EXIT_CODES.userCancelled` → `EXIT_CODES.cancelled` (undefined property access, 28 occurrences)
+  - Fixed `LABELS.profileList` missing constant
+  - Fixed `MISC_DEFAULTS.baseUrl` → `MISC_DEFAULTS.baseUrlFallback` (undefined property access)
+  - Fixed Codex apply hint showing "swixter claude create" instead of "swixter codex create"
+  - Added `wire_api` and `env_key` fields to `ProviderPresetSchema` (were silently stripped from user providers)
+  - Removed unimplemented `doctor` command from registry and help
+  - Enabled `parseFlags()` from parsers.ts across all CLI handlers (short flags like `-k`, `-p` now work)
+  - All adapters now use async `getPresetByIdAsync()` (user-defined providers were invisible)
+  - Claude adapter `verify()` now handles credential-less profiles (e.g., Ollama)
+  - Qwen profile name validation now uses shared `ProfileValidators.name`
+  - Added `apiKey` null guard in `cmdCurrent()` to prevent crash on Ollama profiles
+  - Claude adapter `apply()` now preserves non-Swixter env vars during merge
+  - Fixed Codex adapter async issues in `createProviderTable`/`createProfileTable`
+  - Added `process.exit()` after `showError()` in unknown command handlers
+  - Removed `-p` semantic conflict in Codex `run` command (was stripping Codex's `-p` prompt flag)
+  - Fixed Continue adapter `remove()` YAML formatting consistency
+
+### Changed
+- Removed duplicate `parseArgs()` functions from commands.ts and install-commands.ts
+- Cleaned 30 unused imports across claude.ts, codex.ts, qwen.ts
+- Removed `if (true)` dead code block in claude.ts
+- Replaced hardcoded coder list with `Object.keys(CODER_REGISTRY)` in config manager
+
+### Improved
+- Updated README.md with missing commands, features, and aliases
+- Updated CLAUDE.md with current architecture and design patterns
+- Fixed CHANGELOG.md formatting issues and broken links
+- Updated docs/WINDOWS.md version references
+
 ## [0.0.8] - 2025-02-11
 
 ### Fixed
@@ -26,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Platform-specific recommendations (curl for Unix, PowerShell for Windows)
   - Non-interactive mode with `--method` parameter
   - Reinstall confirmation when CLI already installed
+- **Comprehensive Test Coverage**
+  - New test file: `tests/utils/cli-version.test.ts` (19 tests, all passing)
+  - New test file: `tests/utils/install.test.ts` (42 tests, all passing)
+  - New E2E scenarios: install-detection, install-command, update-command (all passing)
+  - Total: 215 unit tests + 11 E2E tests = 226 tests passing
 
 ### Changed
 - **Code Refactoring: Eliminate Duplicate Install/Update Handlers**
@@ -40,19 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Support for pre-release versions (e.g., 1.0.0-alpha, 2.0.0-beta.1)
   - More robust version parsing and comparison
   - New `isValidVersion()` utility function
-
-### Improved
 - **Update Command Fallback Logic**
   - Interactive mode: prompts user to select installation method when auto-detection fails
   - Non-interactive mode: uses recommended method with clear warning messages
   - Prevents incorrect update commands when installation method is ambiguous
-
-### Added
-- **Comprehensive Test Coverage**
-  - New test file: `tests/utils/cli-version.test.ts` (19 tests, all passing)
-  - New test file: `tests/utils/install.test.ts` (42 tests, all passing)
-  - New E2E scenarios: install-detection, install-command, update-command (all passing)
-  - Total: 215 unit tests + 11 E2E tests = 226 tests passing
 
 ### Technical
 - Added `semver` as production dependency
@@ -61,10 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All tests passing (215 unit + 11 E2E)
 - Fully backward compatible - no breaking changes
 
-[0.0.8]: https://github.com/dawnswwwww/swixter/compare/v0.0.7...v0.0.8
-[0.0.7]: https://github.com/dawnswwwww/swixter/compare/v0.0.6...v0.0.7
-
-## [0.0.6] - 2025-02-XX
+## [0.0.6] - 2025-12-10
 
 ### Added
 - **Comprehensive Model Configuration Support for All Coders**
@@ -74,8 +100,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Environment variable mapping for model configuration
   - Interactive prompts during profile creation and editing
 
-[0.0.6]: https://github.com/dawnswwwww/swixter/compare/v0.0.5...v0.0.6
-
 ## [0.0.5] - 2025-12-07
 
 ### Added
@@ -84,8 +108,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Profile management (create, switch, list, delete, apply)
 - Custom provider configuration
 - Command aliases
-
-[0.0.5]: https://github.com/dawnswwwww/swixter/compare/v0.0.4...v0.0.5
 
 ## [0.0.4] - 2025-12-06
 
@@ -212,7 +234,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test coverage (unit + E2E)
 - Docker-based E2E testing for reliability
 
-[Unreleased]: https://github.com/dawnswwwww/swixter/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/dawnswwwww/swixter/compare/v0.0.9...HEAD
+[0.0.9]: https://github.com/dawnswwwww/swixter/compare/v0.0.8...v0.0.9
+[0.0.8]: https://github.com/dawnswwwww/swixter/compare/v0.0.7...v0.0.8
+[0.0.7]: https://github.com/dawnswwwww/swixter/compare/v0.0.6...v0.0.7
+[0.0.6]: https://github.com/dawnswwwww/swixter/compare/v0.0.5...v0.0.6
+[0.0.5]: https://github.com/dawnswwwww/swixter/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/dawnswwwww/swixter/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/dawnswwwww/swixter/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/dawnswwwww/swixter/compare/v0.0.1...v0.0.2

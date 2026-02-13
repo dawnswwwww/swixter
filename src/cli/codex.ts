@@ -13,16 +13,10 @@ import type { ClaudeCodeProfile } from "../types.js";
 import {
   CODER_REGISTRY,
   ERRORS,
-  SUCCESS,
   PROMPTS,
-  VALIDATION,
   USAGE,
   INFO,
-  PROGRESS,
   LABELS,
-  MENU,
-  MENU_HINTS,
-  PLACEHOLDERS,
   DEFAULT_PLACEHOLDERS,
   MISC_DEFAULTS,
   MARKERS,
@@ -30,14 +24,11 @@ import {
   INSTALL,
 } from "../constants/index.js";
 import {
-  withSpinner,
   showError,
-  showSuccess,
-  formatProfileListItem,
-  showProfileDetails,
 } from "../utils/ui.js";
 import { ProfileValidators } from "../utils/validation.js";
 import { handleApplyPrompt } from "../utils/commands.js";
+import { parseFlags } from "./commands/parsers.js";
 import { spawnCLI } from "../utils/process.js";
 import { ensureCliAvailable } from "../utils/install.js";
 import { handleInstallCommand, handleUpdateCommand } from "../utils/install-commands.js";
@@ -107,6 +98,7 @@ export async function handleCodexCommand(args: string[]): Promise<void> {
         ERRORS.unknownCommand(command),
         USAGE.checkHelp(CODER_NAME)
       );
+      process.exit(EXIT_CODES.generalError);
   }
 }
 
@@ -168,34 +160,10 @@ ${pc.bold("Examples:")}
 }
 
 /**
- * Parse command line arguments
- */
-function parseArgs(args: string[]): Record<string, string | boolean> {
-  const parsed: Record<string, string | boolean> = {};
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith("--")) {
-      const key = args[i].slice(2);
-      const value = args[i + 1];
-
-      // Check if it's a boolean flag
-      if (!value || value.startsWith("--")) {
-        parsed[key] = true;
-      } else {
-        parsed[key] = value;
-        i++;
-      }
-    }
-  }
-
-  return parsed;
-}
-
-/**
  * Create profile (interactive or non-interactive)
  */
 async function cmdCreate(args: string[]): Promise<void> {
-  const params = parseArgs(args);
+  const params = parseFlags(args);
 
   // Check if non-interactive mode
   if (params.quiet) {
@@ -228,7 +196,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(name)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // 2. Select provider
@@ -243,7 +211,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(providerId)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   const preset = presets.find((p) => p.id === providerId);
@@ -260,7 +228,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(apiKey)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // 4. Custom Base URL (optional)
@@ -279,7 +247,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(customBaseURL)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // 5. Model selection
@@ -303,7 +271,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
     if (p.isCancel(modelName)) {
       p.cancel(ERRORS.cancelled);
-      process.exit(EXIT_CODES.userCancelled);
+      process.exit(EXIT_CODES.cancelled);
     }
 
     // If user selected custom, ask for input
@@ -319,7 +287,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
       if (p.isCancel(modelName)) {
         p.cancel(ERRORS.cancelled);
-        process.exit(EXIT_CODES.userCancelled);
+        process.exit(EXIT_CODES.cancelled);
       }
     }
   } else {
@@ -335,7 +303,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
     if (p.isCancel(modelName)) {
       p.cancel(ERRORS.cancelled);
-      process.exit(EXIT_CODES.userCancelled);
+      process.exit(EXIT_CODES.cancelled);
     }
   }
 
@@ -351,7 +319,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(customEnvKey)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // 7. Apply immediately?
@@ -362,7 +330,7 @@ async function cmdCreateInteractive(): Promise<void> {
 
   if (p.isCancel(shouldApply)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   // Create profile
@@ -526,7 +494,7 @@ async function cmdList(): Promise<void> {
     const preset = getPresetById(profile.providerId);
     const isCurrent = current?.name === profile.name;
     const marker = isCurrent ? pc.green(MARKERS.active) : pc.dim(MARKERS.inactive);
-    const baseUrl = profile.baseURL || preset?.baseURL || MISC_DEFAULTS.baseUrl;
+    const baseUrl = profile.baseURL || preset?.baseURL || MISC_DEFAULTS.baseUrlFallback;
     console.log(
       `${marker} ${pc.cyan(profile.name.padEnd(20))} ${pc.dim("|")} ${preset?.displayName.padEnd(25)} ${pc.dim("|")} ${pc.yellow(baseUrl)}`
     );
@@ -887,7 +855,7 @@ async function cmdApply(): Promise<void> {
 
   if (!profile) {
     console.log(pc.yellow("No active profile"));
-    console.log(pc.dim("Run 'swixter claude create' to create a profile"));
+    console.log(pc.dim("Run 'swixter codex create' to create a profile"));
     return;
   }
 
@@ -913,7 +881,7 @@ async function cmdApply(): Promise<void> {
 
       // Show environment variable export commands
       if (adapter.name === "codex" && "getEnvExportCommands" in adapter) {
-        const envCommands = (adapter as any).getEnvExportCommands(profile);
+        const envCommands = await (adapter as any).getEnvExportCommands(profile);
         if (envCommands.length > 0) {
           console.log(pc.bold("To use this profile, set environment variables:"));
           console.log();
@@ -958,7 +926,9 @@ async function cmdCurrent(): Promise<void> {
   console.log(`  Name: ${pc.cyan(profile.name)}`);
   console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
   console.log(`  Base URL: ${pc.yellow(baseUrl)}`);
-  console.log(`  API Key: ${pc.dim(profile.apiKey.slice(0, 10) + "...")}`);
+  if (profile.apiKey) {
+    console.log(`  API Key: ${pc.dim(profile.apiKey.slice(0, 10) + "...")}`);
+  }
   console.log();
 }
 
@@ -989,7 +959,7 @@ async function cmdMainMenu(): Promise<void> {
 
   if (p.isCancel(action)) {
     p.cancel(ERRORS.cancelled);
-    process.exit(EXIT_CODES.userCancelled);
+    process.exit(EXIT_CODES.cancelled);
   }
 
   console.log();
@@ -1027,7 +997,7 @@ async function cmdMainMenu(): Promise<void> {
       break;
     case "exit":
       console.log(pc.green("Goodbye!"));
-      process.exit(EXIT_CODES.userCancelled);
+      process.exit(EXIT_CODES.cancelled);
   }
 }
 
@@ -1117,7 +1087,7 @@ async function cmdRun(args: string[]): Promise<void> {
   // Ensure Codex CLI is installed before proceeding
   await ensureCliAvailable(CODER_NAME, CODER_CONFIG);
 
-  const params = parseArgs(args);
+  const params = parseFlags(args);
 
   // Get profile to use
   let profile: ClaudeCodeProfile | null = null;
@@ -1175,10 +1145,10 @@ async function cmdRun(args: string[]): Promise<void> {
 
     // Step 4: Filter out --profile parameter, build codex arguments
     const codexArgs = args.filter((arg, idx) => {
-      if (arg === "--profile" || arg === "-p") {
+      if (arg === "--profile") {
         return false;
       }
-      if (idx > 0 && (args[idx - 1] === "--profile" || args[idx - 1] === "-p")) {
+      if (idx > 0 && args[idx - 1] === "--profile") {
         return false;
       }
       return true;

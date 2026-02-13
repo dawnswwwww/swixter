@@ -90,6 +90,7 @@ Supports OpenRouter, DeepSeek, MiniMax, and any OpenAI-compatible API.
 🎨 **Beautiful** - Clean, modern CLI interface
 🔒 **Secure** - Keys stored locally, optional sanitization for sharing
 🔧 **Flexible** - Works with any OpenAI-compatible API
+🎯 **Model config** - Set specific models per profile (Claude: Sonnet/Opus/Haiku; Codex/Qwen: any model)
 📦 **Lightweight** - Small package size, zero bloat
 
 ## Commands
@@ -102,18 +103,26 @@ swixter claude list             # List all profiles (alias: ls)
 swixter claude switch <name>    # Switch active profile (alias: sw)
 swixter claude apply            # Apply to Claude Code
 swixter claude run              # Run Claude Code with current profile (alias: r)
+swixter claude edit <name>      # Edit existing profile (alias: update)
+swixter claude current          # Show current active profile
 swixter claude delete <name>    # Delete profile (alias: rm)
+swixter claude install          # Install Claude Code CLI
+swixter claude update-cli       # Update Claude Code CLI (alias: upgrade)
 ```
 
 ### For Codex
 
 ```bash
-swixter codex create          # Create new profile
-swixter codex list             # List all profiles (alias: ls)
-swixter codex switch <name>    # Switch active profile (alias: sw)
-swixter codex apply            # Apply to Codex (writes ~/.codex/config.toml)
-swixter codex run              # Apply + set env + run codex (alias: r, all-in-one)
-swixter codex delete <name>    # Delete profile (alias: rm)
+swixter codex create           # Create new profile
+swixter codex list              # List all profiles (alias: ls)
+swixter codex switch <name>     # Switch active profile (alias: sw)
+swixter codex apply             # Apply to Codex (writes ~/.codex/config.toml)
+swixter codex run               # Apply + set env + run codex (alias: r, all-in-one)
+swixter codex edit <name>       # Edit existing profile (alias: update)
+swixter codex current           # Show current active profile
+swixter codex delete <name>     # Delete profile (alias: rm)
+swixter codex install           # Install Codex CLI
+swixter codex update-cli        # Update Codex CLI (alias: upgrade)
 ```
 
 **Two ways to use Codex profiles**:
@@ -134,7 +143,11 @@ swixter qwen list               # List all profiles (alias: ls)
 swixter qwen switch <name>      # Switch active profile (alias: sw)
 swixter qwen apply              # Apply to Continue
 swixter qwen run                # Run Qwen Code with current profile (alias: r)
+swixter qwen edit <name>        # Edit existing profile (alias: update)
+swixter qwen current            # Show current active profile
 swixter qwen delete <name>      # Delete profile (alias: rm)
+swixter qwen install            # Install Qwen Code CLI
+swixter qwen update-cli         # Update Qwen Code CLI (alias: upgrade)
 ```
 
 ### Provider Management
@@ -281,6 +294,8 @@ Full command reference:
 - `sw` → `switch` - Switch profiles
 - `rm` → `delete` - Delete profiles
 - `new` → `create` - Create new profile
+- `update` → `edit` - Edit existing profile
+- `upgrade` → `update-cli` - Update CLI tool
 
 ## Help & Documentation
 
@@ -315,16 +330,7 @@ bun test
 - **TypeScript** - Type safety
 - **@clack/prompts** - Beautiful CLI prompts
 - **Zod** - Schema validation
-
-## Contributing
-
-Contributions are welcome! Feel free to:
-
-- 🐛 Report bugs
-- 💡 Suggest features
-- 🔧 Submit pull requests
-
-Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (if available).
+- **semver** - Version parsing and comparison
 
 ## Changelog
 

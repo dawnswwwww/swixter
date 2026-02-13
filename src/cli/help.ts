@@ -428,26 +428,6 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
       ],
     },
 
-    doctor: {
-      name: "doctor",
-      description: "Diagnose configuration and environment issues",
-      usage: `swixter ${coderName} doctor`,
-      args: [],
-      examples: [
-        {
-          description: "Run diagnostic checks",
-          command: `swixter ${coderName} doctor`,
-        },
-      ],
-      relatedCommands: ["current"],
-      notes: [
-        "Checks configuration file integrity",
-        "Validates API Key format",
-        "Checks target CLI installation status",
-        "Tests network connectivity",
-      ],
-    },
-
     install: {
       name: "install",
       description: "Install the target CLI tool",
@@ -587,7 +567,6 @@ ${pc.bold("Management Commands:")}
 ${pc.bold("Utility Commands:")}
   ${pc.cyan("install")}             ${pc.dim("Install target CLI tool")}
   ${pc.cyan("update-cli, upgrade")} ${pc.dim("Update target CLI tool")}
-  ${pc.cyan("doctor")}              ${pc.dim("Diagnose configuration issues")}
 
 ${pc.bold("Command Aliases:")}
   ${pc.dim("ls")} → list          ${pc.dim("sw")} → switch          ${pc.dim("rm")} → delete
@@ -613,7 +592,7 @@ ${pc.bold("Getting Help:")}
   ${pc.green(`swixter ${coderName} <command> --help`)} ${pc.dim("Show detailed command help")}
   ${pc.green(`swixter providers`)}                ${pc.dim("View all available providers")}
 
-${pc.dim("Documentation: https://github.com/loonghao/swixter")}
+${pc.dim("Documentation: https://github.com/dawnswwwww/swixter")}
 `);
 }
 
@@ -638,7 +617,6 @@ ${pc.bold("Global Commands:")}
   ${pc.cyan("export <file>")}       ${pc.dim("Export all configurations to file")}
   ${pc.cyan("import <file>")}       ${pc.dim("Import configurations from file")}
   ${pc.cyan("completion <shell>")}  ${pc.dim("Generate shell auto-completion script")}
-  ${pc.cyan("doctor")}              ${pc.dim("Diagnose system configuration")}
   ${pc.cyan("help")}                ${pc.dim("Show help information")}
   ${pc.cyan("version")}             ${pc.dim("Show version information")}
 
@@ -658,6 +636,6 @@ ${pc.bold("Examples:")}
   ${pc.dim("# Install bash auto-completion")}
   ${pc.green("swixter completion bash > ~/.local/share/bash-completion/completions/swixter")}
 
-${pc.dim("Documentation: https://github.com/loonghao/swixter")}
+${pc.dim("Documentation: https://github.com/dawnswwwww/swixter")}
 `);
 }

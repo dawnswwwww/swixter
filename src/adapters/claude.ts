@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { CoderAdapter } from "./base.js";
 import type { ClaudeCodeProfile } from "../types.js";
-import { getPresetById } from "../providers/presets.js";
+import { getPresetByIdAsync } from "../providers/presets.js";
 import { getConfigPath } from "../constants/paths.js";
 import { CODER_REGISTRY, SERIALIZATION } from "../constants/index.js";
 
@@ -21,7 +21,7 @@ export class ClaudeCodeAdapter implements CoderAdapter {
    * Smart merge: only update env.ANTHROPIC_* fields, preserve other configs
    */
   async apply(profile: ClaudeCodeProfile): Promise<void> {
-    const preset = getPresetById(profile.providerId);
+    const preset = await getPresetByIdAsync(profile.providerId);
     const baseURL = profile.baseURL || preset?.baseURL || "";
 
     // Read existing configuration (if exists)
@@ -70,10 +70,20 @@ export class ClaudeCodeAdapter implements CoderAdapter {
       }
     }
 
-    // Smart merge: preserve existing config, only replace env section
+    // Smart merge: preserve non-Swixter env vars, replace managed ones
+    const managedKeys = Object.values(envVars).filter(Boolean) as string[];
+    const preservedEnv: Record<string, string> = {};
+    if (existingConfig.env) {
+      for (const [key, value] of Object.entries(existingConfig.env)) {
+        if (!managedKeys.includes(key)) {
+          preservedEnv[key] = value as string;
+        }
+      }
+    }
+
     const newConfig = {
       ...existingConfig,
-      env: newEnv,
+      env: { ...preservedEnv, ...newEnv },
     };
 
     // Ensure config directory exists
@@ -96,7 +106,7 @@ export class ClaudeCodeAdapter implements CoderAdapter {
       const content = await readFile(this.configPath, "utf-8");
       const config = JSON.parse(content);
 
-      const preset = getPresetById(profile.providerId);
+      const preset = await getPresetByIdAsync(profile.providerId);
       const expectedBaseURL = profile.baseURL || preset?.baseURL || "";
 
       // Use configured environment variable names
@@ -128,8 +138,11 @@ export class ClaudeCodeAdapter implements CoderAdapter {
         }
       }
 
+      // Profiles without credentials (e.g., Ollama) skip credential check
+      const noCredentials = !profile.apiKey && !profile.authToken;
+
       return (
-        (hasApiKey || hasAuthToken) &&
+        (noCredentials || hasApiKey || hasAuthToken) &&
         config.env?.[envVars.baseURL] === expectedBaseURL &&
         hasMatchingModels
       );
