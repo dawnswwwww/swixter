@@ -1101,6 +1101,18 @@ async function cmdRun(args: string[]): Promise<void> {
     return true;
   });
 
+  // Pass --settings with a temp file containing profile env vars
+  // Claude Code CLI args (--settings) take precedence over user settings.json,
+  // so this overrides the env vars without modifying any files on disk.
+  // Using a temp file because shell:true mangles inline JSON strings.
+  const tmp = await import("node:os");
+  const path = await import("node:path");
+  const fs = await import("node:fs/promises");
+  const settingsContent = JSON.stringify({ env }, null, 2);
+  const tmpFile = path.join(tmp.tmpdir(), `swixter-settings-${Date.now()}.json`);
+  await fs.writeFile(tmpFile, settingsContent, "utf-8");
+  claudeArgs.push("--settings", tmpFile);
+
   // Show profile being used
   console.log();
   console.log(pc.dim(`Using profile: ${pc.cyan(profile.name)} (${preset?.displayName})`));
@@ -1113,6 +1125,10 @@ async function cmdRun(args: string[]): Promise<void> {
     args: claudeArgs,
     env,
     displayName: CODER_CONFIG.displayName,
+    onExit: () => {
+      // Clean up temp settings file
+      fs.unlink(tmpFile).catch(() => {});
+    },
   });
 }
 

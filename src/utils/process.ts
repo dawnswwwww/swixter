@@ -17,6 +17,8 @@ export interface SpawnOptions {
   env?: Record<string, string>;
   /** Display name for error messages (e.g., "Claude Code", "Qwen Code") */
   displayName: string;
+  /** Callback when child process exits (before this process exits) */
+  onExit?: () => void;
 }
 
 /**
@@ -31,7 +33,7 @@ export interface SpawnOptions {
  * @param options Spawn configuration options
  */
 export function spawnCLI(options: SpawnOptions): void {
-  const { command, args, env, displayName } = options;
+  const { command, args, env, displayName, onExit } = options;
 
   // Merge environment variables with process.env
   const finalEnv = env ? { ...process.env, ...env } : process.env;
@@ -45,6 +47,7 @@ export function spawnCLI(options: SpawnOptions): void {
 
   // Handle normal exit
   child.on("exit", (code) => {
+    onExit?.();
     process.exit(code || 0);
   });
 
@@ -54,6 +57,7 @@ export function spawnCLI(options: SpawnOptions): void {
     console.log(pc.red(`✗ Run failed: ${error.message}`));
     console.log(pc.dim(`Please ensure ${displayName} CLI is installed`));
     console.log();
+    onExit?.();
     process.exit(1);
   });
 }

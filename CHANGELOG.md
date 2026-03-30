@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.11] - 2026-03-30
+
+### Fixed
+- **`claude run --profile` model env vars not working** - Claude Code reads `~/.claude/settings.json` env vars on startup, overriding process-level env vars. Now uses `--settings` CLI flag with a temp file to override settings.json without modifying it, ensuring the profile's model, base URL, and auth token take effect for the current session only.
+
 ## [0.0.10] - 2026-03-30
 
 ### Added
