@@ -40,6 +40,7 @@ export const FLAG_ALIASES = {
   "-i": "--input",
   "-y": "--yes",
   "-v": "--verbose",
+  "-P": "--port",
 } as const;
 
 /**
@@ -75,6 +76,7 @@ export const GLOBAL_COMMANDS = [
   "completion",
   "help",
   "version",
+  "ui",
 ] as const;
 
 /**

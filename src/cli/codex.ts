@@ -32,6 +32,7 @@ import { parseFlags } from "./commands/parsers.js";
 import { spawnCLI } from "../utils/process.js";
 import { ensureCliAvailable } from "../utils/install.js";
 import { handleInstallCommand, handleUpdateCommand } from "../utils/install-commands.js";
+import { buildProfileEnv } from "../utils/model-helper.js";
 
 const CODER_NAME = "codex";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
@@ -1133,15 +1134,10 @@ async function cmdRun(args: string[]): Promise<void> {
       }
     }
 
-    // Set the API key using the correct env_key name
-    if (profile.apiKey) {
-      env[envKey] = profile.apiKey;
-    }
-
-    // Set model if available
-    if (profile.model || profile.openaiModel) {
-      env["OPENAI_MODEL"] = profile.model || profile.openaiModel;
-    }
+    // Set profile env vars via shared utility
+    Object.assign(env, buildProfileEnv(profile, CODER_CONFIG.envVarMapping, "", {
+      apiKeyEnvName: envKey,
+    }));
 
     // Step 4: Filter out --profile parameter, build codex arguments
     const codexArgs = args.filter((arg, idx) => {

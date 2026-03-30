@@ -15,9 +15,12 @@
   ],
   "scripts": {
     "build": "bun build src/cli/index.ts --outdir dist/cli --target node --format esm && chmod +x dist/cli/index.js",
+    "build:ui": "cd ui && npm run build && mkdir -p ../dist/ui && cp -r dist/* ../dist/ui/",
+    "build:all": "npm run build:ui && npm run build",
     "prepublishOnly": "bun run build && bun test",
     "cli": "bun src/cli/index.ts",
     "cli:dev": "bun --hot src/cli/index.ts",
+    "ui:dev": "cd ui && npm run dev",
     "test": "bun test",
     "test:e2e": "bash test/e2e-docker.sh",
     "preversion": "bun test",

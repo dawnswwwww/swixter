@@ -32,6 +32,7 @@ import { parseFlags } from "./commands/parsers.js";
 import { spawnCLI } from "../utils/process.js";
 import { ensureCliAvailable } from "../utils/install.js";
 import { handleInstallCommand, handleUpdateCommand } from "../utils/install-commands.js";
+import { buildProfileEnv } from "../utils/model-helper.js";
 
 const CODER_NAME = "claude";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
@@ -1084,20 +1085,8 @@ async function cmdRun(args: string[]): Promise<void> {
     }
   }
 
-  // Set API Key (if available)
-  if (profile.apiKey) {
-    env.ANTHROPIC_API_KEY = profile.apiKey;
-  }
-
-  // Set Auth Token (if available)
-  if (profile.authToken) {
-    env.ANTHROPIC_AUTH_TOKEN = profile.authToken;
-  }
-
-  // Set Base URL
-  if (baseURL) {
-    env.ANTHROPIC_BASE_URL = baseURL;
-  }
+  // Set profile env vars via shared utility
+  Object.assign(env, buildProfileEnv(profile, CODER_CONFIG.envVarMapping, baseURL));
 
   // Filter out --profile parameter, pass other arguments to claude
   const claudeArgs = args.filter((arg, idx) => {

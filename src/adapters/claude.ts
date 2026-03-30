@@ -6,6 +6,7 @@ import type { ClaudeCodeProfile } from "../types.js";
 import { getPresetByIdAsync } from "../providers/presets.js";
 import { getConfigPath } from "../constants/paths.js";
 import { CODER_REGISTRY, SERIALIZATION } from "../constants/index.js";
+import { buildProfileEnv } from "../utils/model-helper.js";
 
 /**
  * Claude Code configuration adapter
@@ -41,34 +42,7 @@ export class ClaudeCodeAdapter implements CoderAdapter {
 
     // Build fresh env object (full replacement strategy)
     // This ensures undefined fields are removed when switching profiles
-    const newEnv: Record<string, string> = {
-      [envVars.baseURL]: baseURL,
-    };
-
-    // Add optional fields only if present
-    if (profile.apiKey) {
-      newEnv[envVars.apiKey] = profile.apiKey;
-    }
-
-    if (profile.authToken && envVars.authToken) {
-      newEnv[envVars.authToken] = profile.authToken;
-    }
-
-    // Add model environment variables if configured
-    if (profile.models) {
-      if (profile.models.anthropicModel && envVars.anthropicModel) {
-        newEnv[envVars.anthropicModel] = profile.models.anthropicModel;
-      }
-      if (profile.models.defaultHaikuModel && envVars.defaultHaikuModel) {
-        newEnv[envVars.defaultHaikuModel] = profile.models.defaultHaikuModel;
-      }
-      if (profile.models.defaultOpusModel && envVars.defaultOpusModel) {
-        newEnv[envVars.defaultOpusModel] = profile.models.defaultOpusModel;
-      }
-      if (profile.models.defaultSonnetModel && envVars.defaultSonnetModel) {
-        newEnv[envVars.defaultSonnetModel] = profile.models.defaultSonnetModel;
-      }
-    }
+    const newEnv = buildProfileEnv(profile, envVars, baseURL);
 
     // Smart merge: preserve non-Swixter env vars, replace managed ones
     const managedKeys = Object.values(envVars).filter(Boolean) as string[];
@@ -112,40 +86,18 @@ export class ClaudeCodeAdapter implements CoderAdapter {
       // Use configured environment variable names
       const envVars = this.coderConfig.envVarMapping;
 
-      // Verify at least one key/token matches
-      const hasApiKey = profile.apiKey && config.env?.[envVars.apiKey] === profile.apiKey;
-      const hasAuthToken = profile.authToken && envVars.authToken &&
-                          config.env?.[envVars.authToken] === profile.authToken;
+      // Build expected env from profile, then verify each against actual config
+      const expectedEnv = buildProfileEnv(profile, envVars, expectedBaseURL);
 
-      // Verify model configurations if present
-      let hasMatchingModels = true;
-      if (profile.models) {
-        if (profile.models.anthropicModel && envVars.anthropicModel) {
-          hasMatchingModels = hasMatchingModels &&
-            config.env?.[envVars.anthropicModel] === profile.models.anthropicModel;
-        }
-        if (profile.models.defaultHaikuModel && envVars.defaultHaikuModel) {
-          hasMatchingModels = hasMatchingModels &&
-            config.env?.[envVars.defaultHaikuModel] === profile.models.defaultHaikuModel;
-        }
-        if (profile.models.defaultOpusModel && envVars.defaultOpusModel) {
-          hasMatchingModels = hasMatchingModels &&
-            config.env?.[envVars.defaultOpusModel] === profile.models.defaultOpusModel;
-        }
-        if (profile.models.defaultSonnetModel && envVars.defaultSonnetModel) {
-          hasMatchingModels = hasMatchingModels &&
-            config.env?.[envVars.defaultSonnetModel] === profile.models.defaultSonnetModel;
+      // All expected env vars must match actual config
+      for (const [key, value] of Object.entries(expectedEnv)) {
+        if (config.env?.[key] !== value) {
+          return false;
         }
       }
 
-      // Profiles without credentials (e.g., Ollama) skip credential check
-      const noCredentials = !profile.apiKey && !profile.authToken;
-
-      return (
-        (noCredentials || hasApiKey || hasAuthToken) &&
-        config.env?.[envVars.baseURL] === expectedBaseURL &&
-        hasMatchingModels
-      );
+      // If no env vars were expected (e.g., empty profile), verify not applied
+      return Object.keys(expectedEnv).length > 0;
     } catch (error) {
       return false;
     }

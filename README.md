@@ -57,6 +57,9 @@ swixter claude switch my-profile
 
 # Apply profile to Claude Code
 swixter claude apply
+
+# Or launch the Web UI (new!)
+swixter ui
 ```
 
 ## Built-in Providers
@@ -92,6 +95,7 @@ Supports OpenRouter, DeepSeek, MiniMax, and any OpenAI-compatible API.
 🔧 **Flexible** - Works with any OpenAI-compatible API
 🎯 **Model config** - Set specific models per profile (Claude: Sonnet/Opus/Haiku; Codex/Qwen: any model)
 📦 **Lightweight** - Small package size, zero bloat
+🌐 **Web UI** - Browser-based configuration management (new in v0.1.0!)
 
 ## Commands
 
@@ -161,6 +165,7 @@ swixter providers remove <id>   # Remove provider
 ### Configuration
 
 ```bash
+swixter ui                     # Launch Web UI (new!)
 swixter export config.json      # Export configs
 swixter import config.json      # Import configs
 swixter completion bash         # Shell completion
@@ -343,8 +348,8 @@ Future plans for Swixter:
 - [ ] Support for more AI coding assistants
 - [ ] Profile templates for common setups
 - [ ] Configuration validation and migration tools
-- [ ] Web UI for profile management
-- [ ] Cloud sync for profiles (optional)
+- [x] Web UI for profile management (v0.1.0)
+- [ ] Cloud sync for profiles (optional, planned)
 
 ## Contributing
 

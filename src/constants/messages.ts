@@ -199,3 +199,15 @@ export const INSTALL = {
   restartTerminalHint: "You may need to restart your terminal for the command to be available",
   skipInstall: "Skipping installation",
 } as const;
+
+/**
+ * Web UI messages
+ */
+export const UI = {
+  serverStarting: "Starting Web UI server...",
+  serverStarted: (port: number) => `Web UI server started on port ${port}`,
+  serverStopped: "Web UI server stopped",
+  openBrowser: "Opening browser...",
+  portInUse: (port: number) => `Port ${port} is already in use`,
+  portAvailable: (port: number) => `Using port ${port}`,
+} as const;

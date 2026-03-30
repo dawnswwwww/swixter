@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.10] - 2026-03-30
+
+### Added
+- **Web UI** - Local HTTP server for browser-based configuration management
+  - `swixter ui` command to launch Web UI (default port: 3141)
+  - Auto-opens browser on supported platforms (macOS, Linux, Windows)
+  - REST API for Profiles, Providers, Coders, and Config operations
+  - API key masking in GET responses (shows first 4 and last 4 characters)
+  - ETag-based config polling support for efficient cache validation
+- **SPA Project Structure** - React + Vite foundation for Web UI
+  - Located in `ui/` directory with independent package.json
+  - shadcn/ui integration ready (requires manual installation)
+  - Development mode: `npm run ui:dev` with API proxy
+  - Build integration: `npm run build:all` includes UI assets
+- **New Scripts**
+  - `npm run build:ui` - Build SPA to `dist/ui/`
+  - `npm run build:all` - Build both CLI and UI
+  - `npm run ui:dev` - Start Vite dev server with API proxy
+
+### Changed
+- Updated `src/cli/index.ts` to route `ui` command
+- Updated `src/cli/help.ts` to include UI command documentation
+- Updated `src/constants/commands.ts` to add `ui` to GLOBAL_COMMANDS
+- Updated `src/constants/messages.ts` with UI-related messages
+- Updated `src/constants/paths.ts` AUTH path placeholder for future sync feature
+
+### Technical
+- **Server Infrastructure** (`src/server/`)
+  - `index.ts` - Main server with port detection and browser launch
+  - `router.ts` - Lightweight HTTP router with pattern matching
+  - `middleware.ts` - CORS, JSON parsing, error handling
+  - `static.ts` - Static file serving with SPA fallback
+  - `api/` - REST API endpoints for all resources
+- **Zero additional runtime dependencies** - Uses Node.js built-in `node:http`
+- **API Endpoints**
+  - `/api/profiles` - CRUD operations for profiles
+  - `/api/providers` - CRUD operations for user providers
+  - `/api/coders` - Coder status, active profile, apply, verify
+  - `/api/version` - Version information
+  - `/api/config` - Config metadata, export, import
+- **Unit Tests**
+  - `tests/server/router.test.ts` - 10 passing tests
+  - `tests/server/util.test.ts` - 13 passing tests
+- **Cross-platform browser launch** - Platform-specific commands (open/xdg-open/start)
+
+### Fixed
+- **`swixter claude run` not setting model environment variables** - `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL` were missing from spawned process env
+
+### Changed
+- **Unified env var construction** - Extracted `buildProfileEnv()` utility in `src/utils/model-helper.ts`
+  - Replaces hardcoded env var logic in 3 CLI run commands (claude/codex/qwen) and Claude adapter (`apply`/`verify`)
+  - Dynamically reads `envVarMapping` from coder config, so new fields are auto-supported
+  - Supports `apiKeyEnvName` override for Codex custom env_key
+- **Test coverage** - Added 17 unit tests for `buildProfileEnv` (total: 238 → 255)
+
 ## [0.0.9] - 2025-02-13
 
 ### Fixed
@@ -234,7 +289,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test coverage (unit + E2E)
 - Docker-based E2E testing for reliability
 
-[Unreleased]: https://github.com/dawnswwwww/swixter/compare/v0.0.9...HEAD
+[Unreleased]: https://github.com/dawnswwwww/swixter/compare/v0.0.10...HEAD
+[0.0.10]: https://github.com/dawnswwwww/swixter/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/dawnswwwww/swixter/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/dawnswwwww/swixter/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/dawnswwwww/swixter/compare/v0.0.6...v0.0.7

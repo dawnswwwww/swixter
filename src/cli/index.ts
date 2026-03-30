@@ -5,6 +5,7 @@ import pc from "picocolors";
 import { handleClaudeCommand } from "./claude.js";
 import { handleQwenCommand } from "./qwen.js";
 import { handleCodexCommand } from "./codex.js";
+import { handleUiCommand } from "./ui.js";
 import { exportConfig, importConfig } from "../config/export.js";
 import { showGlobalHelp } from "./help.js";
 import { generateCompletion, showCompletionInstructions } from "./completions.js";
@@ -200,6 +201,12 @@ export async function main(): Promise<void> {
     // No arguments or help
     if (!firstArg || firstArg === "--help" || firstArg === "-h") {
       showGlobalHelp();
+      return;
+    }
+
+    // UI command
+    if (firstArg === "ui") {
+      await handleUiCommand(args.slice(1));
       return;
     }
 

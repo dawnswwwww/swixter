@@ -32,6 +32,7 @@ import { parseFlags } from "./commands/parsers.js";
 import { spawnCLI } from "../utils/process.js";
 import { ensureCliAvailable } from "../utils/install.js";
 import { handleInstallCommand, handleUpdateCommand } from "../utils/install-commands.js";
+import { buildProfileEnv } from "../utils/model-helper.js";
 
 const CODER_NAME = "qwen";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
@@ -941,17 +942,8 @@ async function cmdRun(args: string[]): Promise<void> {
     }
   }
 
-  // Set corresponding environment variables based on provider
-  if (profile.apiKey) {
-    env.OPENAI_API_KEY = profile.apiKey;
-  }
-  if (baseURL) {
-    env.OPENAI_BASE_URL = baseURL;
-  }
-  // Set OPENAI_MODEL if model is configured
-  if (profile.model || profile.openaiModel) {
-    env.OPENAI_MODEL = profile.model || profile.openaiModel;
-  }
+  // Set profile env vars via shared utility
+  Object.assign(env, buildProfileEnv(profile, CODER_CONFIG.envVarMapping, baseURL));
 
   // Filter out --profile parameter, build qwen arguments
   const qwenArgs = [];

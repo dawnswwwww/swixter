@@ -4,6 +4,7 @@
  */
 
 import type { ClaudeCodeProfile } from "../types.js";
+import type { CoderConfig } from "../constants/coders.js";
 
 /**
  * Get the model value from a profile with backward compatibility
@@ -81,4 +82,56 @@ export function getClaudeModels(profile: ClaudeCodeProfile): {
     defaultOpusModel: profile.models.defaultOpusModel,
     defaultSonnetModel: profile.models.defaultSonnetModel,
   };
+}
+
+/**
+ * Build environment variables from a profile using coder's envVarMapping.
+ * Centralizes env var construction for both adapters and CLI run commands.
+ *
+ * @param profile The profile to extract values from
+ * @param envVarMapping The coder's environment variable mapping (from CoderConfig)
+ * @param baseURL Resolved base URL (profile.baseURL || preset.baseURL)
+ * @param options Optional overrides:
+ *   - apiKeyEnvName: Override the env var name for API key (e.g. for Codex custom env_key)
+ * @returns Record of env var name -> value (only non-empty values included)
+ */
+export function buildProfileEnv(
+  profile: ClaudeCodeProfile,
+  envVarMapping: CoderConfig["envVarMapping"],
+  baseURL: string,
+  options?: { apiKeyEnvName?: string },
+): Record<string, string> {
+  const env: Record<string, string> = {};
+
+  // Base fields
+  if (baseURL && envVarMapping.baseURL) {
+    env[envVarMapping.baseURL] = baseURL;
+  }
+  if (profile.apiKey) {
+    const apiKeyEnvName = options?.apiKeyEnvName || envVarMapping.apiKey;
+    if (apiKeyEnvName) {
+      env[apiKeyEnvName] = profile.apiKey;
+    }
+  }
+  if (profile.authToken && envVarMapping.authToken) {
+    env[envVarMapping.authToken] = profile.authToken;
+  }
+
+  // Claude model fields (models object)
+  if (profile.models) {
+    for (const [key, value] of Object.entries(profile.models)) {
+      const envName = envVarMapping[key as keyof typeof envVarMapping];
+      if (value && envName) {
+        env[envName] = value;
+      }
+    }
+  }
+
+  // OpenAI-compatible model field (model / openaiModel)
+  const openaiModel = profile.model || profile.openaiModel;
+  if (openaiModel && envVarMapping.openaiModel) {
+    env[envVarMapping.openaiModel] = openaiModel;
+  }
+
+  return env;
 }

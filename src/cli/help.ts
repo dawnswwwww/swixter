@@ -1,7 +1,6 @@
 /**
  * CLI help system
- * Provides detailed command help, examples, and documentation
- */
+ * Provides detailed command help, examples, and documentation */
 
 import pc from "picocolors";
 import type { CoderConfig } from "../constants/coders.js";
@@ -216,13 +215,13 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
         },
         {
           name: "--apply",
-          description: "Automatically apply the profile without prompting",
+          description: "Automatically apply profile without prompting",
           required: false,
           type: "boolean",
         },
         {
           name: "--no-apply",
-          description: "Skip apply prompt and don't apply the profile",
+          description: "Skip apply prompt and don't apply profile",
           required: false,
           type: "boolean",
         },
@@ -249,8 +248,8 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
       notes: [
         "By default, you will be prompted to apply after switching",
         "Use --apply to automatically apply without prompting",
-        "Use --no-apply to skip the prompt and apply manually later",
-        "Use 'current' command to view the currently active configuration",
+        "Use --no-apply to skip prompt and apply manually later",
+        "Use 'current' command to view currently active configuration",
       ],
     },
 
@@ -269,7 +268,7 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
       ],
       examples: [
         {
-          description: "Edit the currently active configuration",
+          description: "Edit currently active configuration",
           command: `swixter ${coderName} edit`,
         },
         {
@@ -346,14 +345,14 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
       relatedCommands: ["create", "list"],
       notes: [
         "Confirmation will be requested before deletion (unless using --force)",
-        "Cannot delete the currently active configuration, must switch first",
+        "Cannot delete currently active configuration, must switch first",
         "Deletion is irreversible, recommend exporting configuration backup first",
       ],
     },
 
     apply: {
       name: "apply",
-      description: "Apply the currently active configuration",
+      description: "Apply currently active configuration",
       usage: `swixter ${coderName} apply`,
       args: [],
       examples: [
@@ -364,14 +363,14 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
       ],
       relatedCommands: ["current", "switch"],
       notes: [
-        "Will update the target tool's configuration file",
+        "Will update target tool's configuration file",
         "Configuration validity will be validated before applying",
       ],
     },
 
     current: {
       name: "current",
-      description: "Show details of the currently active configuration",
+      description: "Show details of currently active configuration",
       usage: `swixter ${coderName} current [options]`,
       args: [
         {
@@ -418,7 +417,7 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
         },
         {
           description: "Pass arguments to target CLI",
-          command: `swixter ${coderName} run --print "What is AI?"`,
+          command: `swixter ${coderName} run --prompt "What is AI?"`,
         },
       ],
       relatedCommands: ["apply", "current"],
@@ -430,7 +429,7 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
 
     install: {
       name: "install",
-      description: "Install the target CLI tool",
+      description: "Install target CLI tool",
       usage: `swixter ${coderName} install [--method <index>]`,
       args: [
         {
@@ -461,7 +460,7 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
     "update-cli": {
       name: "update-cli",
       aliases: ["upgrade"],
-      description: "Update the target CLI tool to latest version",
+      description: "Update target CLI tool to latest version",
       usage: `swixter ${coderName} update-cli`,
       args: [],
       examples: [
@@ -477,7 +476,7 @@ export function getCommandHelp(coderName: string): Record<string, CommandHelp> {
       relatedCommands: ["install"],
       notes: [
         "Requires CLI to be already installed",
-        "Uses the recommended installation method to update",
+        "Uses recommended installation method to update",
         "Shows version before and after update",
       ],
     },
@@ -503,16 +502,15 @@ ${pc.bold(pc.cyan(help.description))}
 ${pc.bold("Command:")} ${pc.green(help.name)}${help.aliases ? pc.dim(` (aliases: ${help.aliases.join(", ")})`) : ""}
 
 ${pc.bold("Usage:")}
-  ${pc.green(help.usage)}
-${
-  help.args.length > 0
+  ${pc.green(help.usage)}${
+    help.args.length > 0
     ? `
 ${pc.bold("Arguments:")}
 ${help.args
   .map(
     (arg) =>
       `  ${pc.cyan(arg.name.padEnd(25))} ${arg.description}
-   ${pc.dim(arg.required ? "✱ Required" : "○ Optional")}${arg.defaultValue ? pc.dim(` (default: ${arg.defaultValue})`) : ""}${arg.type ? pc.dim(` [${arg.type}]`) : ""}`
+    ${pc.dim(arg.required ? "● Required" : "○ Optional")}${arg.defaultValue ? pc.dim(` (default: ${arg.defaultValue})`) : ""}${arg.type ? pc.dim(` [${arg.type}]`) : ""}`
   )
   .join("\n")}`
     : ""
@@ -526,14 +524,14 @@ ${help.examples
   )
   .join("\n\n")}
 ${
-  help.relatedCommands && help.relatedCommands.length > 0
+    help.relatedCommands && help.relatedCommands.length > 0
     ? `
 ${pc.bold("Related Commands:")}
   ${help.relatedCommands.map((cmd) => pc.cyan(cmd)).join(", ")}`
     : ""
 }
 ${
-  help.notes && help.notes.length > 0
+    help.notes && help.notes.length > 0
     ? `
 ${pc.bold("Notes:")}
 ${help.notes.map((note) => `  • ${pc.dim(note)}`).join("\n")}`
@@ -590,10 +588,9 @@ ${pc.bold("Quick Start:")}
 ${pc.bold("Getting Help:")}
   ${pc.green(`swixter ${coderName} --help`)}           ${pc.dim("Show this help")}
   ${pc.green(`swixter ${coderName} <command> --help`)} ${pc.dim("Show detailed command help")}
-  ${pc.green(`swixter providers`)}                ${pc.dim("View all available providers")}
+  ${pc.green(`swixter providers`)}                     ${pc.dim("View all available providers")}
 
-${pc.dim("Documentation: https://github.com/dawnswwwww/swixter")}
-`);
+${pc.dim("Documentation: https://github.com/dawnswwwww/swixter")}`);
 }
 
 /**
@@ -612,6 +609,11 @@ ${pc.bold("Supported Coders:")}
   ${pc.cyan("codex")}               ${pc.dim("Codex configuration management")}
   ${pc.cyan("qwen")}                ${pc.dim("Continue/Qwen configuration management")}
 
+${pc.bold("Web UI:")}
+  ${pc.cyan("ui")}                    ${pc.dim("Launch local Web UI")}
+    ${pc.dim("swixter ui [--port <port>]")}
+    ${pc.dim("Start local HTTP server and open browser")}
+
 ${pc.bold("Global Commands:")}
   ${pc.cyan("providers")}           ${pc.dim("List all available API providers")}
   ${pc.cyan("export <file>")}       ${pc.dim("Export all configurations to file")}
@@ -627,15 +629,11 @@ ${pc.bold("Examples:")}
   ${pc.dim("# Create Claude Code configuration")}
   ${pc.green("swixter claude create")}
 
+  ${pc.dim("# Launch Web UI")}
+  ${pc.green("swixter ui")}
+
   ${pc.dim("# View all providers")}
   ${pc.green("swixter providers")}
 
-  ${pc.dim("# Export configurations")}
-  ${pc.green("swixter export my-config.json")}
-
-  ${pc.dim("# Install bash auto-completion")}
-  ${pc.green("swixter completion bash > ~/.local/share/bash-completion/completions/swixter")}
-
-${pc.dim("Documentation: https://github.com/dawnswwwww/swixter")}
-`);
+${pc.dim("Documentation: https://github.com/dawnswwwww/swixter")}`);
 }
