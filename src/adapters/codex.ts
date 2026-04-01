@@ -147,9 +147,11 @@ export class CodexAdapter implements CoderAdapter {
    * API keys should be set as environment variables before running Codex
    */
   private async createProviderTable(profile: ClaudeCodeProfile, preset: any): Promise<any> {
+    // Use baseURLChat if available (for chat-compatible Codex/Qwen), otherwise fall back to baseURL
+    const baseUrl = preset.baseURLChat || preset.baseURL;
     const providerTable: any = {
       name: preset.displayName,
-      base_url: profile.baseURL || preset.baseURL,
+      base_url: profile.baseURL || baseUrl,
       wire_api: preset.wire_api || "chat",
     };
 

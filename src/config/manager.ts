@@ -233,3 +233,30 @@ export async function profileExists(profileName: string): Promise<boolean> {
   const config = await loadConfig();
   return profileName in config.profiles;
 }
+
+/**
+ * Reset all data - delete all profiles and reset coder configs
+ * This removes ALL profiles and clears active profile assignments
+ */
+export async function resetAllData(): Promise<void> {
+  const config = await loadConfig();
+
+  // Remove adapter configurations for all profiles across all coders
+  const allCoders = Object.keys(CODER_REGISTRY);
+
+  for (const profileName of Object.keys(config.profiles)) {
+    for (const coder of allCoders) {
+      try {
+        const adapter = getAdapter(coder);
+        await adapter.remove(profileName);
+      } catch (error) {
+        // Don't fail the entire reset if adapter cleanup fails
+        console.warn(`Warning: Failed to cleanup ${coder} adapter configuration: ${error}`);
+      }
+    }
+  }
+
+  // Reset config to default (empty profiles and coders)
+  const defaultConfig = createDefaultConfig();
+  await saveConfig(defaultConfig);
+}

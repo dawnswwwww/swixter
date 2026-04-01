@@ -27,6 +27,8 @@ export async function listCoders(req: IncomingMessage, res: ServerResponse): Pro
       id: coderId,
       displayName: coderConfig.displayName,
       executable: coderConfig.executable,
+      wireApi: coderConfig.wireApi,
+      supportsAuthToken: coderConfig.supportsAuthToken,
       activeProfile: activeProfile ? {
         name: activeProfile.name,
         providerId: activeProfile.providerId,
@@ -118,6 +120,31 @@ export async function applyProfile(req: IncomingMessage, res: ServerResponse, pa
   if (!profile) {
     sendError(res, { code: "NO_ACTIVE_PROFILE", message: `No active profile for coder "${coder}"` }, 400);
     return;
+  }
+
+  // Check wire_api compatibility
+  const coderConfig = CODER_REGISTRY[coder];
+  const { getPresetById } = await import("../../providers/presets.js");
+  const provider = getPresetById(profile.providerId);
+
+  if (provider) {
+    const providerWireApi = provider.wire_api || "chat";
+    const coderWireApi = coderConfig.wireApi;
+
+    // Check compatibility
+    const isCompatible =
+      coderWireApi === "both" ||
+      (coderWireApi === "chat" && providerWireApi === "chat") ||
+      (coderWireApi === "responses" && providerWireApi === "responses");
+
+    if (!isCompatible) {
+      sendJson(res, {
+        success: false,
+        message: `Provider "${provider.displayName}" uses ${providerWireApi} API which is not compatible with ${coderConfig.displayName}. This provider may not work correctly with this coder.`,
+        warning: true,
+      });
+      return;
+    }
   }
 
   try {

@@ -41,6 +41,8 @@ export interface CoderConfig {
   };
   /** Whether Auth Token is supported */
   supportsAuthToken: boolean;
+  /** Supported wire API types */
+  wireApi: "chat" | "responses" | "both";
 }
 
 /**
@@ -68,6 +70,7 @@ export const CODER_REGISTRY: Record<string, CoderConfig> = {
       file: "settings.json",
     },
     supportsAuthToken: true,
+    wireApi: "both",
   },
   qwen: {
     id: "qwen",
@@ -84,6 +87,7 @@ export const CODER_REGISTRY: Record<string, CoderConfig> = {
       file: "config.yaml",
     },
     supportsAuthToken: false,
+    wireApi: "chat",
   },
   codex: {
     id: "codex",
@@ -100,6 +104,7 @@ export const CODER_REGISTRY: Record<string, CoderConfig> = {
       file: "config.toml",
     },
     supportsAuthToken: false,
+    wireApi: "chat",
   },
 } as const;
 

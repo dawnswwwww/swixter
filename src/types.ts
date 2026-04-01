@@ -11,6 +11,19 @@ export type AuthType = "bearer" | "api-key" | "custom";
 export type ApiKeyEnvVar = "ANTHROPIC_API_KEY" | "ANTHROPIC_AUTH_TOKEN";
 
 /**
+ * Model family grouping
+ * Used to organize models into hierarchical families (e.g., Claude's Sonnet/Haiku/Opus)
+ */
+export interface ModelFamily {
+  /** Family ID, e.g., "sonnet", "haiku", "opus" */
+  id: string;
+  /** Display name, e.g., "Sonnet", "Haiku", "Opus" */
+  name: string;
+  /** List of model IDs in this family */
+  models: string[];
+}
+
+/**
  * Provider preset configuration
  */
 export interface ProviderPreset {
@@ -20,8 +33,10 @@ export interface ProviderPreset {
   name: string;
   /** Provider display name */
   displayName: string;
-  /** API base URL */
+  /** API base URL (for Anthropic/Responses API) */
   baseURL: string;
+  /** Optional chat-compatible base URL (for Codex/Qwen/OpenAI Chat API) */
+  baseURLChat?: string;
   /** Default supported model list */
   defaultModels: string[];
   /** Authentication type */
@@ -41,6 +56,8 @@ export interface ProviderPreset {
   wire_api?: "chat" | "responses";
   /** Environment variable name for API key (for Codex) */
   env_key?: string;
+  /** Optional model family hierarchy */
+  modelFamilies?: ModelFamily[];
 }
 
 /**
@@ -159,6 +176,11 @@ export const ProviderPresetSchema = z.object({
   isChinese: z.boolean().optional(),
   wire_api: z.enum(["chat", "responses"]).optional(),
   env_key: z.string().optional(),
+  modelFamilies: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    models: z.array(z.string()).min(1),
+  })).optional(),
 });
 
 export const ClaudeCodeProfileSchema = z.object({

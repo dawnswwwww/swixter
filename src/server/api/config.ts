@@ -82,16 +82,31 @@ export async function getConfigMeta(req: IncomingMessage, res: ServerResponse): 
 
 /**
  * GET /api/config/export - Export configuration
+ * Query params: ?sanitize=true to mask API keys
  */
 export async function exportConfigFile(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
-    const configPath = getConfigPath("swixter");
-    const content = await readFile(configPath, "utf-8");
+    const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
+    const sanitize = url.searchParams.get("sanitize") === "true";
 
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Content-Disposition", 'attachment; filename="swixter-config.json"');
-    res.statusCode = 200;
-    res.end(content);
+    // Use the export config function with sanitization support
+    const { exportConfig } = await import("../../config/export.js");
+    const tempDir = getConfigDir("swixter");
+    const tempPath = join(tempDir, `.export-${Date.now()}.json`);
+
+    try {
+      await exportConfig(tempPath, { sanitizeKeys: sanitize });
+
+      const content = await readFile(tempPath, "utf-8");
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", 'attachment; filename="swixter-config.json"');
+      res.statusCode = 200;
+      res.end(content);
+    } finally {
+      // Clean up temp file
+      try { await unlink(tempPath); } catch {}
+    }
   } catch (error) {
     sendError(res, { code: "EXPORT_FAILED", message: "Failed to export configuration" }, 500);
   }
@@ -125,5 +140,18 @@ export async function importConfigFile(req: IncomingMessage, res: ServerResponse
     }
   } catch (error) {
     sendError(res, { code: "IMPORT_FAILED", message: error instanceof Error ? error.message : "Failed to import configuration" }, 500);
+  }
+}
+
+/**
+ * POST /api/config/reset - Reset all data
+ */
+export async function resetConfig(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const { resetAllData } = await import("../../config/manager.js");
+    await resetAllData();
+    sendJson(res, { success: true, message: "All data has been reset" });
+  } catch (error) {
+    sendError(res, { code: "RESET_FAILED", message: error instanceof Error ? error.message : "Failed to reset configuration" }, 500);
   }
 }

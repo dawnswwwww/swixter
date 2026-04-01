@@ -5,44 +5,40 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+        background: "var(--bg-base)",
+        foreground: "var(--text-primary)",
+        surface: {
+          DEFAULT: "var(--bg-surface)",
+          elevated: "var(--bg-elevated)",
         },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
+        border: "var(--border-subtle)",
+        borderStrong: "var(--border-strong)",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "var(--accent-amber)",
+          muted: "var(--accent-amber-muted)",
         },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+        success: "var(--status-success)",
+        warning: "var(--status-warning)",
+        destructive: "var(--status-error)",
+        text: {
+          primary: "var(--text-primary)",
+          secondary: "var(--text-secondary)",
+          muted: "var(--text-muted)",
         },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
+      },
+      fontFamily: {
+        mono: ["JetBrains Mono", "SF Mono", "Fira Code", "monospace"],
+        sans: ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        NONE: "0",
+        SM: "2px",
+        MD: "4px",
+        DEFAULT: "4px",
+      },
+      spacing: {
+        "18": "4.5rem",
+        "88": "22rem",
       },
     },
   },

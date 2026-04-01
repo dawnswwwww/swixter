@@ -200,7 +200,7 @@ async function cmdCreateInteractive(): Promise<void> {
     options: presets.map((preset) => ({
       value: preset.id,
       label: preset.displayName,
-      hint: preset.baseURL,
+      hint: preset.baseURLChat || preset.baseURL,
     })),
   });
 
@@ -229,7 +229,7 @@ async function cmdCreateInteractive(): Promise<void> {
   // 4. Custom Base URL (optional)
   const customBaseURL = await p.text({
     message: "Base URL (optional, leave empty for default)",
-    placeholder: preset?.baseURL || "https://api.example.com",
+    placeholder: preset?.baseURLChat || preset?.baseURL || "https://api.example.com",
     validate: (value) => {
       // Allow empty (will use preset default)
       if (!value || value.trim() === "") {
@@ -276,7 +276,7 @@ async function cmdCreateInteractive(): Promise<void> {
   spinner.start("Creating profile...");
 
   try {
-    const finalBaseURL = (customBaseURL as string) || preset?.baseURL;
+    const finalBaseURL = (customBaseURL as string) || preset?.baseURLChat || preset?.baseURL;
 
     const profile: ClaudeCodeProfile = {
       name: name as string,
@@ -345,7 +345,7 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
   }
 
   try {
-    const finalBaseURL = (params["base-url"] as string) || preset.baseURL;
+    const finalBaseURL = (params["base-url"] as string) || preset.baseURLChat || preset.baseURL;
 
     const profile: ClaudeCodeProfile = {
       name: params.name as string,
@@ -407,7 +407,7 @@ async function cmdList(): Promise<void> {
     const preset = getPresetById(profile.providerId);
     const isCurrent = current?.name === profile.name;
     const marker = isCurrent ? pc.green(MARKERS.active) : pc.dim(MARKERS.inactive);
-    const baseUrl = profile.baseURL || preset?.baseURL || MISC_DEFAULTS.baseUrlFallback;
+    const baseUrl = profile.baseURL || preset?.baseURLChat || preset?.baseURL || MISC_DEFAULTS.baseUrlFallback;
     console.log(
       `${marker} ${pc.cyan(profile.name.padEnd(20))} ${pc.dim("|")} ${preset?.displayName.padEnd(25)} ${pc.dim("|")} ${pc.yellow(baseUrl)}`
     );
@@ -435,7 +435,7 @@ async function cmdSwitch(profileName: string, args: string[] = []): Promise<void
     await setActiveProfileForCoder(CODER_NAME, profileName);
     const profile = await getActiveProfileForCoder(CODER_NAME);
     const preset = getPresetById(profile!.providerId);
-    const baseUrl = profile!.baseURL || preset?.baseURL || "Default";
+    const baseUrl = profile!.baseURL || preset?.baseURLChat || preset?.baseURL || "Default";
 
     console.log();
     console.log(pc.green("✓") + " Switched successfully!");
@@ -552,7 +552,7 @@ async function cmdEdit(profileName?: string): Promise<void> {
       options: presets.map((preset) => ({
         value: preset.id,
         label: preset.displayName,
-        hint: preset.baseURL,
+        hint: preset.baseURLChat || preset.baseURL,
       })),
       initialValue: profile.providerId,
     });
@@ -737,7 +737,7 @@ async function cmdCurrent(): Promise<void> {
   }
 
   const preset = getPresetById(profile.providerId);
-  const baseUrl = profile.baseURL || preset?.baseURL || "Default";
+  const baseUrl = profile.baseURL || preset?.baseURLChat || preset?.baseURL || "Default";
 
   console.log();
   console.log(pc.bold("Current active profile:"));
@@ -930,7 +930,7 @@ async function cmdRun(args: string[]): Promise<void> {
 
   // Get preset and baseURL
   const preset = getPresetById(profile.providerId);
-  const baseURL = profile.baseURL || preset?.baseURL || "";
+  const baseURL = profile.baseURL || preset?.baseURLChat || preset?.baseURL || "";
 
   // Build environment variables
   const env: Record<string, string> = {};

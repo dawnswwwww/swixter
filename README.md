@@ -2,7 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/swixter.svg)](https://www.npmjs.com/package/swixter)
 [![Test Status](https://github.com/dawnswwwww/swixter/actions/workflows/test.yml/badge.svg)](https://github.com/dawnswwwww/swixter/actions/workflows/test.yml)
-[![Release Status](https://github.com/dawnswwwww/swixter/actions/workflows/release.yml/badge.svg)](https://github.com/dawnswwwww/swixter/actions/workflows/release.yml)
+[![Release Status](https://github.com/dawnswwwww/swixter/actions/workflows/release.yml/badge.svg)](https://github.com/dawnswwwww/swixter/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/node/v/swixter.svg)](https://nodejs.org)
 
@@ -20,6 +20,7 @@ Working with AI coding tools shouldn't be complicated. Swixter lets you:
 - **Use command aliases** - Ultra-short commands (`r`, `ls`, `sw`) for maximum productivity
 - **Add custom providers** - Easily integrate any OpenAI-compatible AI service
 - **Stay in control** - All configs stored locally, no cloud dependencies
+- **Web UI** - Browser-based interface for visual configuration management
 
 ## Installation
 
@@ -37,72 +38,81 @@ npx swixter --help
 
 ### Platform Support
 
-- **Linux/macOS**: Full support
-- **Windows**: Full support (Windows 10/11, requires Node.js 18+)
-  - Config stored at `~/swixter/config.json` (e.g., `C:\Users\YourName\swixter\config.json`)
-  - Docker Desktop + WSL2 recommended for E2E tests
-  - See [docs/WINDOWS.md](docs/WINDOWS.md) for detailed Windows guide
+| Platform | Status | Notes |
+|----------|--------|-------|
+| **Linux** | ✅ Full | Full support |
+| **macOS** | ✅ Full | Full support |
+| **Windows 10/11** | ✅ Full | Requires Node.js 18+; Docker Desktop + WSL2 for E2E tests |
+
+Config stored at:
+- **Linux/macOS**: `~/.config/swixter/`
+- **Windows**: `~/swixter/` (e.g., `C:\Users\YourName\swixter\`)
+
+See [docs/WINDOWS.md](docs/WINDOWS.md) for detailed Windows guide.
 
 ## Quick Start
 
 ```bash
-# Create your first profile
-swixter claude create
+# Interactive mode - guided setup
+swixter
 
-# List all profiles
-swixter claude list
+# Or use commands directly
+swixter claude create                    # Create profile
+swixter claude list                     # List profiles
+swixter claude switch my-profile        # Switch profile
+swixter claude apply                    # Apply to Claude Code
 
-# Switch between profiles
-swixter claude switch my-profile
-
-# Apply profile to Claude Code
-swixter claude apply
-
-# Or launch the Web UI (new!)
+# Launch Web UI (browser-based management)
 swixter ui
 ```
 
 ## Built-in Providers
 
-- **Anthropic** - Official Claude API
-- **Ollama** - Run Qwen and other models locally
-- **Custom** - Add any OpenAI-compatible API
+| Provider | API Type | Description |
+|----------|----------|-------------|
+| **Anthropic** | responses | Official Claude API |
+| **Ollama** | chat | Run Qwen, Llama, and other models locally |
+| **OpenAI** | chat | OpenAI API |
+| **OpenRouter** | chat | Unified access to 100+ models |
+| **Custom** | chat | Add any OpenAI-compatible API |
 
-## Add Custom Providers
+## Web UI
 
-Easily add any AI service:
+Launch `swixter ui` to open a browser-based interface for managing profiles.
+
+### Features
+
+- **Dashboard** - View all coders, switch active profiles, apply configurations
+- **Profiles** - Create, edit, delete configuration profiles
+- **Providers** - Manage custom API providers
+- **Settings** - Import/export configurations
+
+### Running the Web UI
 
 ```bash
-# Interactive setup
-swixter providers add
+# Default port (3141)
+swixter ui
 
-# Or use flags
-swixter providers add \
-  --id openrouter \
-  --name "OpenRouter" \
-  --base-url "https://openrouter.ai/api/v1" \
-  --auth-type bearer
+# Custom port
+swixter ui --port 8080
 ```
 
-Supports OpenRouter, DeepSeek, MiniMax, and any OpenAI-compatible API.
+The UI auto-opens in your browser at `http://localhost:3141`.
 
-## Features
+### Web UI Dashboard
 
-✨ **Simple** - Minimal commands, maximum productivity
-🚀 **Fast** - Built with Bun for instant operations
-🎨 **Beautiful** - Clean, modern CLI interface
-🔒 **Secure** - Keys stored locally, optional sanitization for sharing
-🔧 **Flexible** - Works with any OpenAI-compatible API
-🎯 **Model config** - Set specific models per profile (Claude: Sonnet/Opus/Haiku; Codex/Qwen: any model)
-📦 **Lightweight** - Small package size, zero bloat
-🌐 **Web UI** - Browser-based configuration management (new in v0.1.0!)
+The Dashboard shows:
+- All installed coders (Claude Code, Codex, Continue)
+- Current active profile per coder
+- Quick profile switching via dropdown
+- One-click Apply to write config to coder's settings file
 
 ## Commands
 
 ### For Claude Code
 
 ```bash
-swixter claude create          # Create new profile
+swixter claude create          # Create new profile (alias: new)
 swixter claude list             # List all profiles (alias: ls)
 swixter claude switch <name>    # Switch active profile (alias: sw)
 swixter claude apply            # Apply to Claude Code
@@ -110,28 +120,28 @@ swixter claude run              # Run Claude Code with current profile (alias: r
 swixter claude edit <name>      # Edit existing profile (alias: update)
 swixter claude current          # Show current active profile
 swixter claude delete <name>    # Delete profile (alias: rm)
-swixter claude install          # Install Claude Code CLI
-swixter claude update-cli       # Update Claude Code CLI (alias: upgrade)
+swixter claude install           # Install Claude Code CLI
+swixter claude update-cli        # Update Claude Code CLI (alias: upgrade)
 ```
 
 ### For Codex
 
 ```bash
-swixter codex create           # Create new profile
-swixter codex list              # List all profiles (alias: ls)
-swixter codex switch <name>     # Switch active profile (alias: sw)
-swixter codex apply             # Apply to Codex (writes ~/.codex/config.toml)
-swixter codex run               # Apply + set env + run codex (alias: r, all-in-one)
-swixter codex edit <name>       # Edit existing profile (alias: update)
-swixter codex current           # Show current active profile
-swixter codex delete <name>     # Delete profile (alias: rm)
-swixter codex install           # Install Codex CLI
-swixter codex update-cli        # Update Codex CLI (alias: upgrade)
+swixter codex create            # Create new profile
+swixter codex list               # List all profiles (alias: ls)
+swixter codex switch <name>      # Switch active profile (alias: sw)
+swixter codex apply              # Apply to Codex (writes ~/.codex/config.toml)
+swixter codex run                # Apply + set env + run codex (alias: r)
+swixter codex edit <name>        # Edit existing profile (alias: update)
+swixter codex current            # Show current active profile
+swixter codex delete <name>      # Delete profile (alias: rm)
+swixter codex install            # Install Codex CLI
+swixter codex update-cli         # Update Codex CLI (alias: upgrade)
 ```
 
 **Two ways to use Codex profiles**:
 
-1. **Quick way** (recommended): `swixter codex r` (or `swixter codex run`)
+1. **Quick way** (recommended): `swixter codex r`
    - Automatically applies profile to config.toml
    - Sets environment variables
    - Runs codex in one command
@@ -158,22 +168,64 @@ swixter qwen update-cli         # Update Qwen Code CLI (alias: upgrade)
 
 ```bash
 swixter providers list          # List available providers
-swixter providers add           # Add custom provider
+swixter providers add            # Add custom provider
 swixter providers remove <id>   # Remove provider
+swixter providers show <id>    # Show provider details
 ```
 
 ### Configuration
 
 ```bash
-swixter ui                     # Launch Web UI (new!)
-swixter export config.json      # Export configs
-swixter import config.json      # Import configs
-swixter completion bash         # Shell completion
+swixter ui                      # Launch Web UI
+swixter ui --port <port>        # Launch Web UI on custom port
+swixter export <file>           # Export configs
+swixter export <file> --sanitize # Export without API keys
+swixter import <file>           # Import configs
+swixter import <file> --overwrite # Overwrite existing profiles
+swixter completion bash          # Bash completion
+swixter completion zsh           # Zsh completion
+swixter completion fish          # Fish completion
+```
+
+## Model Configuration
+
+### Claude Code Models
+
+Set specific models per profile:
+
+```bash
+swixter claude create \
+  --name production \
+  --provider anthropic \
+  --api-key sk-ant-xxx \
+  --anthropic-model claude-sonnet-4-20250514 \
+  --default-haiku-model claude-haiku-4-20250506 \
+  --default-opus-model claude-opus-4-20250514 \
+  --default-sonnet-model claude-sonnet-4-20250514
+```
+
+| Flag | Environment Variable | Description |
+|------|---------------------|-------------|
+| `--anthropic-model` | `ANTHROPIC_MODEL` | Default model |
+| `--default-haiku-model` | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | Haiku model |
+| `--default-opus-model` | `ANTHROPIC_DEFAULT_OPUS_MODEL` | Opus model |
+| `--default-sonnet-model` | `ANTHROPIC_DEFAULT_SONNET_MODEL` | Sonnet model |
+
+### Codex/Qwen Models
+
+```bash
+swixter codex create \
+  --name local-ollama \
+  --provider ollama \
+  --base-url http://localhost:11434 \
+  --model qwen3:32b
 ```
 
 ## Configuration File
 
-Configs are stored at `~/.config/swixter/config.json`
+Configs are stored at:
+- **Linux/macOS**: `~/.config/swixter/config.json`
+- **Windows**: `~/swixter/config.json`
 
 ```json
 {
@@ -181,16 +233,60 @@ Configs are stored at `~/.config/swixter/config.json`
     "my-profile": {
       "name": "my-profile",
       "providerId": "anthropic",
-      "apiKey": "sk-ant-...",
-      "model": "claude-sonnet-4-20250514"
+      "apiKey": "sk-ant-xxx",
+      "authToken": "sk-ant-auth-xxx",
+      "baseURL": "https://api.anthropic.com",
+      "models": {
+        "anthropicModel": "claude-sonnet-4-20250514",
+        "defaultHaikuModel": "claude-haiku-4-20250506",
+        "defaultOpusModel": "claude-opus-4-20250514",
+        "defaultSonnetModel": "claude-sonnet-4-20250514"
+      },
+      "envKey": "CUSTOM_API_KEY",
+      "headers": {
+        "X-Custom-Header": "value"
+      },
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    "ollama-local": {
+      "name": "ollama-local",
+      "providerId": "ollama",
+      "apiKey": "",
+      "baseURL": "http://localhost:11434",
+      "model": "qwen3:32b"
     }
   },
   "coders": {
     "claude": {
       "activeProfile": "my-profile"
+    },
+    "codex": {
+      "activeProfile": "ollama-local"
+    },
+    "qwen": {
+      "activeProfile": ""
     }
   }
 }
+```
+
+## Add Custom Providers
+
+```bash
+# Interactive setup
+swixter providers add
+
+# With flags
+swixter providers add \
+  --id openrouter \
+  --name "OpenRouter" \
+  --display-name "OpenRouter" \
+  --base-url "https://openrouter.ai/api/v1" \
+  --auth-type bearer
+
+# Then create a profile using it
+swixter claude create --provider openrouter --api-key sk-or-xxx
 ```
 
 ## Examples
@@ -204,10 +300,10 @@ swixter claude create --name work --provider anthropic --api-key sk-ant-work-xxx
 # Setup personal profile
 swixter claude create --name personal --provider anthropic --api-key sk-ant-personal-xxx
 
-# Switch to work (using short alias)
+# Switch to work
 swixter claude sw work && swixter claude apply
 
-# Quick run with work profile (using ultra-short alias)
+# Quick run
 swixter claude r
 
 # Switch to personal
@@ -224,7 +320,7 @@ swixter qwen create \
   --provider ollama \
   --base-url http://localhost:11434
 
-# Switch and run (using aliases)
+# Switch and run
 swixter qwen sw local
 swixter qwen r
 ```
@@ -238,81 +334,98 @@ swixter codex create \
   --provider ollama \
   --base-url http://localhost:11434
 
-# Quick way: All-in-one command (using ultra-short alias)
+# Quick way: All-in-one
 swixter codex r
 
-# Or manual way:
+# Manual way
 swixter codex apply
 export OLLAMA_API_KEY=""
 codex
-
-# Run with different profile temporarily
-swixter codex run --profile other-profile
 ```
 
-### Example 4: Add OpenRouter
+### Example 4: Web UI workflow
 
 ```bash
-# Add OpenRouter as custom provider
-swixter providers add \
-  --id openrouter \
-  --base-url "https://openrouter.ai/api/v1" \
-  --auth-type bearer
+# Launch Web UI
+swixter ui
 
-# Create profile using OpenRouter
-swixter claude create \
-  --name openrouter-profile \
-  --provider openrouter \
-  --api-key sk-or-v1-xxx
+# In browser:
+# 1. Go to Profiles → Create a new profile
+# 2. Go to Dashboard → Select profile from dropdown
+# 3. Click APPLY to write config
 ```
 
 ## Shell Completion
 
 Enable auto-completion for faster typing:
 
+### Bash
+
 ```bash
-# Bash
+# Install
 swixter completion bash > ~/.local/share/bash-completion/completions/swixter
 
-# Zsh
+# Reload
+source ~/.bashrc
+```
+
+### Zsh
+
+```bash
+# Install
 swixter completion zsh > ~/.zfunc/_swixter
 
-# Fish
+# Reload
+autoload -U compinit && compinit
+```
+
+### Fish
+
+```bash
+# Install
 swixter completion fish > ~/.config/fish/completions/swixter.fish
+
+# Reload
+fish
 ```
 
 ## Command Aliases
 
 Save keystrokes with short aliases:
 
-```bash
-swixter claude r               # run (ultra-short!)
-swixter claude ls              # list
-swixter claude sw my-profile   # switch
-swixter claude rm old-profile  # delete
-swixter claude new             # create
+| Alias | Full Command | Description |
+|-------|-------------|-------------|
+| `r` | `run` | Execute the AI coder |
+| `ls` | `list` | List all profiles |
+| `sw` | `switch` | Switch profiles |
+| `rm` | `delete` | Delete profiles |
+| `new` | `create` | Create new profile |
+| `update` | `edit` | Edit existing profile |
+| `upgrade` | `update-cli` | Update CLI tool |
+
+## Architecture
+
+```
+swixter/
+├── src/
+│   ├── cli/           # CLI command handlers
+│   ├── config/        # Config file management
+│   ├── adapters/      # Coder-specific adapters (Claude, Codex, Continue)
+│   ├── providers/     # Provider presets
+│   ├── server/        # Web UI API server
+│   └── utils/         # Shared utilities
+├── ui/                # Web UI (React + Vite)
+└── tests/             # Unit tests
 ```
 
-Full command reference:
-- `r` → `run` - Execute the AI coder
-- `ls` → `list` - List all profiles
-- `sw` → `switch` - Switch profiles
-- `rm` → `delete` - Delete profiles
-- `new` → `create` - Create new profile
-- `update` → `edit` - Edit existing profile
-- `upgrade` → `update-cli` - Update CLI tool
-
-## Help & Documentation
-
-```bash
-swixter --help                 # Global help
-swixter claude --help          # Claude commands help
-swixter providers --help       # Provider commands help
-```
+**Data Flow**:
+1. `swixter create/switch` → Updates `~/.config/swixter/config.json`
+2. `swixter apply` → Writes to coder config (`~/.claude/settings.json`, etc.)
+3. `swixter run` → Sets env vars + spawns coder CLI
 
 ## Development
 
-Built with modern tools for a great developer experience:
+Built with modern tools:
 
 ```bash
 # Clone repo
@@ -322,71 +435,70 @@ cd swixter
 # Install dependencies
 bun install
 
-# Run in dev mode
-bun run cli
-
-# Run tests
-bun test
-```
-
-## Tech Stack
-
-- **Bun** - Fast JavaScript runtime
-- **TypeScript** - Type safety
-- **@clack/prompts** - Beautiful CLI prompts
-- **Zod** - Schema validation
-- **semver** - Version parsing and comparison
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.
-
-## Roadmap
-
-Future plans for Swixter:
-
-- [ ] Support for more AI coding assistants
-- [ ] Profile templates for common setups
-- [ ] Configuration validation and migration tools
-- [x] Web UI for profile management (v0.1.0)
-- [ ] Cloud sync for profiles (optional, planned)
-
-## Contributing
-
-Contributions are welcome! Here's how to get started:
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/dawnswwwww/swixter.git
-cd swixter
-
-# Install dependencies
-bun install
-
-# Run in development mode
+# Run CLI in dev mode (with hot reload)
 bun run cli:dev
 
 # Run tests
 bun test
 
-# Build the project
+# Run specific test
+bun test tests/adapters/claude.test.ts
+
+# E2E tests (requires Docker)
+bun run test:e2e
+
+# Build
+bun run build
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Runtime** | Bun |
+| **Language** | TypeScript |
+| **CLI UI** | @clack/prompts |
+| **Validation** | Zod |
+| **Version** | semver |
+| **Web UI** | React + Vite + Tailwind CSS |
+| **Testing** | Bun test, Docker E2E |
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+## Roadmap
+
+- [ ] Profile templates for common setups
+- [ ] Configuration validation and migration tools
+- [x] Web UI for profile management (v0.0.9+)
+- [ ] Cloud sync for profiles (optional, planned)
+
+## Contributing
+
+Contributions welcome!
+
+### Development Setup
+
+```bash
+git clone https://github.com/dawnswwwww/swixter.git
+cd swixter
+bun install
+bun run cli:dev
+bun test
 bun run build
 ```
 
 ### Release Process
 
-Swixter uses a semi-automated release process:
-
-1. **Update CHANGELOG.md** with your changes under `[Unreleased]`
-2. **Run release command**:
+1. Update `CHANGELOG.md` under `[Unreleased]`
+2. Run release command:
    ```bash
-   bun run release:patch  # For bug fixes (0.0.4 → 0.0.5)
-   bun run release:minor  # For new features (0.0.4 → 0.1.0)
-   bun run release:major  # For breaking changes (0.0.4 → 1.0.0)
+   bun run release:patch  # Bug fixes (0.0.10 → 0.0.11)
+   bun run release:minor  # Features (0.0.10 → 0.1.0)
+   bun run release:major  # Breaking changes
    ```
-3. **GitHub Actions** automatically:
+3. GitHub Actions automatically:
    - Runs tests on Linux/macOS/Windows
    - Publishes to npm
    - Creates GitHub Release with changelog

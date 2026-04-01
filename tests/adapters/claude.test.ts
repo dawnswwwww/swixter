@@ -3,6 +3,7 @@ import { ClaudeCodeAdapter } from "../../src/adapters/claude.js";
 import type { ClaudeCodeProfile } from "../../src/types.js";
 import { existsSync, rmSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { getPresetById } from "../../src/providers/presets.js";
 
 const TEST_CONFIG_DIR = "/tmp/swixter-test-claude";
 const TEST_CONFIG_PATH = `${TEST_CONFIG_DIR}/settings.json`;
@@ -321,6 +322,243 @@ describe("ClaudeCodeAdapter", () => {
 
       // Clean up
       rmSync("/tmp/swixter-test-deep", { recursive: true });
+    });
+
+    // New provider apply tests
+
+    test("should apply Groq preset correctly", async () => {
+      const groqPreset = getPresetById("groq");
+      expect(groqPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-groq",
+        providerId: groqPreset!.id,
+        apiKey: "sk-groq-test",
+        model: groqPreset!.defaultModels[0],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-groq-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(groqPreset!.baseURL);
+    });
+
+    test("should apply DeepSeek preset correctly", async () => {
+      const deepseekPreset = getPresetById("deepseek");
+      expect(deepseekPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-deepseek",
+        providerId: deepseekPreset!.id,
+        apiKey: "sk-deepseek-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-deepseek-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(deepseekPreset!.baseURL);
+    });
+
+    test("should apply Moonshot preset correctly", async () => {
+      const moonshotPreset = getPresetById("moonshot");
+      expect(moonshotPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-moonshot",
+        providerId: moonshotPreset!.id,
+        apiKey: "sk-moonshot-test",
+        model: moonshotPreset!.defaultModels[0],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-moonshot-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(moonshotPreset!.baseURL);
+    });
+
+    test("should apply MiniMax CN preset correctly", async () => {
+      const minimaxCnPreset = getPresetById("minimax-cn");
+      expect(minimaxCnPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-minimax-cn",
+        providerId: minimaxCnPreset!.id,
+        apiKey: "sk-minimax-cn-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-minimax-cn-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(minimaxCnPreset!.baseURL);
+    });
+
+    test("should apply MiniMax Global preset correctly", async () => {
+      const minimaxGlobalPreset = getPresetById("minimax-global");
+      expect(minimaxGlobalPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-minimax-global",
+        providerId: minimaxGlobalPreset!.id,
+        apiKey: "sk-minimax-global-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-minimax-global-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(minimaxGlobalPreset!.baseURL);
+    });
+
+    test("should apply Dashscope preset correctly", async () => {
+      const dashscopePreset = getPresetById("dashscope");
+      expect(dashscopePreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-dashscope",
+        providerId: dashscopePreset!.id,
+        apiKey: "sk-dashscope-test",
+        model: dashscopePreset!.defaultModels[0],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-dashscope-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(dashscopePreset!.baseURL);
+    });
+
+    test("should apply Together AI preset correctly", async () => {
+      const togetherPreset = getPresetById("together");
+      expect(togetherPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-together",
+        providerId: togetherPreset!.id,
+        apiKey: "sk-together-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-together-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(togetherPreset!.baseURL);
+    });
+
+    test("should apply Fireworks AI preset correctly", async () => {
+      const fireworksPreset = getPresetById("fireworks");
+      expect(fireworksPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-fireworks",
+        providerId: fireworksPreset!.id,
+        apiKey: "sk-fireworks-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-fireworks-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(fireworksPreset!.baseURL);
+    });
+
+    test("should apply 01.ai preset correctly", async () => {
+      const zeroonePreset = getPresetById("zeroone");
+      expect(zeroonePreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-zeroone",
+        providerId: zeroonePreset!.id,
+        apiKey: "sk-zeroone-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-zeroone-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(zeroonePreset!.baseURL);
+    });
+
+    test("should apply Zhipu CN preset correctly", async () => {
+      const zhipuCnPreset = getPresetById("zhipu-cn");
+      expect(zhipuCnPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-zhipu-cn",
+        providerId: zhipuCnPreset!.id,
+        apiKey: "sk-zhipu-cn-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_API_KEY).toBe("sk-zhipu-cn-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(zhipuCnPreset!.baseURL);
+    });
+
+    test("should apply Zhipu Global preset correctly", async () => {
+      const zhipuGlobalPreset = getPresetById("zhipu-global");
+      expect(zhipuGlobalPreset).toBeDefined();
+
+      const profile: ClaudeCodeProfile = {
+        name: "test-zhipu-global",
+        providerId: zhipuGlobalPreset!.id,
+        apiKey: "sk-zhipu-global-test",
+        authToken: "sk-zhipu-auth-test",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const file = Bun.file(TEST_CONFIG_PATH);
+      const config = JSON.parse(await file.text());
+
+      expect(config.env.ANTHROPIC_AUTH_TOKEN).toBe("sk-zhipu-auth-test");
+      expect(config.env.ANTHROPIC_BASE_URL).toBe(zhipuGlobalPreset!.baseURL);
     });
   });
 

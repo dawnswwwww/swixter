@@ -1027,7 +1027,7 @@ model_provider = "swixter-test"
     test("getEnvExportCommands should include OPENAI_MODEL when openaiModel is set", async () => {
       const profile: ClaudeCodeProfile = {
         name: "test",
-        providerId: "openrouter",
+        providerId: "custom",
         apiKey: "sk-or-test",
         openaiModel: "claude-3-5-sonnet-20241022",
         createdAt: new Date().toISOString(),

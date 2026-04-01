@@ -2,11 +2,24 @@
 
 export type AuthType = "bearer" | "api-key" | "custom";
 
+/**
+ * Model family grouping for hierarchical model organization
+ */
+export interface ModelFamily {
+  /** Family ID, e.g., "sonnet", "haiku", "opus" */
+  id: string;
+  /** Display name, e.g., "Sonnet", "Haiku", "Opus" */
+  name: string;
+  /** List of model IDs in this family */
+  models: string[];
+}
+
 export interface ProviderPreset {
   id: string;
   name: string;
   displayName: string;
   baseURL: string;
+  baseURLChat?: string;
   defaultModels: string[];
   authType: AuthType;
   headers?: Record<string, string>;
@@ -18,6 +31,8 @@ export interface ProviderPreset {
   isChinese?: boolean;
   wire_api?: "chat" | "responses";
   env_key?: string;
+  /** Optional model family hierarchy */
+  modelFamilies?: ModelFamily[];
   isUser?: boolean; // Added by API
 }
 
@@ -67,6 +82,8 @@ export interface CoderStatus {
   id: string;
   displayName: string;
   executable: string;
+  wireApi: "chat" | "responses" | "both";
+  supportsAuthToken: boolean;
   activeProfile: {
     name: string;
     providerId: string;

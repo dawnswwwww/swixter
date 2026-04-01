@@ -116,6 +116,7 @@ export async function startServer(portArg?: number): Promise<Server> {
   router.get("/api/config", configApi.getConfigMeta);
   router.get("/api/config/export", configApi.exportConfigFile);
   router.post("/api/config/import", configApi.importConfigFile);
+  router.post("/api/config/reset", configApi.resetConfig);
 
   // Create static file server
   const uiDir = getUiDir();

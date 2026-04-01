@@ -1,20 +1,26 @@
-import React from "react"
+import React from "react";
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: "default" | "primary" | "success" | "warning"
+  variant?: "primary" | "success" | "warning" | "error" | "neutral";
 }
 
 export default function Badge({
   className = "",
-  variant = "default",
+  variant = "neutral",
   ...props
 }: BadgeProps) {
   const variants = {
-    default: "px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs",
-    primary: "px-2 py-1 rounded-full bg-primary/10 text-primary text-xs",
-    success: "px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs",
-    warning: "px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-500 text-xs",
-  }
+    primary: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+    success: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+    warning: "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
+    error: "bg-red-500/10 text-red-400 border border-red-500/20",
+    neutral: "bg-zinc-800/50 text-zinc-400 border border-zinc-700/50",
+  };
 
-  return <span className={`${variants[variant]} ${className}`} {...props} />
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 text-xs font-mono rounded-sm border ${variants[variant]} ${className}`}
+      {...props}
+    />
+  );
 }

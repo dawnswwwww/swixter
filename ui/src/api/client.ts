@@ -96,8 +96,8 @@ export async function setActiveProfile(coder: string, profileName: string): Prom
   });
 }
 
-export async function applyProfile(coder: string): Promise<{ success: boolean; message: string }> {
-  return fetchJson<{ success: boolean; message: string }>(`${API_BASE}/coders/${coder}/apply`, {
+export async function applyProfile(coder: string): Promise<{ success: boolean; warning?: boolean; message: string }> {
+  return fetchJson<{ success: boolean; warning?: boolean; message: string }>(`${API_BASE}/coders/${coder}/apply`, {
     method: "POST",
   });
 }
@@ -120,8 +120,9 @@ export async function getConfigMeta(): Promise<ConfigMeta> {
   return response.json();
 }
 
-export async function exportConfig(): Promise<string> {
-  const response = await fetch(`${API_BASE}/config/export`);
+export async function exportConfig(sanitize?: boolean): Promise<string> {
+  const url = sanitize ? `${API_BASE}/config/export?sanitize=true` : `${API_BASE}/config/export`;
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error("Failed to export config");
   }
@@ -132,5 +133,11 @@ export async function importConfig(config: string, overwrite?: boolean): Promise
   return fetchJson<{ success: boolean; message: string }>(`${API_BASE}/config/import`, {
     method: "POST",
     body: JSON.stringify({ config, overwrite }),
+  });
+}
+
+export async function resetConfig(): Promise<{ success: boolean; message: string }> {
+  return fetchJson<{ success: boolean; message: string }>(`${API_BASE}/config/reset`, {
+    method: "POST",
   });
 }
