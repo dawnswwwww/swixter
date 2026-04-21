@@ -530,7 +530,6 @@ describe("handleProxyCommand run", () => {
       expect.arrayContaining(["--print", "hi", "--settings"]),
       expect.objectContaining({
         stdio: "inherit",
-        shell: true,
         env: expect.objectContaining({
           ANTHROPIC_API_BASE: "http://127.0.0.1:15721",
           ANTHROPIC_AUTH_TOKEN: SWIXTER_PROXY_AUTH_TOKEN,
@@ -594,7 +593,6 @@ describe("handleProxyCommand run", () => {
       expect.arrayContaining(["--settings"]),
       expect.objectContaining({
         stdio: "inherit",
-        shell: true,
         env: expect.objectContaining({
           ANTHROPIC_API_BASE: "http://127.0.0.1:18001",
           ANTHROPIC_AUTH_TOKEN: SWIXTER_PROXY_AUTH_TOKEN,
