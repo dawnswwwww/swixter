@@ -6,7 +6,17 @@ import {
   hasClaudeModels,
   hasOpenAIModel,
   getClaudeModels,
+  buildClaudeProxyMarkerModels,
+  getGeneralProxyModel,
+  isSwixterClaudeProxyMarker,
+  resolveSwixterClaudeProxyMarker,
 } from "../../src/utils/model-helper.js";
+import {
+  SWIXTER_CLAUDE_HAIKU_MODEL,
+  SWIXTER_CLAUDE_MODEL,
+  SWIXTER_CLAUDE_OPUS_MODEL,
+  SWIXTER_CLAUDE_SONNET_MODEL,
+} from "../../src/constants/proxy.js";
 import type { ClaudeCodeProfile } from "../../src/types.js";
 
 const CLAUDE_ENV_MAPPING = {
@@ -213,42 +223,105 @@ describe("getModel", () => {
   });
 });
 
-describe("hasClaudeModels / hasOpenAIModel", () => {
-  test("hasClaudeModels returns true for profiles with models", () => {
+describe("proxy model helpers", () => {
+  test("buildClaudeProxyMarkerModels mirrors only the Claude slots defined on the first profile", () => {
     const profile: ClaudeCodeProfile = {
-      name: "test",
+      name: "primary",
       providerId: "anthropic",
       apiKey: "key",
-      models: { anthropicModel: "claude-sonnet-4-20250514" },
+      model: "fallback-model",
+      models: {
+        defaultHaikuModel: "claude-haiku-4-20250506",
+        defaultSonnetModel: "claude-sonnet-4-20250514",
+      },
     };
-    expect(hasClaudeModels(profile)).toBe(true);
+
+    expect(buildClaudeProxyMarkerModels(profile)).toEqual({
+      anthropicModel: SWIXTER_CLAUDE_MODEL,
+      defaultHaikuModel: SWIXTER_CLAUDE_HAIKU_MODEL,
+      defaultSonnetModel: SWIXTER_CLAUDE_SONNET_MODEL,
+    });
   });
 
-  test("hasClaudeModels returns false without models", () => {
+  test("buildClaudeProxyMarkerModels returns undefined when the profile has no model configuration", () => {
     const profile: ClaudeCodeProfile = {
-      name: "test",
-      providerId: "ollama",
-      apiKey: "key",
-    };
-    expect(hasClaudeModels(profile)).toBe(false);
-  });
-
-  test("hasOpenAIModel returns true with model field", () => {
-    const profile: ClaudeCodeProfile = {
-      name: "test",
-      providerId: "ollama",
-      apiKey: "key",
-      model: "qwen3:32b",
-    };
-    expect(hasOpenAIModel(profile)).toBe(true);
-  });
-
-  test("hasOpenAIModel returns false without model fields", () => {
-    const profile: ClaudeCodeProfile = {
-      name: "test",
+      name: "minimal",
       providerId: "anthropic",
       apiKey: "key",
     };
-    expect(hasOpenAIModel(profile)).toBe(false);
+
+    expect(buildClaudeProxyMarkerModels(profile)).toBeUndefined();
+  });
+
+  test("isSwixterClaudeProxyMarker recognizes every internal marker", () => {
+    expect(isSwixterClaudeProxyMarker(SWIXTER_CLAUDE_MODEL)).toBe(true);
+    expect(isSwixterClaudeProxyMarker(SWIXTER_CLAUDE_HAIKU_MODEL)).toBe(true);
+    expect(isSwixterClaudeProxyMarker(SWIXTER_CLAUDE_SONNET_MODEL)).toBe(true);
+    expect(isSwixterClaudeProxyMarker(SWIXTER_CLAUDE_OPUS_MODEL)).toBe(true);
+    expect(isSwixterClaudeProxyMarker("claude-sonnet-4-20250514")).toBe(false);
+  });
+
+  test("resolveSwixterClaudeProxyMarker prefers family-specific model before generic fallbacks", () => {
+    const profile: ClaudeCodeProfile = {
+      name: "family-aware",
+      providerId: "anthropic",
+      apiKey: "key",
+      model: "profile-model-fallback",
+      models: {
+        anthropicModel: "generic-model",
+        defaultSonnetModel: "sonnet-model",
+      },
+    };
+
+    expect(resolveSwixterClaudeProxyMarker(SWIXTER_CLAUDE_SONNET_MODEL, profile)).toBe("sonnet-model");
+    expect(resolveSwixterClaudeProxyMarker(SWIXTER_CLAUDE_MODEL, profile)).toBe("generic-model");
+  });
+
+  test("resolveSwixterClaudeProxyMarker falls back to anthropicModel and model in priority order", () => {
+    const anthropicFallbackProfile: ClaudeCodeProfile = {
+      name: "anthropic-fallback",
+      providerId: "anthropic",
+      apiKey: "key",
+      models: {
+        anthropicModel: "generic-model",
+      },
+    };
+
+    const modelFallbackProfile: ClaudeCodeProfile = {
+      name: "model-fallback",
+      providerId: "openai",
+      apiKey: "key",
+      model: "profile-model",
+    };
+
+    expect(resolveSwixterClaudeProxyMarker(SWIXTER_CLAUDE_HAIKU_MODEL, anthropicFallbackProfile)).toBe("generic-model");
+    expect(resolveSwixterClaudeProxyMarker(SWIXTER_CLAUDE_OPUS_MODEL, modelFallbackProfile)).toBe("profile-model");
+  });
+
+  test("resolveSwixterClaudeProxyMarker returns undefined when no concrete model exists", () => {
+    const profile: ClaudeCodeProfile = {
+      name: "unresolved",
+      providerId: "anthropic",
+      apiKey: "key",
+    };
+
+    expect(resolveSwixterClaudeProxyMarker(SWIXTER_CLAUDE_HAIKU_MODEL, profile)).toBeUndefined();
+  });
+
+  test("getGeneralProxyModel prefers anthropicModel then model", () => {
+    expect(getGeneralProxyModel({
+      name: "claude-profile",
+      providerId: "anthropic",
+      apiKey: "key",
+      model: "ignored-model",
+      models: { anthropicModel: "claude-generic" },
+    })).toBe("claude-generic");
+
+    expect(getGeneralProxyModel({
+      name: "openai-profile",
+      providerId: "openai",
+      apiKey: "key",
+      model: "gpt-4.1",
+    })).toBe("gpt-4.1");
   });
 });

@@ -109,6 +109,99 @@ export interface VersionInfo {
   exportVersion: string;
 }
 
+export type ProxyInstanceType = "service" | "run";
+
+export interface ProxyStatus {
+  instanceId: string;
+  type: ProxyInstanceType;
+  running: boolean;
+  host: string;
+  port: number;
+  groupName?: string;
+  activeGroup?: string;
+  activeGroupName?: string;
+  pid?: number;
+  requestCount: number;
+  errorCount: number;
+  startTime?: string;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  profiles: string[];
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  profileDetails?: Array<{
+    id: string;
+    name: string;
+    providerId: string;
+  } | null>;
+}
+
+export interface ProxyLogEntry {
+  ts: string;
+  level: string;
+  msg: string;
+  method?: string;
+  path?: string;
+  status?: number;
+  durationMs?: number;
+  error?: string;
+  stack?: string;
+}
+
+export interface ProxyLogsResponse {
+  lines: ProxyLogEntry[];
+  total: number;
+}
+
+export interface LogEvent {
+  type: "log";
+  instanceId: string;
+  entry: ProxyLogEntry;
+}
+
+export interface StatusEvent {
+  type: "status";
+  status: ProxyStatus;
+}
+
+export interface InstanceStartEvent {
+  type: "instance.start";
+  status: ProxyStatus;
+}
+
+export interface InstanceStopEvent {
+  type: "instance.stop";
+  instanceId: string;
+}
+
+export interface GroupChangeEvent {
+  type: "group.change";
+  groupId: string;
+  groupName: string;
+}
+
+export interface SnapshotEvent {
+  type: "snapshot";
+  instances: ProxyStatus[];
+  activeGroupId?: string;
+  activeGroupName?: string;
+}
+
+export type ProxyWsEvent =
+  | LogEvent
+  | StatusEvent
+  | InstanceStartEvent
+  | InstanceStopEvent
+  | GroupChangeEvent;
+
+export type ProxyWsServerEvent = SnapshotEvent | ProxyWsEvent;
+
+export type ProxyWsConnectionState = "connecting" | "connected" | "reconnecting" | "disconnected";
+
 export interface ApiError {
   code: string;
   message: string;

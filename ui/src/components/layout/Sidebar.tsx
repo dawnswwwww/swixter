@@ -9,6 +9,8 @@ const navItems: NavItem[] = [
   { to: "/", label: "Dashboard" },
   { to: "/profiles", label: "Profiles" },
   { to: "/providers", label: "Providers" },
+  { to: "/groups", label: "Groups" },
+  { to: "/proxy", label: "Proxy" },
   { to: "/settings", label: "Settings" },
 ];
 

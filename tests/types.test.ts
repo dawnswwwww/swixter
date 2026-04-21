@@ -1,10 +1,29 @@
 import { describe, test, expect } from "bun:test";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   ProviderPresetSchema,
   ClaudeCodeProfileSchema,
   ConfigFileSchema,
   ExportConfigSchema,
 } from "../src/types.js";
+import { getConfigPath } from "../src/config/manager.js";
+
+describe("config path override", () => {
+  test("uses SWIXTER_CONFIG_PATH when provided", () => {
+    const original = process.env.SWIXTER_CONFIG_PATH;
+    const overridePath = join(tmpdir(), "swixter-config-override-test.json");
+
+    process.env.SWIXTER_CONFIG_PATH = overridePath;
+    expect(getConfigPath()).toBe(overridePath);
+
+    if (original === undefined) {
+      delete process.env.SWIXTER_CONFIG_PATH;
+    } else {
+      process.env.SWIXTER_CONFIG_PATH = original;
+    }
+  });
+});
 
 describe("Zod Schema Validation", () => {
   describe("ProviderPresetSchema", () => {
@@ -213,6 +232,7 @@ describe("Zod Schema Validation", () => {
         coders: {
           claude: { activeProfile: "test-profile" },
         },
+        groups: {},
         version: "2.0.0",
       };
 
@@ -225,6 +245,7 @@ describe("Zod Schema Validation", () => {
       const config = {
         profiles: {},
         coders: {},
+        groups: {},
         version: "2.0.0",
       };
 
@@ -254,6 +275,7 @@ describe("Zod Schema Validation", () => {
           claude: { activeProfile: "profile1" },
           qwen: { activeProfile: "profile2" },
         },
+        groups: {},
         version: "2.0.0",
       };
 
@@ -268,6 +290,7 @@ describe("Zod Schema Validation", () => {
         coders: {
           claude: { activeProfile: "" },
         },
+        groups: {},
         version: "2.0.0",
       };
 
@@ -279,6 +302,7 @@ describe("Zod Schema Validation", () => {
       const config = {
         profiles: {},
         coders: {},
+        groups: {},
         // missing version
       };
 
@@ -289,6 +313,7 @@ describe("Zod Schema Validation", () => {
       const config = {
         // missing profiles
         coders: {},
+        groups: {},
         version: "2.0.0",
       };
 
@@ -299,6 +324,7 @@ describe("Zod Schema Validation", () => {
       const config = {
         profiles: {},
         // missing coders
+        groups: {},
         version: "2.0.0",
       };
 

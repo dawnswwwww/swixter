@@ -11,7 +11,7 @@ import { getAdapter } from "../adapters/index.js";
  * Get configuration file path
  */
 export function getConfigPath(): string {
-  return getSwixterConfigPath("swixter");
+  return process.env.SWIXTER_CONFIG_PATH || getSwixterConfigPath("swixter");
 }
 
 /**
@@ -33,6 +33,7 @@ function createDefaultConfig(): ConfigFile {
   return {
     profiles: {},
     coders: {},
+    groups: {},
     version: CONFIG_VERSION,
   };
 }
@@ -61,8 +62,11 @@ export async function loadConfig(): Promise<ConfigFile> {
       };
       delete data.activeProfile;
       data.version = "2.0.0";
-      // Save upgraded config
-      await saveConfig(data as ConfigFile);
+    }
+
+    // Ensure groups field exists (for configs created before groups were added)
+    if (!data.groups) {
+      data.groups = {};
     }
 
     // Validate configuration structure

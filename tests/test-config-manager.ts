@@ -28,6 +28,7 @@ function createDefaultConfig(): ConfigFile {
   return {
     profiles: {},
     coders: {},
+    groups: {},
     version: CONFIG_VERSION,
   };
 }

@@ -824,6 +824,11 @@ async function cmdEdit(profileName?: string): Promise<void> {
   }
 }
 
+export async function applyClaudeProfile(profile: ClaudeCodeProfile): Promise<void> {
+  const adapter = getAdapter(CODER_NAME);
+  await adapter.apply(profile);
+}
+
 /**
  * Apply profile
  */
@@ -843,7 +848,7 @@ async function cmdApply(): Promise<void> {
     console.log();
     console.log(pc.dim(`Applying profile to ${adapter.configPath}...`));
 
-    await adapter.apply(profile);
+    await applyClaudeProfile(profile);
 
     // Verify application result
     const verified = await adapter.verify(profile);
@@ -1036,6 +1041,61 @@ async function cmdDeleteInteractive(): Promise<void> {
  * Run Claude Code
  * Run Claude Code CLI with current or specified profile
  */
+export async function spawnClaudeWithEnv(
+  args: string[],
+  env: Record<string, string>,
+  options?: {
+    profileName?: string;
+    providerDisplayName?: string;
+    baseURL?: string;
+    onExit?: () => void | Promise<void>;
+  }
+): Promise<void> {
+  // Filter out --profile parameter, pass other arguments to claude
+  const claudeArgs = args.filter((arg, idx) => {
+    if (arg === "--profile") {
+      // Skip --profile and its value
+      return false;
+    }
+    if (idx > 0 && args[idx - 1] === "--profile") {
+      // Skip --profile value
+      return false;
+    }
+    return true;
+  });
+
+  // Pass --settings with a temp file containing profile env vars
+  // Claude Code CLI args (--settings) take precedence over user settings.json,
+  // so this overrides the env vars without modifying any files on disk.
+  // Using a temp file because shell:true mangles inline JSON strings.
+  const tmp = await import("node:os");
+  const path = await import("node:path");
+  const fs = await import("node:fs/promises");
+  const settingsContent = JSON.stringify({ env }, null, 2);
+  const tmpFile = path.join(tmp.tmpdir(), `swixter-settings-${Date.now()}.json`);
+  await fs.writeFile(tmpFile, settingsContent, "utf-8");
+  claudeArgs.push("--settings", tmpFile);
+
+  if (options?.profileName) {
+    console.log();
+    console.log(pc.dim(`Using profile: ${pc.cyan(options.profileName)}${options.providerDisplayName ? ` (${options.providerDisplayName})` : ""}`));
+    console.log(pc.dim(`Base URL: ${pc.yellow(options.baseURL || "Default")}`));
+    console.log();
+  }
+
+  // Use shared utility for spawning CLI
+  spawnCLI({
+    command: "claude",
+    args: claudeArgs,
+    env,
+    displayName: CODER_CONFIG.displayName,
+    onExit: async () => {
+      await fs.unlink(tmpFile).catch(() => {});
+      await options?.onExit?.();
+    },
+  });
+}
+
 async function cmdRun(args: string[]): Promise<void> {
   if (!CODER_CONFIG) {
     console.log(pc.red("Error: Invalid coder configuration"));
@@ -1088,47 +1148,10 @@ async function cmdRun(args: string[]): Promise<void> {
   // Set profile env vars via shared utility
   Object.assign(env, buildProfileEnv(profile, CODER_CONFIG.envVarMapping, baseURL));
 
-  // Filter out --profile parameter, pass other arguments to claude
-  const claudeArgs = args.filter((arg, idx) => {
-    if (arg === "--profile") {
-      // Skip --profile and its value
-      return false;
-    }
-    if (idx > 0 && args[idx - 1] === "--profile") {
-      // Skip --profile value
-      return false;
-    }
-    return true;
-  });
-
-  // Pass --settings with a temp file containing profile env vars
-  // Claude Code CLI args (--settings) take precedence over user settings.json,
-  // so this overrides the env vars without modifying any files on disk.
-  // Using a temp file because shell:true mangles inline JSON strings.
-  const tmp = await import("node:os");
-  const path = await import("node:path");
-  const fs = await import("node:fs/promises");
-  const settingsContent = JSON.stringify({ env }, null, 2);
-  const tmpFile = path.join(tmp.tmpdir(), `swixter-settings-${Date.now()}.json`);
-  await fs.writeFile(tmpFile, settingsContent, "utf-8");
-  claudeArgs.push("--settings", tmpFile);
-
-  // Show profile being used
-  console.log();
-  console.log(pc.dim(`Using profile: ${pc.cyan(profile.name)} (${preset?.displayName})`));
-  console.log(pc.dim(`Base URL: ${pc.yellow(baseURL || "Default")}`));
-  console.log();
-
-  // Use shared utility for spawning CLI
-  spawnCLI({
-    command: "claude",
-    args: claudeArgs,
-    env,
-    displayName: CODER_CONFIG.displayName,
-    onExit: () => {
-      // Clean up temp settings file
-      fs.unlink(tmpFile).catch(() => {});
-    },
+  await spawnClaudeWithEnv(args, env, {
+    profileName: profile.name,
+    providerDisplayName: preset?.displayName,
+    baseURL,
   });
 }
 

@@ -614,6 +614,10 @@ ${pc.bold("Web UI:")}
     ${pc.dim("swixter ui [--port <port>]")}
     ${pc.dim("Start local HTTP server and open browser")}
 
+${pc.bold("Proxy Commands:")}
+  ${pc.cyan("proxy")}                ${pc.dim("Start proxy server or run with proxy")}
+  ${pc.cyan("group")}                ${pc.dim("Manage provider failover groups")}
+
 ${pc.bold("Global Commands:")}
   ${pc.cyan("providers")}           ${pc.dim("List all available API providers")}
   ${pc.cyan("export <file>")}       ${pc.dim("Export all configurations to file")}

@@ -210,6 +210,20 @@ export async function main(): Promise<void> {
       return;
     }
 
+    // Group command
+    if (firstArg === "group") {
+      const { handleGroupCommand } = await import("./group.js");
+      await handleGroupCommand(args.slice(1));
+      return;
+    }
+
+    // Proxy command
+    if (firstArg === "proxy") {
+      const { handleProxyCommand } = await import("./proxy.js");
+      await handleProxyCommand(args.slice(1));
+      return;
+    }
+
     // Coder subcommands
     if (firstArg === "claude") {
       await handleClaudeCommand(args.slice(1));

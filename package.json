@@ -14,10 +14,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build src/cli/index.ts --outdir dist/cli --target node --format esm && chmod +x dist/cli/index.js",
+    "build": "bun build src/cli/index.ts --outdir dist/cli --target bun --standalone",
     "build:ui": "cd ui && npm run build && mkdir -p ../dist/ui && cp -r dist/* ../dist/ui/",
     "build:all": "npm run build:ui && npm run build",
-    "prepublishOnly": "bun run build && bun test",
+    "prepublishOnly": "bun run build:all && bun test",
     "cli": "bun src/cli/index.ts",
     "cli:dev": "bun --hot src/cli/index.ts",
     "ui:dev": "cd ui && npm run dev",
@@ -79,6 +79,9 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "js-yaml": "^4.1.1",
     "picocolors": "^1.1.1",
     "semver": "^7.7.4",

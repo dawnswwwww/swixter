@@ -77,6 +77,8 @@ export const GLOBAL_COMMANDS = [
   "help",
   "version",
   "ui",
+  "proxy",
+  "group",
 ] as const;
 
 /**

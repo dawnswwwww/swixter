@@ -2,7 +2,10 @@ import type {
   ClaudeCodeProfile,
   ConfigMeta,
   CoderStatus,
+  Group,
   ProviderPreset,
+  ProxyLogsResponse,
+  ProxyStatus,
   VersionInfo,
 } from "./types";
 
@@ -139,5 +142,71 @@ export async function importConfig(config: string, overwrite?: boolean): Promise
 export async function resetConfig(): Promise<{ success: boolean; message: string }> {
   return fetchJson<{ success: boolean; message: string }>(`${API_BASE}/config/reset`, {
     method: "POST",
+  });
+}
+
+// Proxy API
+export async function fetchProxyStatus(): Promise<ProxyStatus> {
+  return fetchJson<ProxyStatus>(`${API_BASE}/proxy/status`);
+}
+
+export async function startProxy(options?: { host?: string; port?: number }): Promise<ProxyStatus> {
+  return fetchJson<ProxyStatus>(`${API_BASE}/proxy/start`, {
+    method: "POST",
+    body: JSON.stringify(options || {}),
+  });
+}
+
+export async function stopProxy(instanceId?: string): Promise<{ success: boolean; message: string }> {
+  return fetchJson<{ success: boolean; message: string }>(`${API_BASE}/proxy/stop`, {
+    method: "POST",
+    body: JSON.stringify(instanceId ? { instanceId } : {}),
+  });
+}
+
+export async function fetchProxyInstances(): Promise<ProxyStatus[]> {
+  return fetchJson<ProxyStatus[]>(`${API_BASE}/proxy/instances`);
+}
+
+export async function fetchProxyLogs(lines?: number, instanceId?: string): Promise<ProxyLogsResponse> {
+  const params = new URLSearchParams();
+  if (lines) params.set("lines", String(lines));
+  if (instanceId) params.set("instanceId", instanceId);
+  const qs = params.toString();
+  return fetchJson<ProxyLogsResponse>(`${API_BASE}/proxy/logs${qs ? `?${qs}` : ""}`);
+}
+
+// Groups API
+export async function listGroups(): Promise<Group[]> {
+  return fetchJson<Group[]>(`${API_BASE}/groups`);
+}
+
+export async function getGroup(id: string): Promise<Group> {
+  return fetchJson<Group>(`${API_BASE}/groups/${encodeURIComponent(id)}`);
+}
+
+export async function createGroup(data: { name: string; profiles: string[]; isDefault?: boolean }): Promise<Group> {
+  return fetchJson<Group>(`${API_BASE}/groups`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateGroup(id: string, data: Partial<Pick<Group, "name" | "profiles" | "isDefault">>): Promise<Group> {
+  return fetchJson<Group>(`${API_BASE}/groups/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteGroup(id: string): Promise<{ success: boolean; message: string }> {
+  return fetchJson<{ success: boolean; message: string }>(`${API_BASE}/groups/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function setActiveGroup(id: string): Promise<Group> {
+  return fetchJson<Group>(`${API_BASE}/groups/${encodeURIComponent(id)}/active`, {
+    method: "PUT",
   });
 }

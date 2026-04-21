@@ -18,7 +18,7 @@ export interface SpawnOptions {
   /** Display name for error messages (e.g., "Claude Code", "Qwen Code") */
   displayName: string;
   /** Callback when child process exits (before this process exits) */
-  onExit?: () => void;
+  onExit?: () => void | Promise<void>;
 }
 
 /**
@@ -46,18 +46,18 @@ export function spawnCLI(options: SpawnOptions): void {
   });
 
   // Handle normal exit
-  child.on("exit", (code) => {
-    onExit?.();
+  child.on("exit", async (code) => {
+    await onExit?.();
     process.exit(code || 0);
   });
 
   // Handle spawn errors (command not found, etc.)
-  child.on("error", (error) => {
+  child.on("error", async (error) => {
     console.log();
     console.log(pc.red(`✗ Run failed: ${error.message}`));
     console.log(pc.dim(`Please ensure ${displayName} CLI is installed`));
     console.log();
-    onExit?.();
+    await onExit?.();
     process.exit(1);
   });
 }

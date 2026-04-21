@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { Group, GroupSchema } from "./groups/types";
+
 /**
  * Authentication type
  */
@@ -140,6 +142,10 @@ export interface ConfigFile {
   profiles: Record<string, ClaudeCodeProfile>;
   /** Configuration for each coder */
   coders: Record<string, CoderConfig>;
+  /** All groups for proxy gateway failover */
+  groups: Record<string, Group>;
+  /** Active group ID */
+  activeGroup?: string;
   /** Configuration version */
   version: string;
 }
@@ -210,6 +216,8 @@ export const CoderConfigSchema = z.object({
 export const ConfigFileSchema = z.object({
   profiles: z.record(z.string(), ClaudeCodeProfileSchema),
   coders: z.record(z.string(), CoderConfigSchema),
+  groups: z.record(z.string(), GroupSchema),
+  activeGroup: z.string().optional(),
   version: z.string(),
 });
 

@@ -3,7 +3,6 @@
  * Local HTTP server for Swixter Web UI
  */
 
-import { createServer, type Server } from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,13 +10,28 @@ import { exec } from "node:child_process";
 import pc from "picocolors";
 import { Router } from "./router.js";
 import { corsMiddleware, jsonBodyMiddleware, notFoundHandler } from "./middleware.js";
-import { createStaticServe } from "./static.js";
+import { handleApiRequest } from "./bun-http-bridge.js";
+import { serveStaticRequest } from "./bun-static.js";
+import { WsManager } from "./ws-manager.js";
 import * as profilesApi from "./api/profiles.js";
 import * as providersApi from "./api/providers.js";
 import * as codersApi from "./api/coders.js";
 import * as configApi from "./api/config.js";
+import * as groupsApi from "./api/groups.js";
+import * as proxyStatusApi from "./api/proxy-status.js";
+import * as proxyLogsApi from "./api/proxy-logs.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Server handle returned by startServer().
+ * Provides close() for graceful shutdown, compatible with Node Server API.
+ */
+export interface WebUiServerHandle {
+  host: string;
+  port: number;
+  close(callback?: () => void): void;
+}
 
 /**
  * Find an available port starting from the given port
@@ -62,25 +76,19 @@ export function openBrowser(url: string): void {
  * Get UI directory path
  */
 export function getUiDir(): string {
-  // In development, look for ui/dist relative to project root
-  // In production, look for dist/ui relative to the CLI directory
   const isDev = process.env.NODE_ENV === "development";
 
   if (isDev) {
-    // Development: assume we're in src/server, go to project root then ui/dist
     return join(__dirname, "..", "..", "ui", "dist");
   }
 
-  // Production: check if dist/ui exists (built UI), otherwise look relative to dist/cli
-  // When using bun build on src/cli/index.ts, __dirname is dist/cli
-  // We need to go up two levels to reach dist, then into ui
   return join(__dirname, "..", "..", "ui");
 }
 
 /**
- * Start the Web UI server
+ * Start the Web UI server using Bun.serve with WebSocket support.
  */
-export async function startServer(portArg?: number): Promise<Server> {
+export async function startServer(portArg?: number): Promise<WebUiServerHandle> {
   const port = portArg || await findAvailablePort(3141);
   const host = "127.0.0.1";
 
@@ -118,62 +126,93 @@ export async function startServer(portArg?: number): Promise<Server> {
   router.post("/api/config/import", configApi.importConfigFile);
   router.post("/api/config/reset", configApi.resetConfig);
 
-  // Create static file server
+  // Group routes
+  router.get("/api/groups", groupsApi.handleListGroups);
+  router.get("/api/groups/:id", groupsApi.handleGetGroup);
+  router.post("/api/groups", groupsApi.handleCreateGroup);
+  router.put("/api/groups/:id", groupsApi.handleUpdateGroup);
+  router.delete("/api/groups/:id", groupsApi.handleDeleteGroup);
+  router.put("/api/groups/:id/active", groupsApi.handleSetActiveGroup);
+
+  // Proxy routes
+  router.get("/api/proxy/status", proxyStatusApi.handleGetProxyStatus);
+  router.get("/api/proxy/instances", proxyStatusApi.handleListInstances);
+  router.post("/api/proxy/start", proxyStatusApi.handleStartProxy);
+  router.post("/api/proxy/stop", proxyStatusApi.handleStopProxy);
+  router.get("/api/proxy/logs", proxyLogsApi.handleGetProxyLogs);
+
+  // Static file serving options
   const uiDir = getUiDir();
-  const serveStatic = createStaticServe({ root: uiDir, index: "index.html", spa: true });
+  const staticOptions = { root: uiDir, index: "index.html", spa: true };
 
-  // Create HTTP server
-  const server = createServer(async (req, res) => {
-    const url = req.url || "";
+  // WebSocket manager
+  const wsManager = new WsManager();
+  wsManager.start();
 
-    // API routes go through the router
-    if (url.startsWith("/api/") || url === "/api") {
-      await router.handle(req, res);
-    } else {
-      // Everything else: static files (SPA)
-      await serveStatic(req, res);
-    }
+  // Create Bun.serve server
+  const bunServer = Bun.serve({
+    hostname: host,
+    port,
+    fetch(req, server) {
+      const url = new URL(req.url);
+
+      // WebSocket upgrade
+      if (url.pathname === "/ws") {
+        server.upgrade(req);
+        return;
+      }
+
+      // API routes
+      if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
+        return handleApiRequest(req, router);
+      }
+
+      // Static files / SPA
+      return serveStaticRequest(req, staticOptions);
+    },
+    websocket: {
+      open(ws) {
+        wsManager.addClient(ws);
+      },
+      close(ws) {
+        wsManager.removeClient(ws);
+      },
+      message(_ws, _message) {
+        // No incoming messages expected; all events are server→client
+      },
+    },
   });
 
-  // Start listening
-  server.listen(port, host, () => {
-    const url = `http://${host}:${port}`;
+  const url = `http://${host}:${port}`;
+  console.log();
+  console.log(pc.bold(pc.cyan("Swixter Web UI")));
+  console.log();
+  console.log(`  Server: ${pc.cyan(url)}`);
+  console.log(`  Press ${pc.bold("Ctrl+C")} to stop`);
+  console.log();
 
-    console.log();
-    console.log(pc.bold(pc.cyan("Swixter Web UI")));
-    console.log();
-    console.log(`  Server: ${pc.cyan(url)}`);
-    console.log(`  Press ${pc.bold("Ctrl+C")} to stop`);
-    console.log();
+  // Auto-open browser
+  openBrowser(url);
 
-    // Auto-open browser
-    openBrowser(url);
-  });
+  // Return handle with close() compatible with Node Server API
+  const handle: WebUiServerHandle = {
+    host,
+    port,
+    close(callback?: () => void) {
+      wsManager.stop();
+      bunServer.stop();
+      console.log();
+      console.log(pc.dim("Server closed"));
+      callback?.();
+    },
+  };
 
-  // Handle errors
-  server.on("error", (error: any) => {
-    if (error.code === "EADDRINUSE") {
-      console.error(pc.red(`Error: Port ${port} is already in use`));
-      console.log(pc.dim("Try specifying a different port with --port"));
-      process.exit(1);
-    } else {
-      console.error(pc.red(`Server error: ${error.message}`));
-      process.exit(1);
-    }
-  });
-
-  // Graceful shutdown
-  server.on("close", () => {
-    console.log();
-    console.log(pc.dim("Server closed"));
-  });
-
-  return server;
+  return handle;
 }
 
 /**
  * Stop the server gracefully
  */
-export function stopServer(server: Server): void {
+export function stopServer(server: WebUiServerHandle): void {
   server.close();
 }

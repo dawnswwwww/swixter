@@ -5,6 +5,12 @@
 
 import type { ClaudeCodeProfile } from "../types.js";
 import type { CoderConfig } from "../constants/coders.js";
+import {
+  SWIXTER_CLAUDE_HAIKU_MODEL,
+  SWIXTER_CLAUDE_MODEL,
+  SWIXTER_CLAUDE_OPUS_MODEL,
+  SWIXTER_CLAUDE_SONNET_MODEL,
+} from "../constants/proxy.js";
 
 /**
  * Get the model value from a profile with backward compatibility
@@ -82,6 +88,55 @@ export function getClaudeModels(profile: ClaudeCodeProfile): {
     defaultOpusModel: profile.models.defaultOpusModel,
     defaultSonnetModel: profile.models.defaultSonnetModel,
   };
+}
+
+export function getGeneralProxyModel(profile: ClaudeCodeProfile): string | undefined {
+  return profile.models?.anthropicModel || profile.model;
+}
+
+export function buildClaudeProxyMarkerModels(profile: ClaudeCodeProfile): {
+  anthropicModel?: string;
+  defaultHaikuModel?: string;
+  defaultOpusModel?: string;
+  defaultSonnetModel?: string;
+} | undefined {
+  const markerModels = {
+    anthropicModel: getGeneralProxyModel(profile) ? SWIXTER_CLAUDE_MODEL : undefined,
+    defaultHaikuModel: profile.models?.defaultHaikuModel ? SWIXTER_CLAUDE_HAIKU_MODEL : undefined,
+    defaultOpusModel: profile.models?.defaultOpusModel ? SWIXTER_CLAUDE_OPUS_MODEL : undefined,
+    defaultSonnetModel: profile.models?.defaultSonnetModel ? SWIXTER_CLAUDE_SONNET_MODEL : undefined,
+  };
+
+  if (!Object.values(markerModels).some(Boolean)) {
+    return undefined;
+  }
+
+  return markerModels;
+}
+
+export function isSwixterClaudeProxyMarker(model: string | undefined): boolean {
+  return model === SWIXTER_CLAUDE_MODEL
+    || model === SWIXTER_CLAUDE_HAIKU_MODEL
+    || model === SWIXTER_CLAUDE_SONNET_MODEL
+    || model === SWIXTER_CLAUDE_OPUS_MODEL;
+}
+
+export function resolveSwixterClaudeProxyMarker(
+  model: string | undefined,
+  profile: ClaudeCodeProfile,
+): string | undefined {
+  switch (model) {
+    case SWIXTER_CLAUDE_MODEL:
+      return profile.models?.anthropicModel || profile.model;
+    case SWIXTER_CLAUDE_HAIKU_MODEL:
+      return profile.models?.defaultHaikuModel || profile.models?.anthropicModel || profile.model;
+    case SWIXTER_CLAUDE_SONNET_MODEL:
+      return profile.models?.defaultSonnetModel || profile.models?.anthropicModel || profile.model;
+    case SWIXTER_CLAUDE_OPUS_MODEL:
+      return profile.models?.defaultOpusModel || profile.models?.anthropicModel || profile.model;
+    default:
+      return undefined;
+  }
 }
 
 /**

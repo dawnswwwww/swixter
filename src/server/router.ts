@@ -154,7 +154,7 @@ export class Router {
     const match = this.matchRoute(req);
 
     if (!match) {
-      // No route matched - will be handled by notFoundHandler
+      notFoundHandler(req, res);
       return;
     }
 

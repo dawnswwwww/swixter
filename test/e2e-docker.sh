@@ -78,6 +78,8 @@ SCENARIOS=(
     "test-export-import.sh"
     "test-delete.sh"
     "test-errors.sh"
+    "test-group.sh"
+    "test-proxy.sh"
 )
 
 for scenario in "${SCENARIOS[@]}"; do
