@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-22
+
+### Fixed
+- **User-defined providers not showing in CLI** — Replaced synchronous `getPresetById()` with async `getPresetByIdAsync()` in list/switch/current/edit commands so user-added providers display correctly
+- **Potential crash in profile switch** — Added null guard for profile lookup after switch instead of using non-null assertions
+- **Unpredictable active profile after deletion** — Active profile is now cleared (not randomly reassigned) when the active profile is deleted
+- **Deleting profile referenced in a group** — Deletion is now blocked with a clear error message listing the affected groups
+- **Config file corruption on crash** — Config writes are now atomic (write to temp file + rename)
+- **Deprecated API usage in interactive mode** — Replaced `setActiveProfile`/`getActiveProfile` with `setActiveProfileForCoder`/`getActiveProfileForCoder`
+- **Circuit breaker state inconsistency** — `isOpen` is now kept in sync with `state` during half-open transitions
+- **Command injection in browser open** — Replaced `exec()` with `execFile()` using array args to prevent shell injection
+- **Shell deprecation warning on Unix** — `shell: true` now only used on Windows, avoiding Node.js DEP0190 warning on Unix
+- **Build tooling migration** — Switched from npm to bun for UI build pipeline
+
 ## [0.1.0] - 2026-04-21
 
 ### Added

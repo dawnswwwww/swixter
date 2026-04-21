@@ -3,6 +3,7 @@
  */
 
 import { spawn } from "node:child_process";
+import os from "node:os";
 import pc from "picocolors";
 
 /**
@@ -38,11 +39,14 @@ export function spawnCLI(options: SpawnOptions): void {
   // Merge environment variables with process.env
   const finalEnv = env ? { ...process.env, ...env } : process.env;
 
-  // Spawn the process with shell: true for Windows compatibility
+  // On Windows, shell: true is needed to resolve .cmd/.bat/.exe extensions.
+  // On Unix, avoid shell: true with args to prevent DEP0190 deprecation warning
+  // and potential command injection from unescaped arguments.
+  const isWin32 = os.platform() === "win32";
   const child = spawn(command, args, {
     env: finalEnv,
-    stdio: "inherit", // Inherit stdio for interactive CLI
-    shell: true, // Required for Windows to resolve .cmd/.bat/.exe extensions
+    stdio: "inherit",
+    shell: isWin32,
   });
 
   // Handle normal exit

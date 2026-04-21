@@ -1,11 +1,11 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import type { ClaudeCodeProfile, ProviderPreset } from "../types.js";
-import { allPresets, getPresetById } from "../providers/presets.js";
+import { allPresets, getPresetByIdAsync } from "../providers/presets.js";
 import {
   upsertProfile,
-  setActiveProfile,
-  getActiveProfile,
+  setActiveProfileForCoder,
+  getActiveProfileForCoder,
   listProfiles,
   deleteProfile,
 } from "../config/manager.js";
@@ -23,9 +23,9 @@ export function showWelcome(): void {
  * Main menu
  */
 export async function showMainMenu(): Promise<string> {
-  const currentProfile = await getActiveProfile();
+  const currentProfile = await getActiveProfileForCoder("claude");
   const currentInfo = currentProfile
-    ? pc.dim(`Current: ${currentProfile.name} (${getPresetById(currentProfile.providerId)?.displayName})`)
+    ? pc.dim(`Current: ${currentProfile.name} (${await getPresetByIdAsync(currentProfile.providerId)?.displayName})`)
     : pc.dim("Not configured");
 
   const action = await p.select({
@@ -77,8 +77,8 @@ export async function createProfile(): Promise<void> {
           })),
         }),
 
-      baseURL: ({ results }) => {
-        const preset = getPresetById(results.provider as string);
+      baseURL: async ({ results }) => {
+        const preset = await getPresetByIdAsync(results.provider as string);
         if (preset?.id === "custom") {
           return p.text({
             message: "API Base URL",
@@ -110,8 +110,8 @@ export async function createProfile(): Promise<void> {
           },
         }),
 
-      confirm: ({ results }) => {
-        const preset = getPresetById(results.provider as string);
+      confirm: async ({ results }) => {
+        const preset = await getPresetByIdAsync(results.provider as string);
         return p.confirm({
           message: `Confirm creating configuration "${results.profileName}"?`,
           initialValue: true,
@@ -135,7 +135,7 @@ export async function createProfile(): Promise<void> {
   s.start("Saving configuration...");
 
   try {
-    const preset = getPresetById(group.provider);
+    const preset = await getPresetByIdAsync(group.provider);
     // Use user-provided baseURL, or fall back to preset baseURL if empty
     const finalBaseURL = group.baseURL || preset?.baseURL;
 
@@ -148,8 +148,8 @@ export async function createProfile(): Promise<void> {
       updatedAt: new Date().toISOString(),
     };
 
-    await upsertProfile(profile);
-    await setActiveProfile(profile.name);
+    await upsertProfile(profile, "claude");
+    await setActiveProfileForCoder("claude", profile.name);
 
     s.stop("Configuration created successfully!");
     p.note(
@@ -173,19 +173,19 @@ export async function switchProfile(): Promise<void> {
     return;
   }
 
-  const current = await getActiveProfile();
+  const current = await getActiveProfileForCoder("claude");
 
   const selected = await p.select({
     message: "Select configuration to switch to",
-    options: profiles.map((profile) => {
-      const preset = getPresetById(profile.providerId);
+    options: await Promise.all(profiles.map(async (profile) => {
+      const preset = await getPresetByIdAsync(profile.providerId);
       const isCurrent = current?.name === profile.name;
       return {
         value: profile.name,
         label: isCurrent ? `${profile.name} ${pc.green("(current)")}` : profile.name,
         hint: `${preset?.displayName}`,
       };
-    }),
+    })),
   });
 
   if (p.isCancel(selected)) {
@@ -197,7 +197,7 @@ export async function switchProfile(): Promise<void> {
   s.start("Switching configuration...");
 
   try {
-    await setActiveProfile(selected as string);
+    await setActiveProfileForCoder("claude", selected as string);
     s.stop("Switch successful!");
     p.log.success(`Switched to: ${pc.cyan(selected)}`);
   } catch (error) {
@@ -211,20 +211,20 @@ export async function switchProfile(): Promise<void> {
  */
 export async function showProfiles(): Promise<void> {
   const profiles = await listProfiles();
-  const current = await getActiveProfile();
+  const current = await getActiveProfileForCoder("claude");
 
   if (profiles.length === 0) {
     p.log.warn("No configurations yet");
     return;
   }
 
-  const lines = profiles.map((profile) => {
-    const preset = getPresetById(profile.providerId);
+  const lines = await Promise.all(profiles.map(async (profile) => {
+    const preset = await getPresetByIdAsync(profile.providerId);
     const isCurrent = current?.name === profile.name;
     const marker = isCurrent ? pc.green("●") : pc.dim("○");
     const baseUrl = profile.baseURL || preset?.baseURL || "default";
     return `${marker} ${pc.cyan(profile.name.padEnd(20))} ${pc.dim("|")} ${preset?.displayName.padEnd(25)} ${pc.dim("|")} ${pc.yellow(baseUrl)}`;
-  });
+  }));
 
   p.note(lines.join("\n"), `Configuration list (${profiles.length} total)`);
 }
@@ -242,10 +242,13 @@ export async function removeProfile(): Promise<void> {
 
   const selected = await p.select({
     message: "Select configuration to delete",
-    options: profiles.map((profile) => ({
-      value: profile.name,
-      label: profile.name,
-      hint: getPresetById(profile.providerId)?.displayName,
+    options: await Promise.all(profiles.map(async (profile) => {
+      const preset = await getPresetByIdAsync(profile.providerId);
+      return {
+        value: profile.name,
+        label: profile.name,
+        hint: preset?.displayName,
+      };
     })),
   });
 

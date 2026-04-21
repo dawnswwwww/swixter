@@ -6,7 +6,6 @@
 import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { exec } from "node:child_process";
 import pc from "picocolors";
 import { Router } from "./router.js";
 import { corsMiddleware, jsonBodyMiddleware, notFoundHandler } from "./middleware.js";
@@ -65,10 +64,13 @@ export function openBrowser(url: string): void {
     ? "open"
     : "xdg-open";
 
-  exec(`${command} ${url}`, (error) => {
-    if (error) {
-      console.warn(pc.yellow(`Could not open browser automatically: ${error.message}`));
-    }
+  // Use array form of execFile to avoid shell injection
+  import("node:child_process").then(({ execFile }) => {
+    execFile(command, [url], (error) => {
+      if (error) {
+        console.warn(pc.yellow(`Could not open browser automatically: ${error.message}`));
+      }
+    });
   });
 }
 

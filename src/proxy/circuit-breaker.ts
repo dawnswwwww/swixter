@@ -25,10 +25,6 @@ export class CircuitBreaker {
 
   isAvailable(profileId: string): boolean {
     const state = this.getState(profileId);
-    // If in half_open state, allow the request through
-    if (state.state === "half_open") {
-      return true;
-    }
     return !state.isOpen;
   }
 
@@ -84,7 +80,7 @@ export class CircuitBreaker {
     if (!state || state.state !== "open") return;
 
     state.state = "half_open";
-    // Don't clear isOpen yet - need success to confirm recovery
+    state.isOpen = false;
   }
 
   // Test helper - force state to half_open

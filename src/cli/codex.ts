@@ -7,7 +7,7 @@ import {
   listProfiles,
   deleteProfile,
 } from "../config/manager.js";
-import { getPresetById } from "../providers/presets.js";
+import { getPresetByIdAsync } from "../providers/presets.js";
 import { getAdapter } from "../adapters/index.js";
 import type { ClaudeCodeProfile } from "../types.js";
 import {
@@ -397,7 +397,7 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
     process.exit(1);
   }
 
-  const preset = getPresetById(params.provider as string);
+  const preset = await getPresetByIdAsync(params.provider as string);
   if (!preset) {
     console.log(pc.red(`Error: Unknown provider ID: ${params.provider}`));
     console.log(pc.dim("Run 'swixter providers' to see all supported providers"));
@@ -492,7 +492,7 @@ async function cmdList(): Promise<void> {
   console.log();
 
   for (const profile of profiles) {
-    const preset = getPresetById(profile.providerId);
+    const preset = await getPresetByIdAsync(profile.providerId);
     const isCurrent = current?.name === profile.name;
     const marker = isCurrent ? pc.green(MARKERS.active) : pc.dim(MARKERS.inactive);
     const baseUrl = profile.baseURL || preset?.baseURLChat || preset?.baseURL || MISC_DEFAULTS.baseUrlFallback;
@@ -522,13 +522,19 @@ async function cmdSwitch(profileName: string, args: string[] = []): Promise<void
   try {
     await setActiveProfileForCoder(CODER_NAME, profileName);
     const profile = await getActiveProfileForCoder(CODER_NAME);
-    const preset = getPresetById(profile!.providerId);
-    const baseUrl = profile!.baseURL || preset?.baseURLChat || preset?.baseURL || "Default";
+
+    if (!profile) {
+      console.log(pc.red("Error: Profile not found after switch"));
+      process.exit(1);
+    }
+
+    const preset = await getPresetByIdAsync(profile.providerId);
+    const baseUrl = profile.baseURL || preset?.baseURLChat || preset?.baseURL || "Default";
 
     console.log();
     console.log(pc.green("✓") + " Switched successfully!");
     console.log();
-    console.log(`  Profile: ${pc.cyan(profile!.name)}`);
+    console.log(`  Profile: ${pc.cyan(profile.name)}`);
     console.log(`  Provider: ${pc.yellow(preset?.displayName)}`);
     console.log(`  Base URL: ${pc.yellow(baseUrl)}`);
     console.log();
@@ -588,10 +594,13 @@ async function cmdEdit(profileName?: string): Promise<void> {
 
     const selected = await p.select({
       message: "Select profile to edit",
-      options: profiles.map((profile) => ({
-        value: profile.name,
-        label: profile.name,
-        hint: getPresetById(profile.providerId)?.displayName || "",
+      options: await Promise.all(profiles.map(async (profile) => {
+        const preset = await getPresetByIdAsync(profile.providerId);
+        return {
+          value: profile.name,
+          label: profile.name,
+          hint: preset?.displayName || "",
+        };
       })),
     });
 
@@ -620,7 +629,7 @@ async function cmdEdit(profileName?: string): Promise<void> {
   const { getProvidersByWireApi } = await import("../providers/presets.js");
   // Codex only supports OpenAI-compatible (chat API) providers
   const presets = await getProvidersByWireApi('chat');
-  const currentPreset = getPresetById(profile.providerId);
+  const currentPreset = await getPresetByIdAsync(profile.providerId);
 
   // 1. Change provider?
   const shouldChangeProvider = await p.confirm({
@@ -862,7 +871,7 @@ async function cmdApply(): Promise<void> {
 
   try {
     const adapter = getAdapter(CODER_NAME);
-    const preset = getPresetById(profile.providerId);
+    const preset = await getPresetByIdAsync(profile.providerId);
 
     console.log();
     console.log(pc.dim(`Applying profile to ${adapter.configPath}...`));
@@ -918,7 +927,7 @@ async function cmdCurrent(): Promise<void> {
     return;
   }
 
-  const preset = getPresetById(profile.providerId);
+  const preset = await getPresetByIdAsync(profile.providerId);
   const baseUrl = profile.baseURL || preset?.baseURLChat || preset?.baseURL || "Default";
 
   console.log();
@@ -1018,10 +1027,13 @@ async function cmdSwitchInteractive(): Promise<void> {
 
   const profileName = await p.select({
     message: "Select profile to switch to",
-    options: profiles.map((profile) => ({
-      value: profile.name,
-      label: profile.name,
-      hint: profile.name === current?.name ? "(current)" : getPresetById(profile.providerId)?.displayName || "",
+    options: await Promise.all(profiles.map(async (profile) => {
+      const preset = await getPresetByIdAsync(profile.providerId);
+      return {
+        value: profile.name,
+        label: profile.name,
+        hint: profile.name === current?.name ? "(current)" : preset?.displayName || "",
+      };
     })),
   });
 
@@ -1046,10 +1058,13 @@ async function cmdDeleteInteractive(): Promise<void> {
 
   const profileName = await p.select({
     message: "Select profile to delete",
-    options: profiles.map((profile) => ({
-      value: profile.name,
-      label: profile.name,
-      hint: getPresetById(profile.providerId)?.displayName || "",
+    options: await Promise.all(profiles.map(async (profile) => {
+      const preset = await getPresetByIdAsync(profile.providerId);
+      return {
+        value: profile.name,
+        label: profile.name,
+        hint: preset?.displayName || "",
+      };
     })),
   });
 
@@ -1120,7 +1135,7 @@ async function cmdRun(args: string[]): Promise<void> {
     await adapter.apply(profile);
 
     // Step 2: Get preset to determine env_key
-    const preset = getPresetById(profile.providerId);
+    const preset = await getPresetByIdAsync(profile.providerId);
     // Use profile's custom env_key if provided, otherwise use preset default
     const envKey = profile.envKey || preset?.env_key || "OPENAI_API_KEY";
 

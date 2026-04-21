@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { ConfigFile, ClaudeCodeProfile } from "../types.js";
 import { ConfigFileSchema } from "../types.js";
 import { CONFIG_VERSION, SERIALIZATION, CODER_REGISTRY } from "../constants/index.js";
@@ -89,9 +89,11 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
     // Validate configuration
     ConfigFileSchema.parse(config);
 
-    // Format and save
+    // Format and write atomically via temp file + rename
     const content = JSON.stringify(config, null, SERIALIZATION.jsonIndent);
-    await writeFile(configPath, content, "utf-8");
+    const tmpPath = join(dirname(configPath), `.config.tmp-${Date.now()}`);
+    await writeFile(tmpPath, content, "utf-8");
+    await rename(tmpPath, configPath);
   } catch (error) {
     throw new Error(`Failed to save configuration: ${error}`);
   }
@@ -186,6 +188,17 @@ export async function deleteProfile(profileName: string): Promise<void> {
     throw new Error(`Profile "${profileName}" does not exist`);
   }
 
+  // Check if profile is referenced in any group
+  const referencingGroups = Object.values(config.groups || {})
+    .filter(group => group.profiles.includes(profileName))
+    .map(group => group.name);
+
+  if (referencingGroups.length > 0) {
+    throw new Error(
+      `Profile "${profileName}" is used in group(s): ${referencingGroups.join(", ")}. Remove it from the group(s) first.`
+    );
+  }
+
   // Clean up adapter configurations for ALL coders
   // A profile may have been applied to a coder in the past even if it's not currently active
   // We need to clean up adapter configs BEFORE deleting from swixter config
@@ -203,11 +216,10 @@ export async function deleteProfile(profileName: string): Promise<void> {
 
   delete config.profiles[profileName];
 
-  // Update active config for all coders
+  // Clear active profile for coders that had this profile active
   for (const coder in config.coders) {
     if (config.coders[coder].activeProfile === profileName) {
-      const remainingProfiles = Object.keys(config.profiles);
-      config.coders[coder].activeProfile = remainingProfiles.length > 0 ? remainingProfiles[0] : "";
+      config.coders[coder].activeProfile = "";
     }
   }
 
