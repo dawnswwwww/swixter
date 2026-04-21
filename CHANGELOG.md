@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-04-21
+
+### Added
+- **Proxy Gateway** - Full proxy server with circuit breaker, request forwarding, logging, and health checks
+- **Group Management** - Batch profile operations via CLI (`swixter group`) and REST API
+- **Real-time Web UI** - WebSocket-based live updates for proxy status and groups
+  - Proxy status page with live request monitoring
+  - Groups page with drag-and-drop reordering (dnd-kit)
+- **Bun HTTP Server Enhancements** - Bun-native HTTP bridge, static file serving, WebSocket manager, event system
+- **Model Helper Utilities** - Consistent model configuration handling across adapters
+- **Comprehensive Test Suite** - Full coverage for proxy, server, and UI components
+
 ## [0.0.11] - 2026-03-30
 
 ### Fixed
