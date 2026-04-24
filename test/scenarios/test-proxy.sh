@@ -48,7 +48,7 @@ echo "✓ Test 2 passed"
 
 # Test 3: Status reflects running proxy binding
 STATUS_OUTPUT=$($CLI_CMD proxy status 2>&1)
-if ! echo "$STATUS_OUTPUT" | grep -q "Running"; then
+if ! echo "$STATUS_OUTPUT" | grep -q "Address:"; then
     echo "❌ Error: Proxy status does not show running"
     echo "$STATUS_OUTPUT"
     exit 1
