@@ -251,8 +251,6 @@ async function cmdStartDaemon(config: { host: string; port: number; timeout: num
   console.log(pc.cyan("Starting proxy server in background..."));
 
   const args = [
-    "run",
-    "cli",
     "proxy",
     "start",
     "--host", config.host,
@@ -264,10 +262,9 @@ async function cmdStartDaemon(config: { host: string; port: number; timeout: num
     args.push("--group", config.groupName);
   }
 
-  const child = spawn("bun", args, {
+  const child = spawn(process.execPath, [process.argv[1], ...args], {
     detached: true,
     stdio: "ignore",
-    cwd: process.cwd(),
   });
 
   child.unref();

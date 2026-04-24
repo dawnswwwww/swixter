@@ -258,7 +258,7 @@ echo "✓ Test 11 passed"
 # Test 12: Verify proxy status shows not running
 echo "Test 12: Check proxy status..."
 STATUS_OUTPUT=$($CLI_CMD proxy status 2>&1)
-if ! echo "$STATUS_OUTPUT" | grep -q "Not running"; then
+if ! echo "$STATUS_OUTPUT" | grep -q "No proxy instances running"; then
     echo "❌ Error: Proxy should not be running"
     exit 1
 fi
