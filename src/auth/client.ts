@@ -8,6 +8,8 @@ import type {
   RegisterData,
   RefreshResponse,
   ApiErrorResponse,
+  VerificationCodeResponse,
+  VerifyRegisterData,
   MagicLinkSendResponse,
   MagicLinkVerifyResponse,
   MagicLinkSessionResponse,
@@ -54,7 +56,31 @@ async function apiRequest<T>(
 }
 
 /**
- * Register a new account
+ * Step 1: Request a verification code to be sent to email
+ */
+export async function sendVerificationCode(
+  email: string
+): Promise<VerificationCodeResponse> {
+  return apiRequest<VerificationCodeResponse>("/api/auth/register/send-code", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+/**
+ * Step 2: Verify code and complete registration
+ */
+export async function verifyAndRegister(
+  data: VerifyRegisterData
+): Promise<AuthApiResponse> {
+  return apiRequest<AuthApiResponse>("/api/auth/register/verify", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Register a new account (legacy direct registration — server may require email verification)
  */
 export async function registerUser(
   data: RegisterData

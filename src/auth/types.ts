@@ -74,6 +74,21 @@ export interface MagicLinkSessionResponse {
   encryptionSalt?: string;
 }
 
+/** Verification code send response */
+export interface VerificationCodeResponse {
+  success: boolean;
+  expiresIn: number;
+  code?: string; // Returned in test environments
+}
+
+/** Verify-and-register data */
+export interface VerifyRegisterData {
+  email: string;
+  code: string;
+  password: string;
+  displayName?: string;
+}
+
 /** Magic link verify response */
 export interface MagicLinkVerifyResponse {
   accessToken: string;

@@ -7,7 +7,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import * as readline from "node:readline";
 import type { AuthApiResponse } from "../auth/types.js";
-import { registerUser, loginUser, logoutUser, deleteAccount, sendMagicLink, verifyMagicLink, checkMagicLinkSession, setPassword } from "../auth/client.js";
+import { registerUser, loginUser, logoutUser, deleteAccount, sendMagicLink, verifyMagicLink, checkMagicLinkSession, setPassword, sendVerificationCode, verifyAndRegister } from "../auth/client.js";
 import { loadAuthState, saveAuthState, clearAuthState, isLoggedIn, getAccessToken } from "../auth/token.js";
 import { deriveKey, exportKeyToBase64 } from "../crypto/derive.js";
 import { clearSyncMeta } from "../config/manager.js";
@@ -16,11 +16,12 @@ const MAGIC_LINK_POLL_INTERVAL_MS = 2000;
 const MAGIC_LINK_MAX_ATTEMPTS = 300; // 10 minutes at 2s interval
 
 /**
- * Interactive registration
+ * Interactive registration with email verification
  */
 async function cmdRegister(): Promise<void> {
   p.intro(pc.bold(pc.cyan("Register Swixter Account")));
 
+  // Step 1: Email
   const email = await p.text({
     message: "Email:",
     validate: (v) => {
@@ -30,8 +31,38 @@ async function cmdRegister(): Promise<void> {
   });
   if (p.isCancel(email)) return;
 
+  // Step 2: Request verification code
+  const s = p.spinner();
+  s.start("Sending verification code...");
+
+  try {
+    const sendResult = await sendVerificationCode(email as string);
+    s.stop(pc.green(`✓ Verification code sent! (Expires in ${sendResult.expiresIn}s)`));
+  } catch (err: any) {
+    s.stop(pc.red("✗ Failed to send verification code"));
+    if (err.status === 409) {
+      console.error(pc.red("This email is already registered. Try logging in instead."));
+    } else if (err.status === 429) {
+      console.error(pc.red(err.message || "Please wait before requesting a new code."));
+    } else {
+      console.error(pc.red(err.message || "Unknown error"));
+    }
+    process.exit(1);
+  }
+
+  // Step 3: Enter verification code
+  const code = await p.text({
+    message: "Enter the 6-digit verification code sent to your email:",
+    validate: (v) => {
+      if (!v) return "Verification code is required";
+      if (!/^\d{6}$/.test(v)) return "Please enter a 6-digit code";
+    },
+  });
+  if (p.isCancel(code)) return;
+
+  // Step 4: Password and display name
   const password = await p.password({
-    message: "Password:",
+    message: "Create password:",
     validate: (v) => {
       if (!v) return "Password is required";
       if (v.length < 6) return "Password must be at least 6 characters";
@@ -44,12 +75,13 @@ async function cmdRegister(): Promise<void> {
   });
   if (p.isCancel(displayName)) return;
 
-  const s = p.spinner();
+  // Step 5: Verify code and create account
   s.start("Creating account...");
 
   try {
-    const result = await registerUser({
+    const result = await verifyAndRegister({
       email: email as string,
+      code: code as string,
       password: password as string,
       displayName: displayName as string | undefined,
     });
@@ -64,7 +96,13 @@ async function cmdRegister(): Promise<void> {
     p.outro(`Welcome, ${pc.cyan(result.user.displayName || result.user.email)}!`);
   } catch (err: any) {
     s.stop(pc.red("✗ Registration failed"));
-    console.error(pc.red(err.message || "Unknown error"));
+    if (err.status === 401) {
+      console.error(pc.red(err.message || "Invalid or expired verification code."));
+    } else if (err.status === 409) {
+      console.error(pc.red("This email is already registered."));
+    } else {
+      console.error(pc.red(err.message || "Unknown error"));
+    }
     process.exit(1);
   }
 }

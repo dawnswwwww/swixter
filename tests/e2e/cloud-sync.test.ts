@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { registerUser, loginUser, logoutUser } from "../../src/auth/client";
+import { sendVerificationCode, verifyAndRegister, loginUser, logoutUser } from "../../src/auth/client";
 import { getSyncStatus, pushData, pullData } from "../../src/sync/client";
 import { saveAuthState, clearAuthState, loadAuthState } from "../../src/auth/token";
 
@@ -16,8 +16,15 @@ describe("Cloud Sync E2E", () => {
   let refreshToken: string;
 
   test("register new account", async () => {
-    const result = await registerUser({
+    // Step 1: Send verification code
+    const sendResult = await sendVerificationCode(testEmail);
+    expect(sendResult.success).toBe(true);
+    expect(sendResult.code).toBeTruthy(); // Returned in test env
+
+    // Step 2: Verify code and complete registration
+    const result = await verifyAndRegister({
       email: testEmail,
+      code: sendResult.code!,
       password: testPassword,
       displayName: "E2E Test",
     });
