@@ -3,11 +3,7 @@
 
 set -e
 
-if [ -f "/home/testuser/dist/cli/index.js" ]; then
-    CLI_CMD="node /home/testuser/dist/cli/index.js"
-else
-    CLI_CMD="node /Users/nan/workspace/code/project/swixter/dist/cli/index.js"
-fi
+CLI_CMD="node /home/testuser/dist/cli/index.js"
 CONFIG_FILE="$HOME/.config/swixter/config.json"
 PROXY_PORT=18731
 

@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "bun run build:ui && bun build src/cli/index.ts --outdir dist/cli --target bun --standalone",
-    "build:ui": "cd ui && bun install && bun run build && mkdir -p ../dist/ui && cp -r dist/* ../dist/ui/",
+    "build:ui": "cd ui && bun install && bun run build && node -e \"require('fs').mkdirSync('../dist/ui',{recursive:true});require('fs').cpSync('dist','../dist/ui',{recursive:true})\"",
     "build:cli": "bun build src/cli/index.ts --outdir dist/cli --target bun --standalone",
     "cli": "bun src/cli/index.ts",
     "cli:dev": "bun --hot src/cli/index.ts",

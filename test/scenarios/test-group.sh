@@ -3,7 +3,7 @@
 
 set -e
 
-CLI_CMD="node /Users/nan/workspace/code/project/swixter/dist/cli/index.js"
+CLI_CMD="node /home/testuser/dist/cli/index.js"
 CONFIG_FILE="$HOME/.config/swixter/config.json"
 
 cleanup() {
