@@ -28,7 +28,7 @@ echo ""
 
 # Step 2: Build Docker image
 echo -e "${YELLOW}[2/5]${NC} Building Docker test image..."
-docker build -t swixter-test -f test/docker/Dockerfile . > /dev/null 2>&1
+docker build --no-cache -t swixter-test -f test/docker/Dockerfile . > /dev/null 2>&1
 echo -e "${GREEN}✓${NC} Docker image build successful"
 echo ""
 
