@@ -72,6 +72,7 @@ export interface MagicLinkSessionResponse {
     displayName: string | null;
   };
   encryptionSalt?: string;
+  hasPassword?: boolean;
 }
 
 /** Verification code send response */
@@ -100,4 +101,5 @@ export interface MagicLinkVerifyResponse {
     displayName: string | null;
   };
   encryptionSalt: string;
+  hasPassword?: boolean;
 }

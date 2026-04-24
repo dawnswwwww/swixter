@@ -339,8 +339,12 @@ async function promptSyncChoice(state: Awaited<ReturnType<typeof loadAuthState>>
 /**
  * Prompt user to set a login password after magic link login
  */
-async function promptSetPassword(state: Awaited<ReturnType<typeof loadAuthState>>): Promise<void> {
+async function promptSetPassword(
+  state: Awaited<ReturnType<typeof loadAuthState>>,
+  hasPassword: boolean
+): Promise<void> {
   if (!state) return;
+  if (hasPassword) return;
 
   const setPw = await p.confirm({
     message: "Set a login password for future sign-ins?",
@@ -395,7 +399,7 @@ async function completeMagicLinkManual(email: string): Promise<void> {
       s.stop(pc.green("✓ Logged in!"));
     }
 
-    await promptSetPassword(state);
+    await promptSetPassword(state, !!result.hasPassword);
     if (userChanged) await promptSyncChoice(state);
   } catch (err: any) {
     s.stop(pc.red("✗ Invalid or expired token"));
@@ -449,6 +453,7 @@ async function cmdMagicLinkLogin(): Promise<void> {
   let shouldStop = false;
   let isManual = false;
   let authResult: AuthApiResponse | null = null;
+  let hasPassword = false;
 
   // Listen for Enter key to switch to manual mode
   readline.emitKeypressEvents(process.stdin);
@@ -500,6 +505,7 @@ async function cmdMagicLinkLogin(): Promise<void> {
             user: session.user,
             encryptionSalt: session.encryptionSalt,
           };
+          hasPassword = !!session.hasPassword;
           shouldStop = true;
         }
       } catch (err: any) {
@@ -523,7 +529,7 @@ async function cmdMagicLinkLogin(): Promise<void> {
       await setupEncryptionAfterAuth(state);
     }
 
-    await promptSetPassword(state);
+    await promptSetPassword(state, hasPassword);
     if (userChanged) await promptSyncChoice(state);
 
     p.outro(`Welcome back, ${pc.cyan(authResult.user.displayName || authResult.user.email)}!`);
