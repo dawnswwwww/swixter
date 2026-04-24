@@ -10,6 +10,8 @@ import { exportConfig, importConfig } from "../config/export.js";
 import { showGlobalHelp } from "./help.js";
 import { generateCompletion, showCompletionInstructions } from "./completions.js";
 import { listProviders, addProvider, removeProvider, showProvider } from "./providers.js";
+import { handleAuthCommand } from "./auth.js";
+import { handleSyncCommand } from "./sync.js";
 import { APP_VERSION } from "../constants/meta.js";
 import { CONFIG_VERSION, EXPORT_VERSION } from "../constants/versions.js";
 
@@ -237,6 +239,18 @@ export async function main(): Promise<void> {
 
     if (firstArg === "codex") {
       await handleCodexCommand(args.slice(1));
+      return;
+    }
+
+    // Auth command
+    if (firstArg === "auth") {
+      await handleAuthCommand(args.slice(1));
+      return;
+    }
+
+    // Sync command
+    if (firstArg === "sync") {
+      await handleSyncCommand(args.slice(1));
       return;
     }
 

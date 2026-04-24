@@ -100,6 +100,15 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
 }
 
 /**
+ * Mark config as having local changes that need syncing.
+ */
+export function markDirty(config: ConfigFile): void {
+  if (config.syncMeta) {
+    config.syncMeta.dirty = true;
+  }
+}
+
+/**
  * Get currently active Profile
  * @deprecated Use getActiveProfileForCoder instead
  */
@@ -145,6 +154,7 @@ export async function setActiveProfileForCoder(coder: string, profileName: strin
   }
 
   config.coders[coder].activeProfile = profileName;
+  markDirty(config);
   await saveConfig(config);
 }
 
@@ -175,6 +185,7 @@ export async function upsertProfile(profile: ClaudeCodeProfile, coder?: string):
     }
   }
 
+  markDirty(config);
   await saveConfig(config);
 }
 
@@ -223,6 +234,7 @@ export async function deleteProfile(profileName: string): Promise<void> {
     }
   }
 
+  markDirty(config);
   await saveConfig(config);
 }
 
@@ -274,5 +286,18 @@ export async function resetAllData(): Promise<void> {
 
   // Reset config to default (empty profiles and coders)
   const defaultConfig = createDefaultConfig();
+  markDirty(defaultConfig);
   await saveConfig(defaultConfig);
+}
+
+/**
+ * Clear sync metadata (e.g. on logout or user change).
+ * Keeps local profiles/providers intact.
+ */
+export async function clearSyncMeta(): Promise<void> {
+  const config = await loadConfig();
+  if (config.syncMeta) {
+    delete config.syncMeta;
+    await saveConfig(config);
+  }
 }

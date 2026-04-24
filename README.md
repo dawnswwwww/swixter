@@ -14,9 +14,10 @@ A lightweight CLI tool that makes it easy to switch between AI providers for Cla
 - **Switch providers instantly** - Change between Anthropic, Ollama, or custom APIs with one command
 - **Automatic failover** - Group profiles by priority, auto-retry on provider failure
 - **Local proxy** - Transparent proxy with circuit breaker, your tools won't even notice a provider goes down
+- **Cloud sync** - Encrypt and sync your profiles across devices with end-to-end encryption
 - **Multiple coders** - Works with Claude Code, Codex, Continue
 - **Web UI** - Browser-based interface for visual management
-- **All local** - No cloud dependencies, your keys stay on your machine
+- **All local** - Your keys stay on your machine; cloud sync uses client-side encryption
 
 ## Installation
 
@@ -252,6 +253,56 @@ swixter ui --port 8080    # Custom port
 - **Providers** - Manage custom providers
 - **Settings** - Import/export configurations
 
+## Cloud Sync
+
+Sync your profiles and provider configs across devices with end-to-end encryption. API keys and other sensitive fields are encrypted client-side before uploading — the server never sees plaintext secrets.
+
+### Quick Start
+
+```bash
+swixter auth register                    # Create account
+swixter auth login                       # Sign in (password)
+swixter auth login --magic-link          # Sign in via magic link email
+swixter sync push                        # Upload encrypted config to cloud
+swixter sync pull                        # Download and merge from cloud
+swixter sync status                      # Check sync state
+```
+
+### Auth Commands
+
+```bash
+swixter auth register        # Create a new account
+swixter auth login           # Sign in with email + password
+swixter auth login --magic-link  # Sign in via magic link
+swixter auth logout          # Sign out
+swixter auth status          # Check login status
+swixter auth delete-account  # Delete your account and cloud data
+```
+
+### Sync Commands
+
+```bash
+swixter sync push                # Push local config to cloud
+swixter sync push --force-local  # Force push (overwrite remote)
+swixter sync pull                # Pull remote config to local
+swixter sync pull --force-remote # Force pull (overwrite local)
+swixter sync status              # Show sync status and versions
+swixter sync enable              # Enable auto sync
+swixter sync disable             # Disable auto sync
+```
+
+### How It Works
+
+```
+Local Config → Derive Encryption Key → Encrypt Sensitive Fields → Upload to Cloud
+                                                                               ↓
+Cloud → Download → Decrypt → Merge with Local Config → Apply
+```
+
+- **End-to-end encryption**: Sensitive fields (API keys, auth tokens) are encrypted using a key derived from your master password before leaving your machine
+- **Version-based conflict detection**: Local and remote versions are tracked to detect and handle conflicts
+- **Selective push/pull**: Only config and providers data are synced; local-only settings stay untouched
+
 ## Other Commands
 
 ```bash
@@ -316,6 +367,9 @@ swixter/
 │   ├── providers/     # Provider presets + user-defined providers
 │   ├── groups/        # Group management (failover profiles)
 │   ├── proxy/         # Local proxy server (failover, circuit breaker)
+│   ├── auth/          # Cloud auth (register, login, token management)
+│   ├── sync/          # Cloud sync (push, pull, merge, auto-sync)
+│   ├── crypto/        # End-to-end encryption (key derivation, field encryption)
 │   ├── server/        # Web UI API server
 │   └── utils/         # Shared utilities
 ├── ui/                # Web UI (React + Vite + Tailwind)

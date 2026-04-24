@@ -11,3 +11,4 @@ export * from "./versions.js";
 export * from "./meta.js";
 export * from "./install.js";
 export * from "./proxy.js";
+export { API_BASE } from "./api.js";

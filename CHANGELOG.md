@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cloud Sync** - End-to-end encrypted config sync across devices
+  - `swixter auth register` / `login` / `logout` / `status` / `delete-account`
+  - `swixter sync push` / `pull` / `status` / `enable` / `disable`
+  - Magic link login (`swixter auth login --magic-link`)
+  - Client-side encryption of API keys and sensitive fields using PBKDF2-derived keys
+  - Version-based conflict detection with force-push / force-pull overrides
+  - Auto-sync toggle for automatic push after config changes
+- **Crypto Module** (`src/crypto/`) - Key derivation (PBKDF2), AES-GCM encryption, selective field encryption
+- **Auth Module** (`src/auth/`) - Cloud authentication with token refresh and persistent sessions
+- **Sync Module** (`src/sync/`) - Cloud sync client, three-way merge, conflict detection
+- **Tests** - Unit tests for auth token, crypto derive/encrypt/fields, sync client and merge
+
 ## [0.1.1] - 2026-04-22
 
 ### Fixed

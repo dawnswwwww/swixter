@@ -135,6 +135,18 @@ export interface CoderConfig {
 }
 
 /**
+ * Sync metadata for cloud sync tracking
+ */
+export interface SyncMeta {
+  lastSyncAt: string;
+  configVersion: number;
+  providersVersion: number;
+  localUpdatedAt: string;
+  /** True if local config was modified since last successful push */
+  dirty?: boolean;
+}
+
+/**
  * Configuration file structure
  */
 export interface ConfigFile {
@@ -148,6 +160,8 @@ export interface ConfigFile {
   activeGroup?: string;
   /** Configuration version */
   version: string;
+  /** Cloud sync metadata */
+  syncMeta?: SyncMeta;
 }
 
 /**
@@ -213,12 +227,21 @@ export const CoderConfigSchema = z.object({
   activeProfile: z.string(),
 });
 
+const SyncMetaSchema = z.object({
+  lastSyncAt: z.string(),
+  configVersion: z.number(),
+  providersVersion: z.number(),
+  localUpdatedAt: z.string(),
+  dirty: z.boolean().optional(),
+});
+
 export const ConfigFileSchema = z.object({
   profiles: z.record(z.string(), ClaudeCodeProfileSchema),
   coders: z.record(z.string(), CoderConfigSchema),
   groups: z.record(z.string(), GroupSchema),
   activeGroup: z.string().optional(),
   version: z.string(),
+  syncMeta: SyncMetaSchema.optional(),
 });
 
 export const ExportConfigSchema = z.object({
