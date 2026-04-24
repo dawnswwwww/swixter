@@ -4,6 +4,7 @@ FROM oven/bun:latest
 # 安装基础工具
 RUN apt-get update && apt-get install -y \
     jq \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建测试用户
