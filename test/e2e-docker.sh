@@ -80,6 +80,7 @@ SCENARIOS=(
     "test-errors.sh"
     "test-group.sh"
     "test-proxy.sh"
+    "test-daemon.sh"
 )
 
 for scenario in "${SCENARIOS[@]}"; do
