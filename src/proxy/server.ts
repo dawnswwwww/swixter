@@ -1,3 +1,4 @@
+import http from "node:http";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DEFAULT_PROXY_HOST, DEFAULT_PROXY_PORT } from "../constants/proxy.js";
@@ -7,9 +8,9 @@ import { ProxyHandler } from "./handler.js";
 import { emitInstanceStart, emitInstanceStop, emitStatusUpdate } from "../server/events.js";
 
 // ---------------------------------------------------------------------------
-// In-process server map (only meaningful inside the process that started them)
+// In-process server map
 // ---------------------------------------------------------------------------
-const servers = new Map<string, ReturnType<typeof Bun.serve>>();
+const servers = new Map<string, http.Server>();
 const statuses = new Map<string, ProxyStatus>();
 
 // ---------------------------------------------------------------------------
@@ -109,6 +110,62 @@ function migrateLegacyRuntime(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers: Convert Node.js req to Web API Request
+// ---------------------------------------------------------------------------
+
+async function nodeReqToWebRequest(req: http.IncomingMessage): Promise<Request> {
+  const url = `http://${req.headers.host}${req.url}`;
+
+  // Collect body
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  const body = Buffer.concat(chunks);
+
+  // Build headers
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        headers.append(key, v);
+      }
+    } else {
+      headers.set(key, value);
+    }
+  }
+
+  return new Request(url, {
+    method: req.method,
+    headers,
+    body: body.length > 0 ? body : undefined,
+  });
+}
+
+async function writeWebResponseToNodeRes(response: Response, res: http.ServerResponse): Promise<void> {
+  res.statusCode = response.status;
+  response.headers.forEach((value, key) => {
+    res.setHeader(key, value);
+  });
+
+  if (response.body) {
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  res.end();
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -186,25 +243,34 @@ export async function startProxyServer(config: ProxyConfig): Promise<ProxyStatus
 
   const handler = new ProxyHandler(config.timeout, config.instanceId, config.groupName);
 
-  const server = Bun.serve({
-    hostname: config.host,
-    port: config.port,
-    fetch(req) {
-      const status = statuses.get(instanceId);
-      if (status) {
-        status.requestCount++;
-        emitStatusUpdate({ ...status });
+  const server = http.createServer(async (req, res) => {
+    const status = statuses.get(instanceId);
+    if (status) {
+      status.requestCount++;
+      emitStatusUpdate({ ...status });
+    }
+
+    try {
+      const request = await nodeReqToWebRequest(req);
+      const response = await handler.handleRequest(request);
+      await writeWebResponseToNodeRes(response, res);
+    } catch (error) {
+      const s = statuses.get(instanceId);
+      if (s) {
+        s.errorCount++;
+        emitStatusUpdate({ ...s });
       }
-      return handler.handleRequest(req).catch((error) => {
-        const s = statuses.get(instanceId);
-        if (s) {
-          s.errorCount++;
-          emitStatusUpdate({ ...s });
-        }
-        console.error(`Proxy error [${instanceId}]:`, error);
-        return new Response("Internal Server Error", { status: 500 });
-      });
-    },
+      console.error(`Proxy error [${instanceId}]:`, error);
+      res.statusCode = 500;
+      res.end("Internal Server Error");
+    }
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.listen(config.port, config.host, () => {
+      resolve();
+    });
+    server.on("error", reject);
   });
 
   const status: ProxyStatus = {
@@ -241,7 +307,9 @@ export async function stopProxyServer(instanceId?: string): Promise<void> {
 
   const server = servers.get(id);
   if (server) {
-    server.stop();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
     servers.delete(id);
     statuses.delete(id);
   }
