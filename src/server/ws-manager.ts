@@ -1,4 +1,4 @@
-import type { ServerWebSocket } from "bun";
+import type WebSocket from "ws";
 import { subscribe, type ProxyEvent } from "./events.js";
 import { listProxyInstances } from "../proxy/server.js";
 import { getActiveGroup } from "../groups/manager.js";
@@ -11,7 +11,7 @@ export interface SnapshotPayload {
 }
 
 export class WsManager {
-  private clients = new Set<ServerWebSocket<unknown>>();
+  private clients = new Set<WebSocket>();
   private unsubscribe: (() => void) | null = null;
 
   start(): void {
@@ -35,16 +35,16 @@ export class WsManager {
     this.clients.clear();
   }
 
-  async addClient(ws: ServerWebSocket<unknown>): Promise<void> {
+  async addClient(ws: WebSocket): Promise<void> {
     this.clients.add(ws);
     await this.sendSnapshot(ws);
   }
 
-  removeClient(ws: ServerWebSocket<unknown>): void {
+  removeClient(ws: WebSocket): void {
     this.clients.delete(ws);
   }
 
-  private async sendSnapshot(ws: ServerWebSocket<unknown>): Promise<void> {
+  private async sendSnapshot(ws: WebSocket): Promise<void> {
     const instances = listProxyInstances();
 
     let activeGroupId: string | undefined;
@@ -81,7 +81,7 @@ export class WsManager {
     }
   }
 
-  private sendTo(ws: ServerWebSocket<unknown>, payload: SnapshotPayload): void {
+  private sendTo(ws: WebSocket, payload: SnapshotPayload): void {
     try {
       ws.send(JSON.stringify(payload));
     } catch {
