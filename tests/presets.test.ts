@@ -108,7 +108,8 @@ describe("Provider Presets", () => {
 
   test("DeepSeek preset should contain correct configuration", () => {
     expect(deepseekPreset.id).toBe("deepseek");
-    expect(deepseekPreset.baseURL).toBe("https://api.deepseek.com");
+    expect(deepseekPreset.baseURL).toBe("https://api.deepseek.com/anthropic");
+    expect(deepseekPreset.baseURLChat).toBe("https://api.deepseek.com");
     expect(deepseekPreset.authType).toBe("api-key");
     expect(deepseekPreset.wire_api).toBe("chat");
     expect(deepseekPreset.env_key).toBe("DEEPSEEK_API_KEY");

@@ -85,12 +85,15 @@ export const groqPreset: ProviderPreset = {
 
 /**
  * DeepSeek - High性价比 AI models
+ * OpenAI compatible: https://api.deepseek.com (chat)
+ * Anthropic API: https://api.deepseek.com/anthropic (responses)
  */
 export const deepseekPreset: ProviderPreset = {
   id: "deepseek",
   name: "DeepSeek",
   displayName: "DeepSeek",
-  baseURL: "https://api.deepseek.com",
+  baseURL: "https://api.deepseek.com/anthropic",
+  baseURLChat: "https://api.deepseek.com",
   defaultModels: [
     "deepseek-chat",
     "deepseek-coder",
