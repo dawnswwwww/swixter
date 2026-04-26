@@ -7,7 +7,7 @@
 export const APP_NAME = "swixter" as const;
 
 /** Application version */
-export const APP_VERSION = "0.1.3" as const;
+export const APP_VERSION = "0.1.4" as const;
 
 /** Application description */
 export const APP_DESCRIPTION = "Claude Code configuration management tool - easily switch providers and models" as const;
