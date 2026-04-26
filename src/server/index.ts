@@ -4,6 +4,7 @@
  */
 
 import http from "node:http";
+import { existsSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,16 +77,26 @@ export function openBrowser(url: string): void {
 }
 
 /**
- * Get UI directory path
+ * Get UI directory path.
+ *
+ * Resolves the location of the built Web UI assets across both runtime modes:
+ * - Bundled CLI (`dist/cli/index.js`): UI lives at `dist/ui` (sibling to `dist/cli`).
+ * - Source/dev mode (`src/server/index.ts` via `bun src/cli/index.ts`):
+ *   UI is built to `ui/dist` at the repo root.
+ *
+ * NODE_ENV is intentionally NOT used here — Bun's bundler can statically
+ * substitute `process.env.NODE_ENV` at build time, which previously caused
+ * `isDev` to be hardcoded to `true` and broke the path in published packages.
  */
 export function getUiDir(): string {
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (isDev) {
-    return join(__dirname, "..", "..", "ui", "dist");
+  // Bundled CLI: __dirname = <pkg>/dist/cli, UI is at <pkg>/dist/ui
+  const bundledUiDir = join(__dirname, "..", "ui");
+  if (existsSync(join(bundledUiDir, "index.html"))) {
+    return bundledUiDir;
   }
 
-  return join(__dirname, "..", "..", "ui");
+  // Dev/source: __dirname = <repo>/src/server, UI is at <repo>/ui/dist
+  return join(__dirname, "..", "..", "ui", "dist");
 }
 
 /**

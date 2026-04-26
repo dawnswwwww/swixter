@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-04-26
+
+### Fixed
+- **`swixter ui` returns 404 in published npm package** — `getUiDir()` resolved to a non-existent path because Bun's bundler statically substituted `process.env.NODE_ENV` at build time (forcing `isDev = true`), and both branches pointed outside `dist/`. Replaced the `NODE_ENV` check with `existsSync`-based detection that finds `dist/ui` (bundled mode) or `ui/dist` (source/dev mode) reliably.
+
 ## [0.1.3] - 2026-04-26
 
 ### Added
