@@ -102,7 +102,10 @@ export function getUiDir(): string {
 /**
  * Start the Web UI server using Node.js http.createServer with WebSocket support.
  */
-export async function startServer(portArg?: number): Promise<WebUiServerHandle> {
+export async function startServer(
+  portArg?: number,
+  options?: { noBrowser?: boolean }
+): Promise<WebUiServerHandle> {
   const port = portArg || await findAvailablePort(3141);
   const host = "127.0.0.1";
 
@@ -202,8 +205,10 @@ export async function startServer(portArg?: number): Promise<WebUiServerHandle> 
   console.log(`  Press ${pc.bold("Ctrl+C")} to stop`);
   console.log();
 
-  // Auto-open browser
-  openBrowser(url);
+  // Auto-open browser (skip in daemon mode)
+  if (!options?.noBrowser) {
+    openBrowser(url);
+  }
 
   // Return handle with close() compatible with Node Server API
   const handle: WebUiServerHandle = {
