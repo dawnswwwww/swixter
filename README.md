@@ -260,8 +260,8 @@ Sync your profiles and provider configs across devices with end-to-end encryptio
 ### Quick Start
 
 ```bash
-swixter auth register                    # Create account
-swixter auth login                       # Sign in (password)
+swixter auth register                    # Create account with email verification
+swixter auth login                       # Sign in with email + password
 swixter auth login --magic-link          # Sign in via magic link email
 swixter sync push                        # Upload encrypted config to cloud
 swixter sync pull                        # Download and merge from cloud
@@ -271,13 +271,42 @@ swixter sync status                      # Check sync state
 ### Auth Commands
 
 ```bash
-swixter auth register        # Create a new account
-swixter auth login           # Sign in with email + password
-swixter auth login --magic-link  # Sign in via magic link
-swixter auth logout          # Sign out
-swixter auth status          # Check login status
-swixter auth delete-account  # Delete your account and cloud data
+swixter auth register              # Create a new account (email verification)
+swixter auth login                 # Sign in with email + password
+swixter auth login --magic-link    # Sign in via magic link (browser or manual token)
+swixter auth logout                # Sign out
+swixter auth status                # Check login status
+swixter auth delete-account        # Delete your account and cloud data
 ```
+
+### Registration Flow
+
+Creating an account uses email verification:
+
+1. Enter your email address
+2. A 6-digit verification code is sent to your email
+3. Enter the verification code
+4. Create a login password (min 6 characters)
+5. Optionally set a display name
+6. After registration, set up **end-to-end encryption** with a master password (min 8 characters, separate from your login password)
+7. Choose whether to save the encryption key locally for automatic sync
+
+### Login Options
+
+**Password Login:**
+```bash
+swixter auth login
+# Enter email and password
+```
+
+**Magic Link Login:**
+```bash
+swixter auth login --magic-link
+# Enter email → check email → click the link → CLI detects it automatically
+# Or press Enter to enter the token manually
+```
+
+After magic link login, you'll be prompted to set a login password for future sign-ins.
 
 ### Sync Commands
 
@@ -291,7 +320,7 @@ swixter sync enable              # Enable auto sync
 swixter sync disable             # Disable auto sync
 ```
 
-### How It Works
+### Encryption & Security
 
 ```
 Local Config → Derive Encryption Key → Encrypt Sensitive Fields → Upload to Cloud
@@ -299,9 +328,12 @@ Local Config → Derive Encryption Key → Encrypt Sensitive Fields → Upload t
 Cloud → Download → Decrypt → Merge with Local Config → Apply
 ```
 
-- **End-to-end encryption**: Sensitive fields (API keys, auth tokens) are encrypted using a key derived from your master password before leaving your machine
+- **End-to-end encryption**: Sensitive fields (API keys, auth tokens) are encrypted with AES-GCM using a key derived from your master password via PBKDF2 before leaving your machine
+- **Master password**: Separate from your login password. Used only for encryption. If forgotten, your cloud data cannot be decrypted
+- **Save encryption key**: You can save the derived key locally for convenience (automatic sync without re-entering master password), or enter it each time
 - **Version-based conflict detection**: Local and remote versions are tracked to detect and handle conflicts
-- **Selective push/pull**: Only config and providers data are synced; local-only settings stay untouched
+- **Selective push/pull**: Only profiles and custom providers are synced; local-only settings stay untouched
+- **Switching accounts**: When logging in as a different user, you'll be prompted to pull their cloud data, push your local data, or skip
 
 ## Other Commands
 
