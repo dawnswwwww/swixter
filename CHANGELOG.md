@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-26
+
+### Added
+- **Daemon Mode for `swixter ui`** — Background server management
+  - `swixter ui --daemon` — Start Web UI server in background with PID file and log redirection
+  - `swixter ui --stop` — Stop background server via SIGTERM and clean up PID file
+  - `swixter ui --status` — Check server status with dual verification (PID alive + HTTP health check)
+  - Foreground `swixter ui` now writes PID file so `--status` and `--stop` work on any running instance
+  - Auto-open browser when running `swixter ui` while an instance is already active
+
+### Changed
+- **Deepseek API endpoints** — Updated to support both OpenAI-compatible and Anthropic API formats
+  - `baseURL` (Anthropic): `https://api.deepseek.com/anthropic`
+  - `baseURLChat` (OpenAI): `https://api.deepseek.com`
+
+### Fixed
+- **Foreground UI not detectable** — `swixter ui --status` now correctly detects foreground-started instances
+
 ## [0.1.4] - 2026-04-26
 
 ### Fixed
