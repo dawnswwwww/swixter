@@ -53,7 +53,9 @@ export function isProcessAlive(pid: number): boolean {
 export async function isSwixterUiRunning(pid: number, port: number): Promise<boolean> {
   if (!isProcessAlive(pid)) return false;
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/version`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/version`, {
+      signal: AbortSignal.timeout(3000),
+    });
     return res.ok;
   } catch {
     return false;
