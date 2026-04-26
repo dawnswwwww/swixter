@@ -14,9 +14,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun run build:ui && bun build src/cli/index.ts --outdir dist/cli --target bun --standalone",
+    "build": "bun run build:ui && bun build src/cli/index.ts --outdir dist/cli --target node",
     "build:ui": "cd ui && bun install && bun run build && node -e \"require('fs').mkdirSync('../dist/ui',{recursive:true});require('fs').cpSync('dist','../dist/ui',{recursive:true})\"",
-    "build:cli": "bun build src/cli/index.ts --outdir dist/cli --target bun --standalone",
+    "build:cli": "bun build src/cli/index.ts --outdir dist/cli --target node",
     "cli": "bun src/cli/index.ts",
     "cli:dev": "bun --hot src/cli/index.ts",
     "ui:dev": "cd ui && bun run dev",
@@ -71,7 +71,8 @@
     "@types/bun": "latest",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.10.1",
-    "@types/semver": "^7.7.1"
+    "@types/semver": "^7.7.1",
+    "@types/ws": "^8.18.1"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -90,6 +91,7 @@
     "semver": "^7.7.4",
     "smol-toml": "^1.5.2",
     "tailwind-merge": "^3.5.0",
+    "ws": "^8.20.0",
     "zod": "^4.1.12"
   }
 }
