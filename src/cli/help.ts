@@ -613,6 +613,12 @@ ${pc.bold("Web UI:")}
   ${pc.cyan("ui")}                    ${pc.dim("Launch local Web UI")}
     ${pc.dim("swixter ui [--port <port>]")}
     ${pc.dim("Start local HTTP server and open browser")}
+    ${pc.dim("swixter ui --daemon [--port <port>]")}
+    ${pc.dim("Start server in background")}
+    ${pc.dim("swixter ui --stop")}
+    ${pc.dim("Stop background server")}
+    ${pc.dim("swixter ui --status")}
+    ${pc.dim("Show background server status")}
 
 ${pc.bold("Proxy Commands:")}
   ${pc.cyan("proxy")}                ${pc.dim("Start proxy server or run with proxy")}
