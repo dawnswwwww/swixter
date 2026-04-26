@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-04-26
+
 ### Added
 - **Cloud Sync** - End-to-end encrypted config sync across devices
   - `swixter auth register` / `login` / `logout` / `status` / `delete-account`
@@ -19,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auth Module** (`src/auth/`) - Cloud authentication with token refresh and persistent sessions
 - **Sync Module** (`src/sync/`) - Cloud sync client, three-way merge, conflict detection
 - **Tests** - Unit tests for auth token, crypto derive/encrypt/fields, sync client and merge
+
+### Fixed
+- **Node.js compatibility** - Replaced Bun-specific APIs (`Bun.serve`, `Bun.file`, `ServerWebSocket`) with Node.js standard library equivalents so `swixter ui` and `swixter proxy` work in pure Node.js environments
+  - Web UI server now uses `node:http.createServer()` with `ws` library for WebSocket support
+  - Proxy server now uses `node:http.createServer()` with thin Web API Request/Response adapter
+  - Static file serving now uses `node:fs.readFile()`
+  - Removed `bun-http-bridge.ts` (no longer needed)
+  - Build target changed from `--target bun --standalone` to `--target node`
 
 ## [0.1.1] - 2026-04-22
 
