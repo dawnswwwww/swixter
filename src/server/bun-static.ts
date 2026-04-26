@@ -1,10 +1,11 @@
 /**
- * Bun Static File Server
- * Uses Bun.file() for web-native static file serving with SPA fallback.
+ * Static File Server
+ * Serves static files using node:fs for Node.js compatibility.
  */
 
 import { extname, join } from "node:path";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -32,11 +33,15 @@ export interface StaticOptions {
 }
 
 /**
- * Serve a static file request using Bun.file().
+ * Serve a static file request, writing directly to the ServerResponse.
  */
-export async function serveStaticRequest(request: Request, options: StaticOptions): Promise<Response> {
+export async function serveStaticFile(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  options: StaticOptions,
+): Promise<void> {
   const { root, index = "index.html", spa = true } = options;
-  const url = new URL(request.url);
+  const url = new URL(_req.url || "/", `http://${_req.headers.host || "localhost"}`);
   let filePath = join(root, url.pathname);
 
   try {
@@ -46,28 +51,28 @@ export async function serveStaticRequest(request: Request, options: StaticOption
       filePath = join(filePath, index);
     }
 
-    const file = Bun.file(filePath);
-    const exists = await file.exists();
-    if (!exists) throw new Error("not found");
-
+    const content = await readFile(filePath);
     const ext = extname(filePath);
     const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
-    return new Response(file, {
-      headers: { "Content-Type": contentType },
-    });
+    res.setHeader("Content-Type", contentType);
+    res.statusCode = 200;
+    res.end(content);
   } catch {
     if (spa) {
       const indexPath = join(root, index);
-      const file = Bun.file(indexPath);
-      const exists = await file.exists();
-      if (exists) {
-        return new Response(file, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
+      try {
+        const content = await readFile(indexPath);
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.statusCode = 200;
+        res.end(content);
+      } catch {
+        res.statusCode = 404;
+        res.end("Not Found");
       }
+    } else {
+      res.statusCode = 404;
+      res.end("Not Found");
     }
-
-    return new Response("Not Found", { status: 404 });
   }
 }
