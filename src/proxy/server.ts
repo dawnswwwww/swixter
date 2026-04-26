@@ -155,14 +155,17 @@ async function writeWebResponseToNodeRes(response: Response, res: http.ServerRes
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        res.write(value);
+        if (res.writableEnded) break;
+        res.write(Buffer.from(value));
       }
     } finally {
       reader.releaseLock();
     }
   }
 
-  res.end();
+  if (!res.writableEnded) {
+    res.end();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -267,10 +270,15 @@ export async function startProxyServer(config: ProxyConfig): Promise<ProxyStatus
   });
 
   await new Promise<void>((resolve, reject) => {
+    const onError = (err: Error) => {
+      server.off("error", onError);
+      reject(err);
+    };
+    server.on("error", onError);
     server.listen(config.port, config.host, () => {
+      server.off("error", onError);
       resolve();
     });
-    server.on("error", reject);
   });
 
   const status: ProxyStatus = {
