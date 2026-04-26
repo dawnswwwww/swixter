@@ -114,7 +114,56 @@ else
     exit 1
 fi
 
-# Cleanup
+# Cleanup daemon from test 7
 $CLI_CMD ui --stop > /dev/null 2>&1 || true
+
+# Test 8: Foreground start (backgrounded) → status detects it
+echo "Test 8: Foreground start, then detect via status..."
+nohup $CLI_CMD ui > /tmp/ui-foreground.log 2>&1 &
+sleep 3
+
+# Verify PID file exists
+if [ ! -f "$PID_FILE" ]; then
+    echo "❌ Error: PID file not created for foreground instance"
+    exit 1
+fi
+
+# Verify status shows running
+OUTPUT=$($CLI_CMD ui --status 2>&1)
+if echo "$OUTPUT" | grep -q "is running"; then
+    echo "✓ Test 8 passed"
+else
+    echo "❌ Error: Expected 'is running' for foreground instance"
+    echo "   Got: $OUTPUT"
+    exit 1
+fi
+
+# Test 9: Stop foreground instance
+echo "Test 9: Stop foreground instance..."
+OUTPUT=$($CLI_CMD ui --stop 2>&1)
+if echo "$OUTPUT" | grep -q "stopped"; then
+    echo "✓ Test 9 passed"
+else
+    echo "❌ Error: Expected 'stopped' message for foreground instance"
+    echo "   Got: $OUTPUT"
+    exit 1
+fi
+
+# Verify PID file removed after stop
+if [ -f "$PID_FILE" ]; then
+    echo "❌ Error: PID file not removed after stopping foreground instance"
+    exit 1
+fi
+
+# Test 10: Status after foreground stop shows not running
+echo "Test 10: Check status after foreground stop..."
+OUTPUT=$($CLI_CMD ui --status 2>&1)
+if echo "$OUTPUT" | grep -q "not running"; then
+    echo "✓ Test 10 passed"
+else
+    echo "❌ Error: Expected 'not running' after foreground stop"
+    echo "   Got: $OUTPUT"
+    exit 1
+fi
 
 echo "✅ All daemon mode tests passed"
