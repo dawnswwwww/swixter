@@ -164,14 +164,21 @@ async function runForeground(portArg?: number): Promise<void> {
   const noBrowser = process.env.SWIXTER_UI_DAEMON === "1";
   const server = await startServer(port, { noBrowser });
 
+  // Write PID file so --status and --stop can detect this instance
+  await writePidFile(process.pid, port);
+
   // Handle graceful shutdown
-  process.on("SIGINT", () => {
+  const shutdown = () => {
     console.log();
     console.log(pc.dim("Shutting down..."));
     server.close(() => {
+      removePidFile().catch(() => {});
       process.exit(0);
     });
-  });
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 
   process.stdin.resume();
 }
