@@ -3,14 +3,15 @@
  * Local HTTP server for Swixter Web UI
  */
 
+import http from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WebSocketServer } from "ws";
 import pc from "picocolors";
 import { Router } from "./router.js";
 import { corsMiddleware, jsonBodyMiddleware, notFoundHandler } from "./middleware.js";
-import { handleApiRequest } from "./bun-http-bridge.js";
-import { serveStaticRequest } from "./bun-static.js";
+import { serveStaticFile } from "./bun-static.js";
 import { WsManager } from "./ws-manager.js";
 import * as profilesApi from "./api/profiles.js";
 import * as providersApi from "./api/providers.js";
@@ -88,7 +89,7 @@ export function getUiDir(): string {
 }
 
 /**
- * Start the Web UI server using Bun.serve with WebSocket support.
+ * Start the Web UI server using Node.js http.createServer with WebSocket support.
  */
 export async function startServer(portArg?: number): Promise<WebUiServerHandle> {
   const port = portArg || await findAvailablePort(3141);
@@ -151,38 +152,35 @@ export async function startServer(portArg?: number): Promise<WebUiServerHandle> 
   const wsManager = new WsManager();
   wsManager.start();
 
-  // Create Bun.serve server
-  const bunServer = Bun.serve({
-    hostname: host,
-    port,
-    fetch(req, server) {
-      const url = new URL(req.url);
+  // Create HTTP server
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
-      // WebSocket upgrade
-      if (url.pathname === "/ws") {
-        server.upgrade(req);
-        return;
-      }
+    // API routes
+    if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
+      router.handle(req, res);
+      return;
+    }
 
-      // API routes
-      if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
-        return handleApiRequest(req, router);
-      }
+    // Static files / SPA
+    serveStaticFile(req, res, staticOptions).catch(() => {
+      res.statusCode = 500;
+      res.end("Internal Server Error");
+    });
+  });
 
-      // Static files / SPA
-      return serveStaticRequest(req, staticOptions);
-    },
-    websocket: {
-      open(ws) {
-        wsManager.addClient(ws);
-      },
-      close(ws) {
-        wsManager.removeClient(ws);
-      },
-      message(_ws, _message) {
-        // No incoming messages expected; all events are server→client
-      },
-    },
+  // WebSocket server attached to HTTP server
+  const wss = new WebSocketServer({ server, path: "/ws" });
+  wss.on("connection", (ws) => {
+    wsManager.addClient(ws);
+    ws.on("close", () => wsManager.removeClient(ws));
+  });
+
+  // Start listening
+  await new Promise<void>((resolve) => {
+    server.listen(port, host, () => {
+      resolve();
+    });
   });
 
   const url = `http://${host}:${port}`;
@@ -202,10 +200,12 @@ export async function startServer(portArg?: number): Promise<WebUiServerHandle> 
     port,
     close(callback?: () => void) {
       wsManager.stop();
-      bunServer.stop();
-      console.log();
-      console.log(pc.dim("Server closed"));
-      callback?.();
+      wss.close();
+      server.close(() => {
+        console.log();
+        console.log(pc.dim("Server closed"));
+        callback?.();
+      });
     },
   };
 
