@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
@@ -12,21 +12,23 @@ import { getEnvKey, getEnvExportCommands as getEnvExports } from "../utils/env-k
 /**
  * Codex configuration adapter
  *
- * Handles reading/writing ~/.codex/config.toml
+ * Handles reading/writing ~/.codex/config.toml and ~/.codex/auth.json
  *
  * Key features:
- * - TOML format support
+ * - TOML format support for config.toml
+ * - auth.json support for API key storage (Codex reads keys via requires_openai_auth)
  * - Provider table management [model_providers.<name>]
  * - Profile table management [profiles.<name>]
  * - Smart merge: preserves MCP servers, approval policies, etc.
- * - Mixed environment variable mode: prefer env vars, fallback to direct storage
  */
 export class CodexAdapter implements CoderAdapter {
   name = "codex";
   configPath: string;
+  authPath: string;
 
   constructor() {
     this.configPath = join(homedir(), ".codex", "config.toml");
+    this.authPath = join(homedir(), ".codex", "auth.json");
   }
 
   /**
@@ -99,6 +101,9 @@ export class CodexAdapter implements CoderAdapter {
       const tomlContent = stringifyToml(config);
       await writeFile(this.configPath, tomlContent, "utf-8");
 
+      // Write auth.json so codex can read API key directly
+      await this.writeAuthJson(profile);
+
     } catch (error) {
       throw new Error(`Failed to apply Codex configuration: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -134,6 +139,24 @@ export class CodexAdapter implements CoderAdapter {
         return false;
       }
 
+      // If profile has API key, check auth.json
+      if (profile.apiKey) {
+        const envKey = await getEnvKey(profile);
+        if (existsSync(this.authPath)) {
+          try {
+            const authContent = await readFile(this.authPath, "utf-8");
+            const auth = JSON.parse(authContent);
+            if (auth[envKey] !== profile.apiKey) {
+              return false;
+            }
+          } catch {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+
       return true;
     } catch (error) {
       return false;
@@ -152,7 +175,8 @@ export class CodexAdapter implements CoderAdapter {
     const providerTable: any = {
       name: preset.displayName,
       base_url: profile.baseURL || baseUrl,
-      wire_api: preset.wire_api || "chat",
+      wire_api: "responses",
+      requires_openai_auth: true,
     };
 
     // Use centralized env_key logic
@@ -190,6 +214,43 @@ export class CodexAdapter implements CoderAdapter {
   }
 
   /**
+   * Write auth.json with the API key so codex can read it directly
+   * without requiring environment variables.
+   */
+  private async writeAuthJson(profile: ClaudeCodeProfile): Promise<void> {
+    const envKey = await getEnvKey(profile);
+
+    // Read existing auth.json or start fresh
+    let auth: Record<string, string> = {};
+    if (existsSync(this.authPath)) {
+      try {
+        const content = await readFile(this.authPath, "utf-8");
+        const parsed = JSON.parse(content);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          auth = parsed;
+        }
+      } catch {
+        // If auth.json is corrupted, start fresh
+        auth = {};
+      }
+    }
+
+    // Set or remove the API key
+    if (profile.apiKey) {
+      auth[envKey] = profile.apiKey;
+    } else {
+      delete auth[envKey];
+    }
+
+    // Write back if there are keys; remove file if empty
+    if (Object.keys(auth).length > 0) {
+      await writeFile(this.authPath, JSON.stringify(auth, null, 2), "utf-8");
+    } else if (existsSync(this.authPath)) {
+      await unlink(this.authPath);
+    }
+  }
+
+  /**
    * Get environment variable export commands for the user
    */
   async getEnvExportCommands(profile: ClaudeCodeProfile): Promise<string[]> {
@@ -207,6 +268,7 @@ export class CodexAdapter implements CoderAdapter {
   /**
    * Remove profile from Codex configuration
    * Removes the provider and profile entries with swixter- prefix
+   * and cleans up the corresponding API key from auth.json
    */
   async remove(profileName: string): Promise<void> {
     if (!existsSync(this.configPath)) {
@@ -221,9 +283,11 @@ export class CodexAdapter implements CoderAdapter {
       const profileKey = `swixter-${profileName}`;
 
       let modified = false;
+      let envKeyToRemove: string | undefined;
 
-      // Remove from model_providers
+      // Read env_key from provider table before deleting it
       if (config.model_providers && config.model_providers[providerKey]) {
+        envKeyToRemove = config.model_providers[providerKey].env_key;
         delete config.model_providers[providerKey];
         modified = true;
       }
@@ -245,6 +309,18 @@ export class CodexAdapter implements CoderAdapter {
       if (modified) {
         const tomlContent = stringifyToml(config);
         await writeFile(this.configPath, tomlContent, "utf-8");
+      }
+
+      // Clean up auth.json
+      if (envKeyToRemove && existsSync(this.authPath)) {
+        try {
+          const authContent = await readFile(this.authPath, "utf-8");
+          const auth = JSON.parse(authContent) as Record<string, string>;
+          delete auth[envKeyToRemove];
+          await writeFile(this.authPath, JSON.stringify(auth, null, 2), "utf-8");
+        } catch {
+          // Silently ignore auth.json cleanup errors
+        }
       }
     } catch (error) {
       // Silently fail - config might be corrupted or in unexpected format

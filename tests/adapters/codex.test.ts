@@ -6,14 +6,16 @@ import { parse as parseToml } from "smol-toml";
 
 const TEST_CONFIG_DIR = "/tmp/swixter-test-codex";
 const TEST_CONFIG_PATH = `${TEST_CONFIG_DIR}/config.toml`;
+const TEST_AUTH_PATH = `${TEST_CONFIG_DIR}/auth.json`;
 
 describe("CodexAdapter", () => {
   let adapter: CodexAdapter;
 
   beforeEach(() => {
-    // Create adapter and override config path for testing
+    // Create adapter and override paths for testing
     adapter = new CodexAdapter();
     (adapter as any).configPath = TEST_CONFIG_PATH;
+    (adapter as any).authPath = TEST_AUTH_PATH;
 
     // Clean up and create test directory
     if (existsSync(TEST_CONFIG_DIR)) {
@@ -62,7 +64,7 @@ describe("CodexAdapter", () => {
       expect(config.model_providers["swixter-test"]).toBeDefined();
       expect(config.model_providers["swixter-test"].name).toBe("Ollama (Local models)");
       expect(config.model_providers["swixter-test"].base_url).toBe("http://localhost:11434");
-      expect(config.model_providers["swixter-test"].wire_api).toBe("chat");
+      expect(config.model_providers["swixter-test"].wire_api).toBe("responses");
     });
 
     test("should create config with custom baseURL", async () => {
@@ -641,7 +643,7 @@ model_provider = "swixter-test"
   });
 
   describe("wire_api field", () => {
-    test("should set wire_api to 'chat' for Ollama", async () => {
+    test("should set wire_api to 'responses' for all providers", async () => {
       const profile: ClaudeCodeProfile = {
         name: "ollama-test",
         providerId: "ollama",
@@ -655,10 +657,11 @@ model_provider = "swixter-test"
       const file = Bun.file(TEST_CONFIG_PATH);
       const config = parseToml(await file.text());
 
-      expect(config.model_providers["swixter-ollama-test"].wire_api).toBe("chat");
+      expect(config.model_providers["swixter-ollama-test"].wire_api).toBe("responses");
+      expect(config.model_providers["swixter-ollama-test"].requires_openai_auth).toBe(true);
     });
 
-    test("should set wire_api to 'chat' for Custom provider", async () => {
+    test("should set wire_api to 'responses' for Custom provider", async () => {
       const profile: ClaudeCodeProfile = {
         name: "custom-test",
         providerId: "custom",
@@ -673,7 +676,8 @@ model_provider = "swixter-test"
       const file = Bun.file(TEST_CONFIG_PATH);
       const config = parseToml(await file.text());
 
-      expect(config.model_providers["swixter-custom-test"].wire_api).toBe("chat");
+      expect(config.model_providers["swixter-custom-test"].wire_api).toBe("responses");
+      expect(config.model_providers["swixter-custom-test"].requires_openai_auth).toBe(true);
     });
   });
 
@@ -694,6 +698,116 @@ model_provider = "swixter-test"
 
       // Should have model from Ollama preset's defaultModels[0]
       expect(config.profiles["swixter-ollama-test"].model).toBe("qwen2.5-coder:7b");
+    });
+  });
+
+  describe("auth.json", () => {
+    test("should write API key to auth.json on apply", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      expect(existsSync(TEST_AUTH_PATH)).toBe(true);
+      const auth = JSON.parse(await Bun.file(TEST_AUTH_PATH).text());
+      expect(auth.OPENAI_API_KEY).toBe("sk-test-key");
+    });
+
+    test("should use custom envKey in auth.json", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        envKey: "MY_CUSTOM_KEY",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const auth = JSON.parse(await Bun.file(TEST_AUTH_PATH).text());
+      expect(auth.MY_CUSTOM_KEY).toBe("sk-test-key");
+      expect(auth.OPENAI_API_KEY).toBeUndefined();
+    });
+
+    test("should not write auth.json when apiKey is empty", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "ollama",
+        apiKey: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      expect(existsSync(TEST_AUTH_PATH)).toBe(false);
+    });
+
+    test("should preserve existing keys in auth.json", async () => {
+      // Pre-populate auth.json with another key
+      writeFileSync(TEST_AUTH_PATH, JSON.stringify({ OTHER_KEY: "other-value" }, null, 2));
+
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const auth = JSON.parse(await Bun.file(TEST_AUTH_PATH).text());
+      expect(auth.OPENAI_API_KEY).toBe("sk-test-key");
+      expect(auth.OTHER_KEY).toBe("other-value");
+    });
+
+    test("verify should fail when auth.json has wrong key", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "sk-correct-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      // Tamper with auth.json
+      writeFileSync(TEST_AUTH_PATH, JSON.stringify({ OPENAI_API_KEY: "sk-wrong-key" }, null, 2));
+
+      const result = await adapter.verify(profile);
+      expect(result).toBe(false);
+    });
+
+    test("remove should delete key from auth.json while preserving others", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "test",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      // Add another key
+      writeFileSync(TEST_AUTH_PATH, JSON.stringify({
+        OPENAI_API_KEY: "sk-test-key",
+        OTHER_KEY: "other-value",
+      }, null, 2));
+
+      await adapter.remove("test");
+
+      const auth = JSON.parse(await Bun.file(TEST_AUTH_PATH).text());
+      expect(auth.OPENAI_API_KEY).toBeUndefined();
+      expect(auth.OTHER_KEY).toBe("other-value");
     });
   });
 

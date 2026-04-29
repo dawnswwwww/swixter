@@ -184,9 +184,9 @@ async function cmdCreateInteractive(): Promise<void> {
   console.log(pc.bold(pc.cyan(PROMPTS.createProfile(CODER_CONFIG.displayName))));
   console.log();
 
-  const { getProvidersByWireApi } = await import("../providers/presets.js");
-  // Codex only supports OpenAI-compatible (chat API) providers
-  const presets = await getProvidersByWireApi('chat');
+  const { getAllPresets } = await import("../providers/presets.js");
+  // All providers are supported by Codex (adapter handles wire_api internally)
+  const presets = await getAllPresets();
 
   // 1. Enter profile name
   const name = await p.text({
@@ -404,14 +404,6 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
     process.exit(1);
   }
 
-  // Codex only supports OpenAI-compatible (chat API) providers
-  if (preset.wire_api !== 'chat') {
-    console.log(pc.red(`Error: Provider "${preset.displayName}" is not compatible with ${CODER_CONFIG.displayName}`));
-    console.log(pc.dim(`${CODER_CONFIG.displayName} only supports OpenAI-compatible providers (chat API).`));
-    console.log(pc.dim("Use 'ollama' or 'custom' provider instead."));
-    process.exit(1);
-  }
-
   // Ollama doesn't require API key
   if (params.provider !== "ollama" && !params["api-key"]) {
     console.log(pc.red("Error: This provider requires --api-key parameter"));
@@ -626,9 +618,9 @@ async function cmdEdit(profileName?: string): Promise<void> {
   console.log(pc.bold(pc.cyan(`Edit profile: ${profileName}`)));
   console.log();
 
-  const { getProvidersByWireApi } = await import("../providers/presets.js");
-  // Codex only supports OpenAI-compatible (chat API) providers
-  const presets = await getProvidersByWireApi('chat');
+  const { getAllPresets } = await import("../providers/presets.js");
+  // All providers are supported by Codex (adapter handles wire_api internally)
+  const presets = await getAllPresets();
   const currentPreset = await getPresetByIdAsync(profile.providerId);
 
   // 1. Change provider?
@@ -889,20 +881,11 @@ async function cmdApply(): Promise<void> {
       console.log(`  Config file: ${pc.dim(adapter.configPath)}`);
       console.log();
 
-      // Show environment variable export commands
-      if (adapter.name === "codex" && "getEnvExportCommands" in adapter) {
-        const envCommands = await (adapter as any).getEnvExportCommands(profile);
-        if (envCommands.length > 0) {
-          console.log(pc.bold("To use this profile, set environment variables:"));
-          console.log();
-          envCommands.forEach(cmd => {
-            console.log(`  ${pc.green(cmd)}`);
-          });
-          console.log();
-          console.log(pc.dim(`Then run: ${pc.cyan("codex")}`));
-          console.log();
-        }
-      }
+      // Show usage instructions
+      console.log(pc.bold("Run Codex now: ") + pc.cyan("codex"));
+      console.log();
+      console.log(pc.dim("Environment variables are automatically managed via auth.json."));
+      console.log();
     } else {
       console.log(pc.yellow("⚠  Profile written, but verification failed"));
       console.log(pc.dim("Please check config file format"));

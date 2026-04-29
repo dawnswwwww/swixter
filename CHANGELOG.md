@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-04-29
+
+### Added
+- **Codex auth.json support** — `swixter codex apply` now writes API keys to `~/.codex/auth.json`, enabling Codex to run directly without environment variables
+- **Codex `requires_openai_auth`** — Provider configuration now includes `requires_openai_auth = true`, telling Codex to read keys from `auth.json`
+- **Codex supports all providers** — Removed `wire_api === 'chat'` filtering in CLI; all providers (including Anthropic-format ones) are now available for Codex profiles
+
+### Fixed
+- **Codex `wire_api` compatibility** — Changed from `wire_api = "chat"` to `wire_api = "responses"` to match Codex's updated configuration schema
+- **Empty auth.json cleanup** — `auth.json` is automatically deleted when the last key is removed
+- **Post-apply messaging** — Updated success message to reflect that Codex can run directly after apply (no env var setup needed)
+
+### Changed
+- **Codex adapter verify()** — Now validates that `auth.json` contains the correct API key for the active profile
+
 ## [0.1.5] - 2026-04-26
 
 ### Added
