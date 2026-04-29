@@ -1,0 +1,43 @@
+---
+title: Welcome to Swixter
+description: Swixter is a CLI tool for managing AI coding assistant configurations across multiple tools and providers.
+---
+
+# Swixter
+
+**Swixter** lets you manage configurations for multiple AI coding assistants — Claude Code, Codex, and Continue.dev — from a single command line interface.
+
+## What is Swixter?
+
+Swixter provides a unified way to create, switch between, and apply configuration profiles. Each profile maps to a specific provider (Anthropic, Ollama, OpenAI-compatible, or custom) and can be applied across all your AI coding tools.
+
+## Key Features
+
+- **Switch providers instantly** — one command to flip between Anthropic, Ollama, and custom APIs
+- **Multi-tool support** — manage Claude Code, Codex, and Continue.dev from one config
+- **Cloud sync** — sync your profiles across machines
+- **CLI-first design** — terminal-native with interactive prompts and a local Web UI
+
+## Quick Start
+
+```bash
+npm install -g swixter
+swixter claude create my-profile
+swixter claude switch my-profile
+swixter claude apply
+claude  # ready to go
+```
+
+## Supported Tools
+
+| Tool | Config Format | Adapter |
+|------|-------------|---------|
+| **Claude Code** | JSON (`~/.claude/settings.json`) | Built-in |
+| **Codex** | TOML (`~/.codex/config.toml`) | Built-in |
+| **Continue.dev** | YAML (`~/.continue/config.yaml`) | Built-in |
+
+## Next Steps
+
+- [Installation](/getting-started/installation) — set up Swixter on your machine
+- [Quick Start](/getting-started/quick-start) — create your first profile
+- [Commands](/commands/claude) — explore all CLI commands

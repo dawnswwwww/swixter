@@ -1,0 +1,102 @@
+---
+// Shared layout with Citron Terminal design system
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Manage AI coding assistant configurations with ease. Switch between Anthropic, Ollama, and custom providers across Claude Code, Codex, and Continue.dev." />
+    <title>Swixter — AI Coding Assistant Configuration Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    /* Citron Terminal design system */
+    --color-bg: #151309;
+    --color-surface: #222014;
+    --color-surface-high: #2c2a1e;
+    --color-surface-lowest: #100e05;
+    --color-primary: #d8c603;
+    --color-primary-dim: #dbc90b;
+    --color-secondary: #d3c87e;
+    --color-tertiary: #70f2ff;
+    --color-on-bg: #e8e2d0;
+    --color-on-surface: #e8e2d0;
+    --color-on-surface-variant: #cdc7ac;
+    --color-outline: #969179;
+    --color-outline-variant: #4a4733;
+
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-label: 'Space Grotesk', monospace;
+    --font-code: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+    --radius: 0.5rem;
+    --radius-sm: 0.25rem;
+    --container-max: 1440px;
+    --gutter: 20px;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--color-on-bg);
+    background-color: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    min-height: 100vh;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-body);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  h1 { font-size: 48px; }
+  h2 { font-size: 24px; font-weight: 600; }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: opacity 0.2s;
+  }
+
+  a:hover { opacity: 0.8; }
+
+  pre, code {
+    font-family: var(--font-code);
+    font-size: 13px;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .container {
+    width: 100%;
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+  }
+</style>

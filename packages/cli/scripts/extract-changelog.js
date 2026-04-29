@@ -12,7 +12,8 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const projectRoot = join(__dirname, '..');
+// packages/cli/scripts/ → repo root (3 levels up)
+const projectRoot = join(__dirname, '..', '..', '..');
 const changelogPath = join(projectRoot, 'CHANGELOG.md');
 
 // Get version from command line argument or environment variable

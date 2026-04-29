@@ -29,10 +29,10 @@ jobs:
         run: bun install
 
       - name: Run tests
-        run: bun test
+        run: bun run test
 
-      - name: Build project
-        run: bun run build
+      - name: Build CLI
+        run: bun run build:cli
 
   publish-npm:
     name: Publish to npm
@@ -57,11 +57,11 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build project
-        run: bun run build
+      - name: Build CLI
+        run: bun run build:cli
 
       - name: Publish to npm
-        run: npm publish
+        run: cd packages/cli && npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -95,7 +95,7 @@ jobs:
       - name: Extract changelog
         id: changelog
         run: |
-          CHANGELOG=$(node scripts/extract-changelog.js ${{ steps.get_version.outputs.clean_version }})
+          CHANGELOG=$(node packages/cli/scripts/extract-changelog.js ${{ steps.get_version.outputs.clean_version }})
           echo "content<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

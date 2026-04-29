@@ -36,19 +36,27 @@ jobs:
         run: bun install
 
       - name: Run unit tests
-        run: bun test
+        run: bun run test
 
-      - name: Build project
-        run: bun run build
+      - name: Build CLI
+        run: bun run build:cli
 
-      - name: Verify build output
+      - name: Verify CLI build output
         shell: bash
         run: |
-          if [ ! -f "dist/cli/index.js" ]; then
-            echo "Build failed: dist/cli/index.js not found"
+          if [ ! -f "packages/cli/dist/cli/index.js" ]; then
+            echo "Build failed: packages/cli/dist/cli/index.js not found"
             exit 1
           fi
-          echo "Build successful"
+          echo "CLI build successful"
+
+      - name: Build website
+        run: bun run build:website
+        continue-on-error: true
+
+      - name: Build docs
+        run: bun run build:docs
+        continue-on-error: true
 
   # E2E tests only run on Linux with Docker
   e2e-test:
@@ -67,9 +75,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build project
-        run: bun run build
+      - name: Build CLI
+        run: bun run build:cli
 
       - name: Run E2E tests
-        run: bun run test:e2e
+        run: cd packages/cli && bun run test:e2e
         timeout-minutes: 10

@@ -1,0 +1,67 @@
+/* Citron Terminal theme for Starlight */
+
+:root {
+  --sl-color-accent: #d8c603;
+  --sl-color-accent-high: #f5e232;
+  --sl-color-accent-low: #363100;
+
+  --sl-color-text-accent: #d8c603;
+  --sl-color-text: #e8e2d0;
+  --sl-color-text-invert: #151309;
+
+  --sl-color-bg: #151309;
+  --sl-color-bg-nav: #100e05;
+  --sl-color-bg-sidebar: #100e05;
+  --sl-color-bg-inline-code: #2c2a1e;
+
+  --sl-color-hairline: #4a4733;
+  --sl-color-hairline-light: #3c392d;
+  --sl-color-hairline-shade: #4a4733;
+
+  --sl-color-gray-1: #373528;
+  --sl-color-gray-2: #4a4733;
+  --sl-color-gray-3: #969179;
+  --sl-color-gray-4: #cdc7ac;
+  --sl-color-gray-5: #e8e2d0;
+  --sl-color-gray-6: #e8e2d0;
+  --sl-color-gray-7: #f0ede0;
+
+  --sl-nav-height: 3.5rem;
+  --sl-sidebar-width: 16rem;
+}
+
+/* Typography */
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+code, pre {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* Code blocks - Citron Terminal style */
+.sl-markdown-content pre {
+  background: #100e05;
+  border: 1px solid #4a4733;
+  border-radius: 0.5rem;
+}
+
+.sl-markdown-content code {
+  border-radius: 0.25rem;
+}
+
+/* Sidebar accent */
+[data-theme="dark"] .sidebar-pane {
+  background: #100e05;
+}
+
+/* Links */
+.sl-markdown-content a {
+  color: #d8c603;
+}
