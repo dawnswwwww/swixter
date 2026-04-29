@@ -8,6 +8,12 @@ export default defineConfig({
       title: 'Swixter Docs',
       description: 'Documentation for Swixter — the AI coding assistant configuration manager.',
       customCss: ['./src/styles/theme.css'],
+      head: [
+        {
+          tag: 'script',
+          content: 'document.documentElement.dataset.theme = "dark";',
+        },
+      ],
       sidebar: [
         {
           label: 'Getting Started',

@@ -1,30 +1,37 @@
-/* Citron Terminal theme for Starlight */
+/* Citron Terminal theme for Starlight — dark-only */
 
+/* Force dark color scheme */
 :root {
-  --sl-color-accent: #d8c603;
+  color-scheme: dark;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] {
+  --sl-color-accent: #e8d419;
   --sl-color-accent-high: #f5e232;
-  --sl-color-accent-low: #363100;
+  --sl-color-accent-low: #3d3800;
 
-  --sl-color-text-accent: #d8c603;
-  --sl-color-text: #e8e2d0;
-  --sl-color-text-invert: #151309;
+  --sl-color-text-accent: #e8d419;
+  --sl-color-text: #f2efe6;
+  --sl-color-text-invert: #14120b;
 
-  --sl-color-bg: #151309;
-  --sl-color-bg-nav: #100e05;
-  --sl-color-bg-sidebar: #100e05;
-  --sl-color-bg-inline-code: #2c2a1e;
+  --sl-color-bg: #14120b;
+  --sl-color-bg-nav: #0d0c07;
+  --sl-color-bg-sidebar: #0d0c07;
+  --sl-color-bg-inline-code: #252219;
 
-  --sl-color-hairline: #4a4733;
-  --sl-color-hairline-light: #3c392d;
-  --sl-color-hairline-shade: #4a4733;
+  --sl-color-hairline: #504c3e;
+  --sl-color-hairline-light: #3a372d;
+  --sl-color-hairline-shade: #504c3e;
 
-  --sl-color-gray-1: #373528;
-  --sl-color-gray-2: #4a4733;
-  --sl-color-gray-3: #969179;
-  --sl-color-gray-4: #cdc7ac;
-  --sl-color-gray-5: #e8e2d0;
-  --sl-color-gray-6: #e8e2d0;
-  --sl-color-gray-7: #f0ede0;
+  /* Gray scale for text hierarchy — body text must be bright enough */
+  --sl-color-gray-1: #201d15;
+  --sl-color-gray-2: #504c3e;
+  --sl-color-gray-3: #a09c89;
+  --sl-color-gray-4: #dad6c5;
+  --sl-color-gray-5: #f2efe6;
+  --sl-color-gray-6: #f7f5ee;
+  --sl-color-gray-7: #faf9f4;
 
   --sl-nav-height: 3.5rem;
   --sl-sidebar-width: 16rem;
@@ -45,10 +52,10 @@ code, pre {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
 
-/* Code blocks - Citron Terminal style */
+/* Code blocks */
 .sl-markdown-content pre {
-  background: #100e05;
-  border: 1px solid #4a4733;
+  background: #0d0c07;
+  border: 1px solid #504c3e;
   border-radius: 0.5rem;
 }
 
@@ -56,12 +63,12 @@ code, pre {
   border-radius: 0.25rem;
 }
 
-/* Sidebar accent */
-[data-theme="dark"] .sidebar-pane {
-  background: #100e05;
-}
-
 /* Links */
 .sl-markdown-content a {
-  color: #d8c603;
+  color: #e8d419;
+}
+
+/* Hide theme toggle since we force dark */
+starlight-theme-select {
+  display: none;
 }
