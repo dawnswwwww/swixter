@@ -38,3 +38,4 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 ui/node_modules
 
 .claude/worktrees/
+.worktrees/
