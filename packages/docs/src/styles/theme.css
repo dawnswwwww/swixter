@@ -68,7 +68,30 @@ code, pre {
   color: #e8d419;
 }
 
-/* Hide theme toggle since we force dark */
-starlight-theme-select {
-  display: none;
+/* Copy this page button — sits on the right side of the page title */
+.copy-md-btn {
+  flex-shrink: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--sl-color-gray-3);
+  background: transparent;
+  border: 1px solid var(--sl-color-gray-2);
+  border-radius: 0.3125rem;
+  padding: 0.25rem 0.625rem;
+  cursor: pointer;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
 }
+
+.copy-md-btn:hover {
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-accent);
+}
+
+.copy-md-btn.copied {
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-accent);
+}
+
