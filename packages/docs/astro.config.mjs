@@ -75,15 +75,20 @@ export default defineConfig({
             { slug: 'commands/providers' },
             { slug: 'commands/groups' },
             { slug: 'commands/proxy' },
-            { slug: 'commands/sync' },
             { slug: 'commands/ui' },
           ],
         },
         {
           label: 'Advanced',
           items: [
-            { slug: 'advanced/windows' },
             { slug: 'advanced/cloud-sync' },
+            { slug: 'advanced/windows' },
+          ],
+        },
+        {
+          label: 'Reference',
+          items: [
+            { slug: 'reference/changelog' },
           ],
         },
       ],
