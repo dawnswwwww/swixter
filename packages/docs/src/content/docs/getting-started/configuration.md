@@ -121,4 +121,4 @@ The `apply` command reads the active profile and writes it to the coder's native
 
 - [Claude Code commands](/commands/claude)
 - [Codex commands](/commands/codex)
-- [Provider configuration](/providers/anthropic)
+- [Provider management](/commands/providers)

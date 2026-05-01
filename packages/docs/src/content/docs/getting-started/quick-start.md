@@ -98,4 +98,4 @@ swixter codex run  # applies profile, sets env vars, launches codex
 
 - [Configuration details](/getting-started/configuration) — understand config file structure
 - [Commands reference](/commands/claude) — explore all CLI commands
-- [Provider setup](/providers/anthropic) — configure specific AI providers
+- [Provider management](/commands/providers) — configure AI providers

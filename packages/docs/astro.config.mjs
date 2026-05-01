@@ -80,15 +80,6 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Providers',
-          items: [
-            { slug: 'providers/anthropic' },
-            { slug: 'providers/ollama' },
-            { slug: 'providers/openai' },
-            { slug: 'providers/custom' },
-          ],
-        },
-        {
           label: 'Advanced',
           items: [
             { slug: 'advanced/windows' },
