@@ -84,7 +84,6 @@ export default defineConfig({
           items: [
             { slug: 'advanced/windows' },
             { slug: 'advanced/cloud-sync' },
-            { slug: 'advanced/proxy' },
           ],
         },
       ],
