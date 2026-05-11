@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "dev": "bunx astro dev",
+    "build": "bunx astro build",
+    "preview": "bunx astro preview"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.38.4",
