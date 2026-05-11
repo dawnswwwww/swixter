@@ -153,11 +153,4 @@ function mapThinkingBudgetToEffort(budgetTokens: number): string {
   return "low";
 }
 
-// Self-register
-registerTransformer({
-  clientFormat: "anthropic_messages",
-  targetFormat: "openai_chat",
-  requestTransform: anthropicToOpenAIChatRequest,
-  responseTransform: (body) => body,
-  streamTransform: (stream) => stream,
-});
+// Registration moved to streaming/openai-chat-to-anthropic.ts for full transformer chain
