@@ -1,5 +1,5 @@
 ---
-title: Claude Code Commands
+title: Claude Code
 description: Manage Claude Code configurations with Swixter.
 ---
 

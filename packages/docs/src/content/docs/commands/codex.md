@@ -1,5 +1,5 @@
 ---
-title: Codex Commands
+title: Codex
 description: Manage Codex configurations with Swixter.
 ---
 

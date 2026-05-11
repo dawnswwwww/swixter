@@ -69,9 +69,13 @@ export default defineConfig({
         {
           label: 'Commands',
           items: [
-            { slug: 'commands/claude' },
-            { slug: 'commands/codex' },
-            { slug: 'commands/qwen' },
+            {
+              label: 'Coder Commands',
+              items: [
+                { slug: 'commands/claude' },
+                { slug: 'commands/codex' },
+              ],
+            },
             { slug: 'commands/providers' },
             { slug: 'commands/groups' },
             { slug: 'commands/proxy' },

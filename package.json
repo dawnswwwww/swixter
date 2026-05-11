@@ -11,6 +11,8 @@
   "scripts": {
     "build": "bun run --filter '*' build",
     "build:cli": "bun run --filter 'swixter' build",
+    "dev:website": "bun run --filter 'swixter-website' dev",
+    "dev:docs": "bun run --filter 'swixter-docs' dev",
     "build:website": "bun run --filter 'swixter-website' build",
     "build:docs": "bun run --filter 'swixter-docs' build",
     "test": "bun run --filter 'swixter' test",
