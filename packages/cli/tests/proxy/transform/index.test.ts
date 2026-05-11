@@ -4,6 +4,8 @@ import {
   inferTargetApiFormat,
   getTransformer,
   transformRequest,
+  transformResponse,
+  transformStream,
   registerTransformer,
 } from '../../../src/proxy/transform/index.js'
 import type { ClaudeCodeProfile, ProviderPreset } from '../../../src/types.js'
@@ -103,5 +105,37 @@ describe('transformRequest', () => {
     const result = transformRequest(body, ctx)
     expect(result.body).toBe(body)
     expect(result.targetEndpoint).toBe('/v1/messages')
+  })
+})
+
+describe('transformResponse', () => {
+  it('returns body unchanged when no transformer is registered', () => {
+    const ctx = {
+      endpoint: '/v1/messages',
+      clientFormat: 'anthropic_messages' as const,
+      targetFormat: 'anthropic_messages' as const,
+      profile: { name: 'test', providerId: 'anthropic', apiKey: 'test', createdAt: '', updatedAt: '' } as ClaudeCodeProfile,
+      preset: { id: 'anthropic', name: 'Anthropic', displayName: 'Anthropic', baseURL: '', defaultModels: [], authType: 'api-key' as const } as ProviderPreset,
+      stream: false,
+    }
+    const body = { type: 'message', content: [] }
+    const result = transformResponse(body, ctx)
+    expect(result).toBe(body)
+  })
+})
+
+describe('transformStream', () => {
+  it('returns stream unchanged when no transformer is registered', () => {
+    const ctx = {
+      endpoint: '/v1/messages',
+      clientFormat: 'anthropic_messages' as const,
+      targetFormat: 'anthropic_messages' as const,
+      profile: { name: 'test', providerId: 'anthropic', apiKey: 'test', createdAt: '', updatedAt: '' } as ClaudeCodeProfile,
+      preset: { id: 'anthropic', name: 'Anthropic', displayName: 'Anthropic', baseURL: '', defaultModels: [], authType: 'api-key' as const } as ProviderPreset,
+      stream: true,
+    }
+    const stream = new ReadableStream({ start(controller) { controller.close() } })
+    const result = transformStream(stream, ctx)
+    expect(result).toBe(stream)
   })
 })
