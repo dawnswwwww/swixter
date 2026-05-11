@@ -1,0 +1,97 @@
+/* Citron Terminal theme for Starlight — dark-only */
+
+/* Force dark color scheme */
+:root {
+  color-scheme: dark;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] {
+  --sl-color-accent: #e8d419;
+  --sl-color-accent-high: #f5e232;
+  --sl-color-accent-low: #3d3800;
+
+  --sl-color-text-accent: #e8d419;
+  --sl-color-text: #f2efe6;
+  --sl-color-text-invert: #14120b;
+
+  --sl-color-bg: #14120b;
+  --sl-color-bg-nav: #0d0c07;
+  --sl-color-bg-sidebar: #0d0c07;
+  --sl-color-bg-inline-code: #252219;
+
+  --sl-color-hairline: #504c3e;
+  --sl-color-hairline-light: #3a372d;
+  --sl-color-hairline-shade: #504c3e;
+
+  /* Gray scale for text hierarchy — body text must be bright enough */
+  --sl-color-gray-1: #201d15;
+  --sl-color-gray-2: #504c3e;
+  --sl-color-gray-3: #a09c89;
+  --sl-color-gray-4: #dad6c5;
+  --sl-color-gray-5: #f2efe6;
+  --sl-color-gray-6: #f7f5ee;
+  --sl-color-gray-7: #faf9f4;
+
+  --sl-nav-height: 3.5rem;
+  --sl-sidebar-width: 16rem;
+}
+
+/* Typography */
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+code, pre {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* Code blocks */
+.sl-markdown-content pre {
+  background: #0d0c07;
+  border: 1px solid #504c3e;
+  border-radius: 0.5rem;
+}
+
+.sl-markdown-content code {
+  border-radius: 0.25rem;
+}
+
+/* Links */
+.sl-markdown-content a {
+  color: #e8d419;
+}
+
+/* Copy this page button — sits on the right side of the page title */
+.copy-md-btn {
+  flex-shrink: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--sl-color-gray-3);
+  background: transparent;
+  border: 1px solid var(--sl-color-gray-2);
+  border-radius: 0.3125rem;
+  padding: 0.25rem 0.625rem;
+  cursor: pointer;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.copy-md-btn:hover {
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-accent);
+}
+
+.copy-md-btn.copied {
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-accent);
+}
+

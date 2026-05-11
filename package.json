@@ -1,59 +1,32 @@
 {
   "name": "swixter",
   "version": "0.1.6",
-  "description": "CLI tool for managing AI coding assistant configurations - easily switch between providers (Claude Code, Codex, Continue) with Anthropic, Ollama, or custom APIs",
-  "main": "dist/cli/index.js",
-  "module": "dist/cli/index.js",
+  "private": true,
   "type": "module",
-  "bin": {
-    "swixter": "dist/cli/index.js"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
+  "workspaces": [
+    "packages/cli",
+    "packages/website",
+    "packages/docs"
   ],
   "scripts": {
-    "build": "bun run build:ui && bun build src/cli/index.ts --outdir dist/cli --target node",
-    "build:ui": "cd ui && bun install && bun run build && node -e \"require('fs').mkdirSync('../dist/ui',{recursive:true});require('fs').cpSync('dist','../dist/ui',{recursive:true})\"",
-    "build:cli": "bun build src/cli/index.ts --outdir dist/cli --target node",
-    "cli": "bun src/cli/index.ts",
-    "cli:dev": "bun --hot src/cli/index.ts",
-    "ui:dev": "cd ui && bun run dev",
-    "test": "bun test",
-    "test:e2e": "bash test/e2e-docker.sh",
+    "build": "bun run --filter '*' build",
+    "build:cli": "bun run --filter 'swixter' build",
+    "dev:website": "bun run --filter 'swixter-website' dev",
+    "dev:docs": "bun run --filter 'swixter-docs' dev",
+    "build:website": "bun run --filter 'swixter-website' build",
+    "build:docs": "bun run --filter 'swixter-docs' build",
+    "test": "bun run --filter 'swixter' test",
+    "test:e2e": "cd packages/cli && bun run test:e2e",
+    "cli": "bun run --filter 'swixter' cli",
+    "cli:dev": "bun run --filter 'swixter' cli:dev",
+    "ui:dev": "bun run --filter 'swixter' ui:dev",
     "preversion": "bun test",
-    "version": "node scripts/sync-version.js && git add src/constants/meta.ts",
+    "version": "node scripts/sync-versions.js && git add packages/*/package.json packages/cli/src/constants/meta.ts",
     "postversion": "git push --follow-tags",
-    "release": "npm version",
     "release:patch": "npm version patch",
     "release:minor": "npm version minor",
     "release:major": "npm version major"
   },
-  "keywords": [
-    "claude",
-    "claude-code",
-    "claude-ai",
-    "codex",
-    "continue",
-    "ai",
-    "llm",
-    "config",
-    "configuration",
-    "manager",
-    "cli",
-    "tool",
-    "anthropic",
-    "ollama",
-    "qwen",
-    "provider",
-    "switch",
-    "api-key",
-    "openai-compatible",
-    "ai-assistant",
-    "code-assistant",
-    "developer-tools"
-  ],
   "author": "dawnswwwww",
   "license": "MIT",
   "repository": {
@@ -62,36 +35,5 @@
   },
   "bugs": {
     "url": "https://github.com/dawnswwwww/swixter/issues"
-  },
-  "homepage": "https://github.com/dawnswwwww/swixter#readme",
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^24.10.1",
-    "@types/semver": "^7.7.1",
-    "@types/ws": "^8.18.1"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
-    "@clack/prompts": "^0.11.0",
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "clsx": "^2.1.1",
-    "js-yaml": "^4.1.1",
-    "picocolors": "^1.1.1",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "react-router-dom": "^7.14.1",
-    "semver": "^7.7.4",
-    "smol-toml": "^1.5.2",
-    "tailwind-merge": "^3.5.0",
-    "ws": "^8.20.0",
-    "zod": "^4.1.12"
   }
 }

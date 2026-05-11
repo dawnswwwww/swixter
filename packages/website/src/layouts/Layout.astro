@@ -1,0 +1,120 @@
+---
+// Hackable Terminal — design system
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Manage AI coding assistant configurations with ease. Switch between Anthropic, Ollama, and custom providers across Claude Code, Codex, and Continue.dev." />
+    <title>Swixter — AI Coding Assistant Configuration Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --color-bg: #0a0a08;
+    --color-surface: #111110;
+    --color-surface-high: #1a1a17;
+    --color-surface-lowest: #050504;
+    --color-primary: #c8e008;
+    --color-primary-dim: #a8c000;
+    --color-secondary: #b8a840;
+    --color-tertiary: #50e8d0;
+    --color-accent-green: #5ce892;
+    --color-accent-blue: #68b8f8;
+    --color-accent-rose: #f57a9f;
+    --color-on-bg: #e8e4d8;
+    --color-on-surface: #e8e4d8;
+    --color-on-surface-variant: #b0ac9e;
+    --color-outline: #6a6858;
+    --color-outline-variant: #3a3830;
+
+    --font-body: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    --font-label: 'Space Grotesk', monospace;
+    --font-code: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+    --radius: 0;
+    --radius-sm: 0;
+    --container-max: 1200px;
+    --gutter: 24px;
+    --glow: 0 0 12px rgba(200,224,8,0.15);
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--color-on-bg);
+    background-color: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    min-height: 100vh;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(200,224,8,0.008) 2px,
+        rgba(200,224,8,0.008) 4px
+      );
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-body);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  h1 { font-size: clamp(36px, 6vw, 56px); }
+  h2 { font-size: clamp(18px, 2.5vw, 22px); }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  a:hover { color: var(--color-tertiary); }
+
+  pre, code {
+    font-family: var(--font-code);
+    font-size: 13px;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .container {
+    width: 100%;
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+  }
+
+  /* Terminal-style horizontal rule */
+  hr {
+    border: none;
+    border-top: 1px dashed var(--color-outline-variant);
+    margin: 0;
+  }
+</style>

@@ -1,0 +1,972 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout>
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a href="/" class="logo">
+        <span class="logo-prompt">~$ </span><span class="logo-text">swixter</span>
+      </a>
+      <div class="nav-links">
+        <a href="https://docs.swixter.cc">/docs</a>
+        <a href="https://github.com/dawnswwwww/swixter">/github</a>
+        <a href="https://www.npmjs.com/package/swixter">/npm</a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <p class="hero-line"><span class="comment"># v{import.meta.env.PUBLIC_VERSION ?? '0.1.6'}</span></p>
+        <h1 class="hero-title">
+          <span class="glitch" data-text="swixter">swixter</span>
+        </h1>
+        <p class="hero-desc">
+          <span class="comment">//</span> One config tool for all your AI coding assistants.
+        </p>
+        <div class="hero-install">
+          <span class="prompt-char">$</span>
+          <code class="install-cmd">npm install -g swixter</code>
+          <button class="copy-btn" data-copy="npm install -g swixter" type="button">[copy]</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Coder Compatibility -->
+    <section class="coders">
+      <div class="container">
+        <h2 class="section-title"><span class="comment">##</span> Works with your tools</h2>
+        <div class="coders-list">
+          <div class="coder-card">
+            <span class="coder-name">Claude Code</span>
+            <span class="coder-meta">json &middot; responses_api &middot; anthropic</span>
+          </div>
+          <div class="coder-card">
+            <span class="coder-name">Codex</span>
+            <span class="coder-meta">toml &middot; env_key &middot; openai_compat</span>
+          </div>
+          <div class="coder-card">
+            <span class="coder-name">Qwen / Continue.dev</span>
+            <span class="coder-meta">yaml &middot; vscode_ext &middot; swixter qwen</span>
+          </div>
+        </div>
+        <p class="coders-note">
+          <span class="comment">#</span> All support Anthropic, Ollama, OpenAI-compatible, and custom providers.
+        </p>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="container">
+        <h2 class="section-title"><span class="comment">##</span> Why swixter?</h2>
+        <div class="features-grid">
+          <article class="feature-card" style="--accent: var(--color-primary)">
+            <div class="feature-head">
+              <span class="feature-prompt">&gt;</span>
+              <h3 class="feature-title">provider_switch</h3>
+            </div>
+            <p class="feature-desc">One command to switch between Anthropic, Ollama, OpenAI-compatible, and custom providers.</p>
+            <a href="https://docs.swixter.cc/providers/custom/" target="_blank" class="feature-link">→ /providers/custom</a>
+          </article>
+
+          <article class="feature-card" style="--accent: var(--color-accent-blue)">
+            <div class="feature-head">
+              <span class="feature-prompt">&gt;</span>
+              <h3 class="feature-title">multi_tool</h3>
+            </div>
+            <p class="feature-desc">Works with Claude Code, Codex, and Continue.dev. One profile applies across all your AI coding tools.</p>
+            <a href="https://docs.swixter.cc/commands/claude/" target="_blank" class="feature-link">→ /commands/claude</a>
+          </article>
+
+          <article class="feature-card" style="--accent: var(--color-accent-green)">
+            <div class="feature-head">
+              <span class="feature-prompt">&gt;</span>
+              <h3 class="feature-title">cloud_sync</h3>
+            </div>
+            <p class="feature-desc">End-to-end encrypted profile sync across machines. Set up once, use everywhere.</p>
+            <a href="https://docs.swixter.cc/advanced/cloud-sync/" target="_blank" class="feature-link">→ /advanced/cloud-sync</a>
+          </article>
+
+          <article class="feature-card" style="--accent: var(--color-accent-rose)">
+            <div class="feature-head">
+              <span class="feature-prompt">&gt;</span>
+              <h3 class="feature-title">proxy_gateway</h3>
+            </div>
+            <p class="feature-desc">Local proxy with request logging and circuit breaker. Transparently switch backends with zero downtime.</p>
+            <a href="https://docs.swixter.cc/commands/proxy/" target="_blank" class="feature-link">→ /commands/proxy</a>
+          </article>
+
+          <article class="feature-card" style="--accent: var(--color-tertiary)">
+            <div class="feature-head">
+              <span class="feature-prompt">&gt;</span>
+              <h3 class="feature-title">group_profiles</h3>
+            </div>
+            <p class="feature-desc">Batch switching across multiple coders. One command sets profiles for all your tools at once.</p>
+            <a href="https://docs.swixter.cc/commands/groups/" target="_blank" class="feature-link">→ /commands/groups</a>
+          </article>
+
+          <article class="feature-card" style="--accent: var(--color-primary)">
+            <div class="feature-head">
+              <span class="feature-prompt">&gt;</span>
+              <h3 class="feature-title">web_ui</h3>
+            </div>
+            <p class="feature-desc">Visual profile management in your browser. Drag-and-drop, bulk editing, real-time proxy monitoring.</p>
+            <a href="https://docs.swixter.cc/commands/ui/" target="_blank" class="feature-link">→ /commands/ui</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo -->
+    <section class="demo">
+      <div class="container">
+        <h2 class="section-title"><span class="comment">##</span> See it in action</h2>
+        <div class="terminal-window">
+          <div class="win-titlebar">
+            <span class="window-dots"><i></i><i></i><i></i></span>
+            <div class="browser-tabs" role="tablist">
+              <button class="browser-tab active" data-tab="profile">profile</button>
+              <button class="browser-tab" data-tab="group">group</button>
+              <button class="browser-tab" data-tab="proxy">proxy</button>
+              <button class="browser-tab" data-tab="sync">sync</button>
+              <button class="browser-tab" data-tab="auth">auth</button>
+            </div>
+            <label class="animate-toggle" title="Toggle typing animation">
+              <input type="checkbox" id="animate-switch" checked />
+              <span class="toggle-track">
+                <span class="toggle-thumb"></span>
+              </span>
+              <span class="toggle-label">animate</span>
+            </label>
+          </div>
+          <div class="win-body">
+            <div class="code-header">
+              <span class="code-label" id="terminal-label">terminal — profile</span>
+            </div>
+            <pre><code id="terminal-body"></code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+    <!-- Docs CTA -->
+    <section class="cta">
+      <div class="container">
+        <h2 class="cta-title"><span class="comment">#</span> Ready to dive deeper?</h2>
+        <div class="cta-links">
+          <a href="https://docs.swixter.cc/getting-started/quick-start/" target="_blank" class="cta-btn">/getting-started</a>
+          <a href="https://docs.swixter.cc/commands/claude/" target="_blank" class="cta-btn">/commands</a>
+          <a href="https://docs.swixter.cc/providers/anthropic/" target="_blank" class="cta-btn">/providers</a>
+        </div>
+        <p class="cta-sub">Full docs at <a href="https://docs.swixter.cc">docs.swixter.cc</a></p>
+      </div>
+    </section>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <p class="footer-copy"><span class="comment">/*</span> MIT License <span class="comment">*/</span> swixter</p>
+      <div class="footer-links">
+        <a href="https://github.com/dawnswwwww/swixter">github</a>
+        <a href="https://www.npmjs.com/package/swixter">npm</a>
+        <a href="https://docs.swixter.cc">docs</a>
+      </div>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  /* Nav */
+  .nav {
+    border-bottom: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+    color: var(--color-on-bg);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .logo-prompt {
+    color: var(--color-primary);
+    user-select: none;
+  }
+
+  .logo-text {
+    font-weight: 600;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .nav-links a {
+    color: var(--color-on-surface-variant);
+    font-size: 12px;
+    font-family: var(--font-body);
+    font-weight: 500;
+  }
+
+  .nav-links a:hover {
+    color: var(--color-primary);
+  }
+
+  /* Hero */
+  .hero {
+    padding: clamp(80px, 10vw, 120px) 0 clamp(48px, 6vw, 80px);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(200,224,8,0.05) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-line {
+    margin-bottom: 16px;
+  }
+
+  .hero-title {
+    font-size: clamp(40px, 8vw, 72px);
+    margin-bottom: 16px;
+    color: var(--color-primary);
+    text-shadow: var(--glow);
+    letter-spacing: 0.02em;
+  }
+
+  .glitch {
+    position: relative;
+  }
+
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 2px;
+    top: 0;
+    color: var(--color-tertiary);
+    opacity: 0.3;
+    clip-path: inset(40% 0 30% 0);
+    animation: glitch-skew 4s infinite steps(1);
+  }
+
+  @keyframes glitch-skew {
+    0%, 94%, 100% { transform: none; }
+    95% { transform: translate(-2px, 1px); }
+    96% { transform: translate(2px, -1px); }
+  }
+
+  .hero-desc {
+    font-size: 15px;
+    color: var(--color-on-bg);
+    opacity: 0.85;
+    max-width: 560px;
+    margin: 0 auto 32px;
+    line-height: 1.7;
+  }
+
+  .hero-install {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    padding: 10px 10px 10px 16px;
+  }
+
+  .prompt-char {
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    user-select: none;
+  }
+
+  .install-cmd {
+    font-family: var(--font-code);
+    font-size: 13px;
+    color: var(--color-on-bg);
+  }
+
+  .copy-btn {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-bg);
+    background: var(--color-primary);
+    border: none;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+
+  .copy-btn:hover {
+    background: var(--color-tertiary);
+  }
+
+  .copy-btn.copied {
+    background: var(--color-accent-green);
+  }
+
+  /* Comment style (used across sections) */
+  .comment {
+    color: var(--color-outline);
+    font-weight: 400;
+    user-select: none;
+  }
+
+  /* Sections */
+  .section-title {
+    text-align: left;
+    margin-bottom: clamp(32px, 4vw, 48px);
+    color: var(--color-on-bg);
+  }
+
+  .section-title .comment {
+    margin-right: 0.5ch;
+  }
+
+  /* Coder Compatibility */
+  .coders {
+    padding: 64px 0;
+    border-top: 1px dashed var(--color-outline-variant);
+  }
+
+  .coders-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    max-width: var(--container-max);
+    margin: 0 auto 16px;
+  }
+
+  .coder-card {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    padding: 16px 20px;
+  }
+
+  .coder-name {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .coder-meta {
+    font-size: 11px;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-body);
+  }
+
+  .coders-note {
+    text-align: left;
+    font-size: 12px;
+    color: var(--color-outline);
+    max-width: var(--container-max);
+    font-family: var(--font-body);
+  }
+
+  /* Features */
+  .features {
+    padding: 80px 0;
+    background: var(--color-surface-lowest);
+    border-top: 1px dashed var(--color-outline-variant);
+    border-bottom: 1px dashed var(--color-outline-variant);
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    max-width: var(--container-max);
+  }
+
+  .feature-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    padding: 24px;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+
+  .feature-card:hover {
+    border-color: var(--accent, var(--color-primary));
+    background: var(--color-surface-high);
+  }
+
+  .feature-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .feature-prompt {
+    color: var(--accent, var(--color-primary));
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .feature-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent, var(--color-primary));
+    font-family: var(--font-body);
+  }
+
+  .feature-desc {
+    font-size: 12px;
+    color: var(--color-on-surface-variant);
+    line-height: 1.6;
+    font-family: var(--font-body);
+    margin-bottom: 8px;
+  }
+
+  .feature-link {
+    display: inline-block;
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--color-outline);
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+  }
+
+  .feature-card:hover .feature-link {
+    opacity: 1;
+    color: var(--accent, var(--color-primary));
+  }
+
+  /* Demo */
+  .demo {
+    padding: 80px 0 100px;
+    background: var(--color-bg);
+  }
+
+  /* Terminal window */
+  .terminal-window {
+    max-width: 720px;
+    margin: 0 auto;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    overflow: hidden;
+  }
+
+  .win-titlebar {
+    display: flex;
+    align-items: flex-end;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-outline-variant);
+    padding: 0 10px;
+    gap: 8px;
+    overflow-x: auto;
+  }
+
+  .win-titlebar .window-dots {
+    flex-shrink: 0;
+    padding-bottom: 10px;
+  }
+
+  .browser-tabs {
+    display: flex;
+    gap: 0;
+    margin-right: auto;
+    padding-top: 6px;
+  }
+
+  .browser-tab {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-on-surface-variant);
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-bottom: none;
+    padding: 6px 14px;
+    cursor: pointer;
+    margin-right: -1px;
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .browser-tab:hover {
+    color: var(--color-on-bg);
+  }
+
+  .browser-tab.active {
+    background: var(--color-surface-lowest);
+    color: var(--color-primary);
+    z-index: 1;
+  }
+
+  /* Animate toggle */
+  .animate-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding-bottom: 8px;
+  }
+
+  .animate-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-track {
+    width: 28px;
+    height: 16px;
+    background: var(--color-outline-variant);
+    position: relative;
+    transition: background 0.15s;
+  }
+
+  .animate-toggle input:checked + .toggle-track {
+    background: var(--color-primary);
+  }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    background: var(--color-bg);
+    transition: transform 0.15s;
+  }
+
+  .animate-toggle input:checked + .toggle-track .toggle-thumb {
+    transform: translateX(12px);
+  }
+
+  .toggle-label {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--color-on-surface-variant);
+    white-space: nowrap;
+  }
+
+  /* Terminal body */
+  .win-body {
+    background: var(--color-surface-lowest);
+  }
+
+  .code-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 16px;
+    background: var(--color-surface-lowest);
+    border-bottom: 1px solid var(--color-outline-variant);
+  }
+
+  .window-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .window-dots i {
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .window-dots i:nth-child(1) { background: #f57a9f; }
+  .window-dots i:nth-child(2) { background: #e8d420; }
+  .window-dots i:nth-child(3) { background: #5ce892; }
+
+  .code-label {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--color-outline);
+    text-transform: lowercase;
+  }
+
+  .terminal-window pre {
+    padding: 20px;
+    overflow-x: auto;
+    min-height: 200px;
+  }
+
+  .terminal-window code {
+    line-height: 1.85;
+    color: var(--color-on-bg);
+    font-size: 12px;
+  }
+
+  .prompt {
+    color: var(--color-primary);
+    font-weight: 600;
+    user-select: none;
+  }
+
+  .output {
+    color: var(--color-on-surface-variant);
+  }
+
+  .cursor {
+    color: var(--color-primary);
+    animation: blink 1s steps(1) infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Docs CTA */
+  .cta {
+    padding: 80px 0;
+    text-align: left;
+    border-top: 1px dashed var(--color-outline-variant);
+  }
+
+  .cta-title {
+    font-size: clamp(18px, 2.5vw, 24px);
+    font-weight: 600;
+    color: var(--color-on-bg);
+    margin-bottom: clamp(24px, 3vw, 32px);
+  }
+
+  .cta-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-bottom: 16px;
+  }
+
+  .cta-btn {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-on-bg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    padding: 10px 20px;
+    text-decoration: none;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .cta-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  .cta-sub {
+    font-size: 12px;
+    color: var(--color-outline);
+    font-family: var(--font-body);
+  }
+
+  .cta-sub a {
+    color: var(--color-primary);
+  }
+
+  /* Footer */
+  .footer {
+    border-top: 1px solid var(--color-outline-variant);
+    padding: 32px 0;
+  }
+
+  .footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .footer-copy {
+    font-size: 11px;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-body);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 16px;
+  }
+
+  .footer-links a {
+    font-size: 11px;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-body);
+  }
+
+  .footer-links a:hover {
+    color: var(--color-primary);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .features-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .hero {
+      padding: 64px 0 48px;
+    }
+
+    .hero-title {
+      font-size: 36px;
+    }
+
+    .hero-desc {
+      font-size: 13px;
+    }
+
+    .hero-install {
+      flex-direction: column;
+      padding: 12px;
+      gap: 8px;
+    }
+
+    .features-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .coder-card {
+      min-width: 100%;
+    }
+
+    .coders-list {
+      gap: 1px;
+    }
+
+    .win-titlebar {
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .browser-tabs {
+      overflow-x: auto;
+      order: -1;
+      width: 100%;
+    }
+
+    .browser-tab {
+      padding: 5px 10px;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .cta-links {
+      flex-direction: column;
+    }
+
+    .footer-inner {
+      flex-direction: column;
+      text-align: left;
+    }
+  }
+</style>
+
+<script>
+  // --- Clipboard copy ---
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.dataset.copy;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = '[copied]';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '[copy]'; btn.classList.remove('copied'); }, 2000);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        btn.textContent = '[copied]'; btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '[copy]'; btn.classList.remove('copied'); }, 2000);
+      }
+    });
+  });
+
+  // --- Terminal demo engine ---
+  const terminalBody = document.getElementById('terminal-body');
+  const terminalLabel = document.getElementById('terminal-label');
+  const animateSwitch = document.getElementById('animate-switch');
+
+  const scripts = {
+    profile: `<span class="prompt">$</span> swixter claude create work-profile
+  <span class="output">◇ provider: anthropic
+  ◇ api_key: sk-ant-...
+  ✓ profile_created</span>
+
+<span class="prompt">$</span> swixter claude switch work-profile
+  <span class="output">✓ switched to work-profile</span>
+
+<span class="prompt">$</span> swixter claude apply
+  <span class="output">✓ applied to ~/.claude/settings.json</span>
+
+<span class="prompt">$</span> claude  <span class="output"># ready</span>`,
+
+    group: `<span class="prompt">$</span> swixter claude create work-claude -p anthropic
+  <span class="output">✓ profile "work-claude" created</span>
+
+<span class="prompt">$</span> swixter codex create work-codex -p ollama
+  <span class="output">✓ profile "work-codex" created</span>
+
+<span class="prompt">$</span> swixter group create work-group
+  <span class="output">◇ claude → work-claude
+  ◇ codex → work-codex
+  ✓ group "work-group" created</span>
+
+<span class="prompt">$</span> swixter group switch work-group
+  <span class="output">✓ switched all profiles</span>`,
+
+    proxy: `<span class="prompt">$</span> swixter proxy start
+  <span class="output">◇ listening on 127.0.0.1:18721
+  ✓ proxy running</span>
+
+<span class="prompt">$</span> swixter proxy status
+  <span class="output">◇ active: 2 conns · uptime: 5m 32s</span>
+
+<span class="prompt">$</span> swixter proxy logs --last 5
+  <span class="output">[200] POST /v1/messages  1.2s  2048B
+  [200] POST /v1/messages  0.8s  1536B
+  [200] POST /v1/messages  1.1s  4096B
+  [200] POST /v1/messages  0.9s  1024B
+  [200] POST /v1/messages  1.3s  3072B</span>`,
+
+    sync: `<span class="prompt">$</span> swixter sync push
+  <span class="output">◇ encrypting 5 profiles...
+  ◇ uploading to sync.swixter.cc
+  ✓ pushed 5 profiles</span>
+
+<span class="prompt">$</span> swixter sync pull
+  <span class="output">◇ fetching from sync.swixter.cc
+  ⬇ profile: work-claude (updated)
+  ⬇ profile: work-codex (updated)
+  ✓ pulled 2 changes</span>
+
+<span class="prompt">$</span> swixter sync status
+  <span class="output">✓ connected · last sync: 2m ago</span>`,
+
+    auth: `<span class="prompt">$</span> swixter sync login
+  <span class="output">◇ opening browser...
+  ✓ authenticated as dev@swixter.cc</span>
+
+<span class="prompt">$</span> swixter sync logout
+  <span class="output">✓ signed out (local profiles preserved)</span>
+
+<span class="prompt">$</span> swixter sync login --magic-link
+  <span class="output">◇ link sent to dev@swixter.cc
+  ◇ check your email
+  ✓ authenticated</span>`
+  };
+
+  const labels = {
+    profile: 'terminal — profile',
+    group: 'terminal — group',
+    proxy: 'terminal — proxy',
+    sync: 'terminal — sync',
+    auth: 'terminal — auth'
+  };
+
+  let activeTab = 'profile';
+  let typingTimer = null;
+  let fullText = '';
+
+  function getAnimate() {
+    return animateSwitch.checked;
+  }
+
+  function renderInstant(text) {
+    terminalBody.innerHTML = text;
+  }
+
+  function startTyping(text) {
+    clearTimeout(typingTimer);
+    fullText = text;
+    let i = 0;
+    terminalBody.innerHTML = '';
+
+    function type() {
+      if (i < fullText.length && getAnimate()) {
+        const chunk = Math.floor(Math.random() * 3) + 1;
+        i = Math.min(i + chunk, fullText.length);
+        terminalBody.innerHTML = fullText.slice(0, i) + '<span class="cursor">&#9608;</span>';
+        typingTimer = setTimeout(type, 8 + Math.random() * 20);
+      } else {
+        terminalBody.innerHTML = fullText;
+        typingTimer = null;
+      }
+    }
+    type();
+  }
+
+  function switchTab(name) {
+    activeTab = name;
+    terminalLabel.textContent = labels[name];
+    const text = scripts[name];
+    if (getAnimate()) {
+      startTyping(text);
+    } else {
+      renderInstant(text);
+    }
+  }
+
+  document.querySelectorAll('.browser-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.browser-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      switchTab(tab.dataset.tab);
+    });
+  });
+
+  animateSwitch.addEventListener('change', () => {
+    if (getAnimate()) {
+      startTyping(fullText || scripts[activeTab]);
+    } else {
+      clearTimeout(typingTimer);
+      typingTimer = null;
+      terminalBody.innerHTML = fullText || scripts[activeTab];
+    }
+  });
+
+  switchTab('profile');
+</script>

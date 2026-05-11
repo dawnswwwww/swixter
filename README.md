@@ -4,6 +4,8 @@
 [![Test Status](https://github.com/dawnswwwww/swixter/actions/workflows/test.yml/badge.svg)](https://github.com/dawnswwwww/swixter/actions/workflows/test.yml)
 [![Release Status](https://github.com/dawnswwwww/swixter/actions/workflows/release.yml/badge.svg)](https://github.com/dawnswwwww/swixter/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Website](https://img.shields.io/badge/Website-swixter.cc-4a4733)](https://swixter.cc)
+[![Docs](https://img.shields.io/badge/Docs-docs.swixter.cc-4a4733)](https://docs.swixter.cc)
 
 > Make AI coding tools effortlessly switchable
 

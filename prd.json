@@ -1,0 +1,194 @@
+{
+  "project": "Swixter Monorepo + Website",
+  "branchName": "ralph/monorepo-astro-website",
+  "description": "将 Swixter CLI 改造为 Bun workspaces monorepo，新增 Astro 首页 + Starlight 文档站，部署到 Cloudflare Pages",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Move CLI source files to packages/cli/",
+      "description": "As a developer, I need to move all existing CLI source files into packages/cli/ so that the monorepo structure is ready for additional packages.",
+      "acceptanceCriteria": [
+        "Move src/ → packages/cli/src/",
+        "Move tests/ → packages/cli/tests/",
+        "Move test/ (E2E) → packages/cli/test/",
+        "Move scripts/ → packages/cli/scripts/",
+        "Move ui/ (React Web UI) → packages/cli/ui/",
+        "packages/cli/ directory structure matches expectations (verify with ls -R)",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "纯文件迁移，不修改任何文件内容。移动后确认目录结构正确即可。"
+    },
+    {
+      "id": "US-002",
+      "title": "Update CLI package.json paths and internal imports, verify build and tests",
+      "description": "As a developer, I need to update all path references in package.json, tsconfig, and internal imports so that the CLI builds, tests, and E2E pass after migration.",
+      "acceptanceCriteria": [
+        "packages/cli/package.json: update main, bin, files, scripts paths for new directory layout",
+        "packages/cli/tsconfig.json: update include/exclude paths if needed",
+        "Update any internal import paths that reference old src/ structure",
+        "bun run build succeeds, produces packages/cli/dist/cli/index.js",
+        "bun test passes all unit tests",
+        "bun run test:e2e passes E2E tests (Docker-based)",
+        "npm pack --dry-run from packages/cli/ produces correct package contents (only dist/ files)",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "CLI 功能代码不修改，只更新路径引用。重点关注 import 路径、构建输出路径、npm files 字段。"
+    },
+    {
+      "id": "US-003",
+      "title": "Create root Bun workspace config and version sync script",
+      "description": "As a maintainer, I need a root package.json with Bun workspaces and a sync-versions.js script so that all packages share a single version number.",
+      "acceptanceCriteria": [
+        "Root package.json: name=swixter, private=true, workspaces=['packages/cli','packages/website','packages/docs']",
+        "Root scripts: build, build:cli, build:website, build:docs, test, cli, cli:dev, release:patch/minor/major",
+        "Root scripts: preversion runs bun test, version runs sync-versions.js, postversion pushes tags",
+        "scripts/sync-versions.js reads root version, writes to all 3 package.json + packages/cli/src/constants/meta.ts",
+        "bun install from root installs all workspace dependencies",
+        "bun run release:patch dry-run verifies version sync works end-to-end",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "原 scripts/sync-version.js 重命名为 scripts/sync-versions.js 并扩展为多包同步。原 CLI npm scripts 移到 packages/cli/package.json。"
+    },
+    {
+      "id": "US-004",
+      "title": "Scaffold Astro homepage with Citron Terminal theme",
+      "description": "As a user, I want a landing page at swixter.dev that showcases what Swixter does with a developer-focused dark theme.",
+      "acceptanceCriteria": [
+        "packages/website/ initialized with Astro (npm create astro@latest, blank template)",
+        "Homepage (src/pages/index.astro) renders: Hero, Features cards, Quick Example code block, Footer",
+        "Hero section: title 'Swixter', description 'Manage AI coding assistant configurations with ease', install command 'npm install -g swixter' with copy button",
+        "Features section: 3-4 cards (Switch AI Providers, Multi-tool Support, Cloud Sync, CLI-first Design)",
+        "Quick Example: code block showing swixter claude switch → apply → claude workflow",
+        "Footer: GitHub link, npm link, docs link",
+        "Apply DESIGN.md Citron Terminal theme: background #151309, primary #d8c603, Inter font, 8px border-radius, Space Grotesk for labels",
+        "Zero client-side JavaScript (pure static Astro)",
+        "Responsive layout: mobile (single column), tablet (2-col cards), desktop (max-width 1440px)",
+        "bun run build from packages/website/ succeeds, produces dist/",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill (run astro preview and check homepage renders correctly)"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "参考设计文档中的首页布局 ASCII 线框图。不需要复杂动画或交互，纯静态展示。可参考 impeccable/frontend-design skill 提升设计质量。"
+    },
+    {
+      "id": "US-005",
+      "title": "Scaffold Astro Starlight docs site with Citron Terminal theme",
+      "description": "As a user, I want documentation at docs.swixter.dev with search and navigation, themed consistently with the homepage.",
+      "acceptanceCriteria": [
+        "packages/docs/ initialized with Astro Starlight (npm create astro@latest -- --template starlight)",
+        "Starlight CSS custom properties overridden with Citron Terminal colors from DESIGN.md",
+        "Sidebar navigation configured with all doc sections: Getting Started, Commands, Providers, Advanced",
+        "Site title/logo set to 'Swixter Docs'",
+        "Built-in search indexes all documentation pages",
+        "bun run build from packages/docs/ succeeds, produces dist/",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill (run astro preview and check docs site renders correctly)"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "仅搭建框架和主题，不写文档内容。内容由 US-006, US-007, US-008 完成。Starlight 的 CSS 变量名参考: https://starlight.astro.build/guides/css-and-tailwind/"
+    },
+    {
+      "id": "US-006",
+      "title": "Write getting-started documentation",
+      "description": "As a new user, I want installation and quick-start guides so that I can set up Swixter in under 5 minutes.",
+      "acceptanceCriteria": [
+        "packages/docs/src/content/docs/index.mdx: welcome page with project overview and quick links",
+        "packages/docs/src/content/docs/getting-started/installation.md: npm/brew/script install methods, platform notes, verify installed",
+        "packages/docs/src/content/docs/getting-started/quick-start.md: first profile creation, switch, apply, launch coder",
+        "packages/docs/src/content/docs/getting-started/configuration.md: config file locations, profile anatomy, provider selection",
+        "Content references real paths and CLI commands from CLAUDE.md (config paths, profile naming rules, apply flow)",
+        "Each page has at least one code example showing CLI commands",
+        "bun run build from packages/docs/ succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "参考 CLAUDE.md 的 Configuration File Paths 表格、Quick Start 流程、Architecture Overview 部分。"
+    },
+    {
+      "id": "US-007",
+      "title": "Write command reference documentation",
+      "description": "As a user, I want detailed documentation for every CLI command so that I can use all Swixter features effectively.",
+      "acceptanceCriteria": [
+        "commands/claude.md: create, switch, list, delete, apply, run, edit, install, update-cli",
+        "commands/codex.md: same commands + env_key behavior + run workflow explanation",
+        "commands/qwen.md: Continue.dev adapter commands",
+        "commands/providers.md: add, remove, list, show, user-defined providers",
+        "commands/groups.md: group management commands if applicable",
+        "commands/proxy.md: proxy gateway commands if applicable",
+        "commands/sync.md: cloud sync commands",
+        "commands/ui.md: web UI launch command",
+        "Each command page includes: synopsis, usage examples, common workflows",
+        "Content covers adapter-specific behaviors from CLAUDE.md (e.g., Codex env_key priority, run command differences)",
+        "bun run build from packages/docs/ succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "参考 CLAUDE.md 的 Adapter-specific behaviors、Important Design Patterns、Key Implementation Notes 以及 src/cli/ 下的实际命令实现。"
+    },
+    {
+      "id": "US-008",
+      "title": "Write provider configuration and advanced usage documentation",
+      "description": "As a power user, I want to configure custom AI providers and learn advanced workflows like Windows setup and cloud sync.",
+      "acceptanceCriteria": [
+        "providers/anthropic.md: API key setup, model selection, auth token support",
+        "providers/ollama.md: local setup, base URL, default env_key",
+        "providers/openai.md: OpenAI-compatible providers, wire_api requirements",
+        "providers/custom.md: user-defined provider creation, wire_api field explanation",
+        "advanced/windows.md: platform-specific paths, compatibility notes (from docs/WINDOWS.md)",
+        "advanced/cloud-sync.md: sync feature details, configuration, usage",
+        "advanced/proxy.md: proxy setup and advanced configuration",
+        "reference/changelog.md: link to GitHub CHANGELOG.md",
+        "Each provider page includes YAML/JSON/TOML config examples",
+        "bun run build from packages/docs/ succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "参考 CLAUDE.md 的 Provider System、Configuration File Paths 表格、Windows Compatibility 章节。"
+    },
+    {
+      "id": "US-009",
+      "title": "Update CI/CD workflows for monorepo structure",
+      "description": "As a maintainer, I need GitHub Actions workflows updated so that CI testing and npm publishing work with the new packages/cli/ layout.",
+      "acceptanceCriteria": [
+        ".github/workflows/test.yml: update paths to packages/cli/ for E2E test, build verification",
+        ".github/workflows/test.yml: add build:website and build:docs step to verify website/docs build in CI",
+        ".github/workflows/release.yml: npm publish runs from packages/cli/ directory",
+        ".github/workflows/release.yml: changelog extraction script path updated if needed",
+        "CI matrix (Linux/macOS/Windows, Node 18.x/20.x) unchanged",
+        "Workflow files reference Bun (oven-sh/setup-bun@v1) for all steps",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "不删除原工作流逻辑，仅更新路径和添加 website/docs 构建验证。verify 用 bun run build:website && bun run build:docs 确认能构建成功。"
+    },
+    {
+      "id": "US-010",
+      "title": "Configure Cloudflare Pages for website and docs deployment",
+      "description": "As a maintainer, I want push-to-main auto-deployment so that the website and docs are always up to date.",
+      "acceptanceCriteria": [
+        "Cloudflare Pages project 1: homepage, build dir packages/website/, command bun run build, output dist/",
+        "Cloudflare Pages project 2: docs, build dir packages/docs/, command bun run build, output dist/",
+        "Git integration connected to github.com/dawnswwwww/swixter main branch",
+        "Push to main triggers automatic build and deploy",
+        "Default .pages.dev URLs accessible and render correctly",
+        "DNS CNAME records prepared for swixter.dev and docs.swixter.dev (to be pointed later)",
+        "README.md updated with website and docs URLs"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "自定义域名由用户稍后配置，本 story 只确保 .pages.dev 默认域名可访问。Cloudflare Pages 需要在 Web UI 手动创建项目（不能完全自动化）。"
+    }
+  ]
+}
