@@ -13,6 +13,14 @@ import { getGroup, getActiveGroup } from "../groups/manager.js";
 import { getProfile } from "../config/manager.js";
 import { createProxyLogger, type ProxyLogger } from "./logger.js";
 import { getPresetById } from "../providers/presets.js";
+import {
+  inferClientFormat,
+  inferTargetApiFormat,
+  transformRequest,
+  transformResponse,
+  transformStream,
+} from "./transform/index.js";
+import type { TransformContext } from "./transform/types.js";
 
 export class ProxyHandler {
   private router: ProxyRouter;
@@ -21,15 +29,17 @@ export class ProxyHandler {
   private timeoutMs?: number;
   private instanceId: string;
   private groupName?: string;
+  private profileName?: string;
   private logger: ProxyLogger;
 
-  constructor(timeoutMs?: number, instanceId?: string, groupName?: string) {
+  constructor(timeoutMs?: number, instanceId?: string, groupName?: string, profileName?: string) {
     this.router = new ProxyRouter();
     this.forwarder = new ProxyForwarder();
     this.circuitBreaker = new CircuitBreaker();
     this.timeoutMs = timeoutMs;
     this.instanceId = instanceId || "default";
     this.groupName = groupName;
+    this.profileName = profileName;
     this.logger = createProxyLogger(this.instanceId);
     this.setupRoutes();
   }
@@ -164,7 +174,136 @@ export class ProxyHandler {
     }
   }
 
+  private async forwardSingleProfile(request: Request, profileName: string, _format: "chat" | "anthropic"): Promise<Response> {
+    const profile = await getProfile(profileName);
+    if (!profile) {
+      this.logger.warn("Profile not found", { profileName });
+      return new Response(JSON.stringify({ error: `Profile not found: ${profileName}` }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Read body once as ArrayBuffer
+    let bodyBuffer: ArrayBuffer;
+    try {
+      bodyBuffer = await request.arrayBuffer();
+    } catch (error) {
+      this.logger.error("Failed to read request body", error as Error);
+      return new Response(JSON.stringify({ error: "Failed to read request body" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const preset = getPresetById(profile.providerId);
+    const endpoint = new URL(request.url).pathname + new URL(request.url).search;
+    const clientFormat = inferClientFormat(endpoint);
+    const targetFormat = inferTargetApiFormat(profile, preset || {} as NonNullable<typeof preset>);
+
+    let transformedBodyBuffer = bodyBuffer;
+    let targetEndpoint = endpoint;
+    let ctx: TransformContext | null = null;
+
+    if (clientFormat !== targetFormat) {
+      try {
+        const bodyText = Buffer.from(bodyBuffer).toString("utf-8");
+        const parsedBody = bodyText ? JSON.parse(bodyText) : {};
+
+        ctx = {
+          endpoint,
+          clientFormat,
+          targetFormat,
+          profile,
+          preset: preset || {} as NonNullable<typeof preset>,
+          stream: parsedBody.stream === true,
+        };
+
+        const transformed = transformRequest(parsedBody, ctx);
+        transformedBodyBuffer = Buffer.from(JSON.stringify(transformed.body));
+        targetEndpoint = transformed.targetEndpoint || endpoint;
+      } catch (error) {
+        this.logger.error("Request transform failed, falling back to passthrough", error as Error);
+        // Fall back to passthrough — keep original body and endpoint
+      }
+    }
+
+    const rewrittenBody = this.rewriteRequestBodyForProfile(transformedBodyBuffer, profile);
+    const clonedRequest = {
+      method: request.method,
+      path: targetEndpoint,
+      headers: Object.fromEntries(request.headers.entries()),
+      body: rewrittenBody,
+    };
+
+    try {
+      const forwardResponse = await this.forwarder.forward(clonedRequest, profile, this.timeoutMs);
+      const isSuccess = forwardResponse.status >= 200 && forwardResponse.status < 300;
+
+      if (!isSuccess) {
+        this.logger.warn("Provider returned upstream status", {
+          profileName,
+          status: forwardResponse.status,
+        });
+        return new Response(forwardResponse.body, {
+          status: forwardResponse.status,
+          headers: forwardResponse.headers,
+        });
+      }
+
+      // Transform response back to client format
+      if (ctx && clientFormat !== targetFormat) {
+        if (forwardResponse.isStream && forwardResponse.body) {
+          const transformedStream = transformStream(forwardResponse.body as ReadableStream<Uint8Array>, ctx);
+          return new Response(transformedStream, {
+            status: forwardResponse.status,
+            headers: forwardResponse.headers,
+          });
+        }
+
+        try {
+          const responseText = forwardResponse.body as string;
+          const responseParsed = responseText ? JSON.parse(responseText) : {};
+          const transformedResponse = transformResponse(responseParsed, ctx);
+          return new Response(JSON.stringify(transformedResponse), {
+            status: forwardResponse.status,
+            headers: forwardResponse.headers,
+          });
+        } catch (error) {
+          this.logger.error("Response transform failed, returning raw response", error as Error);
+          return new Response(forwardResponse.body, {
+            status: forwardResponse.status,
+            headers: forwardResponse.headers,
+          });
+        }
+      }
+
+      // No transform needed — return directly
+      if (forwardResponse.isStream) {
+        return new Response(forwardResponse.body as ReadableStream, {
+          status: forwardResponse.status,
+          headers: forwardResponse.headers,
+        });
+      }
+
+      return new Response(forwardResponse.body, {
+        status: forwardResponse.status,
+        headers: forwardResponse.headers,
+      });
+    } catch (error) {
+      this.logger.error("Provider request failed", error as Error, { profileName });
+      return new Response(JSON.stringify({ error: (error as Error).message }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
   private async forwardToProvider(request: Request, format: "chat" | "anthropic"): Promise<Response> {
+    if (this.profileName) {
+      return this.forwardSingleProfile(request, this.profileName, format);
+    }
+
     const group = this.groupName
       ? await getGroup(this.groupName)
       : await getActiveGroup();
@@ -212,11 +351,42 @@ export class ProxyHandler {
         continue;
       }
 
+      const endpoint = new URL(request.url).pathname + new URL(request.url).search;
+      const clientFormat = inferClientFormat(endpoint);
+      const targetFormat = inferTargetApiFormat(profile, preset || {} as NonNullable<typeof preset>);
+
+      let transformedBodyBuffer = bodyBuffer;
+      let targetEndpoint = endpoint;
+      let ctx: TransformContext | null = null;
+
+      if (clientFormat !== targetFormat) {
+        try {
+          const bodyText = Buffer.from(bodyBuffer).toString("utf-8");
+          const parsedBody = bodyText ? JSON.parse(bodyText) : {};
+
+          ctx = {
+            endpoint,
+            clientFormat,
+            targetFormat,
+            profile,
+            preset: preset || {} as NonNullable<typeof preset>,
+            stream: parsedBody.stream === true,
+          };
+
+          const transformed = transformRequest(parsedBody, ctx);
+          transformedBodyBuffer = Buffer.from(JSON.stringify(transformed.body));
+          targetEndpoint = transformed.targetEndpoint || endpoint;
+        } catch (error) {
+          this.logger.error("Request transform failed, falling back to passthrough", error as Error);
+          // Fall back to passthrough — keep original body and endpoint
+        }
+      }
+
       try {
-        const rewrittenBody = this.rewriteRequestBodyForProfile(bodyBuffer, profile);
+        const rewrittenBody = this.rewriteRequestBodyForProfile(transformedBodyBuffer, profile);
         const clonedRequest = {
           method: request.method,
-          path: new URL(request.url).pathname + new URL(request.url).search,
+          path: targetEndpoint,
           headers: Object.fromEntries(request.headers.entries()),
           body: rewrittenBody,
         };
@@ -245,6 +415,33 @@ export class ProxyHandler {
         }
 
         this.circuitBreaker.recordSuccess(profileId);
+
+        // Transform response back to client format if needed
+        if (ctx && clientFormat !== targetFormat) {
+          if (forwardResponse.isStream && forwardResponse.body) {
+            const transformedStream = transformStream(forwardResponse.body as ReadableStream<Uint8Array>, ctx);
+            return new Response(transformedStream, {
+              status: forwardResponse.status,
+              headers: forwardResponse.headers,
+            });
+          }
+
+          try {
+            const responseText = forwardResponse.body as string;
+            const responseParsed = responseText ? JSON.parse(responseText) : {};
+            const transformedResponse = transformResponse(responseParsed, ctx);
+            return new Response(JSON.stringify(transformedResponse), {
+              status: forwardResponse.status,
+              headers: forwardResponse.headers,
+            });
+          } catch (error) {
+            this.logger.error("Response transform failed, returning raw response", error as Error);
+            return new Response(forwardResponse.body, {
+              status: forwardResponse.status,
+              headers: forwardResponse.headers,
+            });
+          }
+        }
 
         // Return streaming response directly
         if (forwardResponse.isStream) {
