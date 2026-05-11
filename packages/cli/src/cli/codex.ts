@@ -9,7 +9,7 @@ import {
 } from "../config/manager.js";
 import { getPresetByIdAsync } from "../providers/presets.js";
 import { getAdapter } from "../adapters/index.js";
-import type { ClaudeCodeProfile } from "../types.js";
+import type { ClaudeCodeProfile, ApiFormat } from "../types.js";
 import {
   CODER_REGISTRY,
   ERRORS,
@@ -36,6 +36,14 @@ import { buildProfileEnv } from "../utils/model-helper.js";
 
 const CODER_NAME = "codex";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
+
+const VALID_API_FORMATS = [
+  "anthropic_messages",
+  "anthropic_responses",
+  "openai_chat",
+  "openai_responses",
+  "gemini_native",
+];
 
 /**
  * Codex subcommand handler
@@ -128,7 +136,7 @@ ${pc.bold("Create profile (interactive):")}
   ${pc.green(`swixter ${CODER_NAME} create`)}
 
 ${pc.bold("Create profile (non-interactive):")}
-  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--model <model>] [--env-key <var>] [--apply]`)}
+  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--model <model>] [--env-key <var>] [--api-format <format>] [--apply]`)}
 
 ${pc.bold("Examples:")}
   ${pc.dim("# Interactive profile creation")}
@@ -393,7 +401,7 @@ async function cmdCreateInteractive(): Promise<void> {
 async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise<void> {
   if (!params.name || !params.provider) {
     console.log(pc.red("Error: Missing required parameters"));
-    console.log(pc.dim(`Usage: swixter ${CODER_NAME} create --quiet --name <name> --provider <id> [--api-key <key>] [--base-url <url>] [--model <model>] [--env-key <var>] [--apply]`));
+    console.log(pc.dim(`Usage: swixter ${CODER_NAME} create --quiet --name <name> --provider <id> [--api-key <key>] [--base-url <url>] [--model <model>] [--env-key <var>] [--api-format <format>] [--apply]`));
     process.exit(1);
   }
 
@@ -408,6 +416,14 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
   if (params.provider !== "ollama" && !params["api-key"]) {
     console.log(pc.red("Error: This provider requires --api-key parameter"));
     process.exit(1);
+  }
+
+  // Validate apiFormat if provided
+  const apiFormat = params["api-format"] as string;
+  if (apiFormat && !VALID_API_FORMATS.includes(apiFormat)) {
+    console.log(pc.red(`Invalid apiFormat: ${apiFormat}`));
+    console.log(pc.dim(`Valid values: ${VALID_API_FORMATS.join(", ")}`));
+    process.exit(EXIT_CODES.invalidArguments);
   }
 
   try {
@@ -433,6 +449,11 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
     // Add custom env_key if provided
     if (params["env-key"]) {
       profile.envKey = params["env-key"] as string;
+    }
+
+    // Add apiFormat if provided
+    if (apiFormat) {
+      profile.apiFormat = apiFormat as ApiFormat;
     }
 
     await upsertProfile(profile, CODER_NAME);
@@ -822,6 +843,11 @@ async function cmdEdit(profileName?: string): Promise<void> {
       if (profile.envKey) {
         updatedProfile.envKey = profile.envKey;
       }
+    }
+
+    // Handle apiFormat
+    if (profile.apiFormat) {
+      updatedProfile.apiFormat = profile.apiFormat;
     }
 
     const finalBaseURL = updatedProfile.baseURL || newPreset?.baseURL || "";

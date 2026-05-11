@@ -9,7 +9,7 @@ import {
 } from "../config/manager.js";
 import { getPresetByIdAsync } from "../providers/presets.js";
 import { getAdapter } from "../adapters/index.js";
-import type { ClaudeCodeProfile } from "../types.js";
+import type { ClaudeCodeProfile, ApiFormat } from "../types.js";
 import {
   CODER_REGISTRY,
   ERRORS,
@@ -36,6 +36,14 @@ import { buildProfileEnv } from "../utils/model-helper.js";
 
 const CODER_NAME = "claude";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
+
+const VALID_API_FORMATS = [
+  "anthropic_messages",
+  "anthropic_responses",
+  "openai_chat",
+  "openai_responses",
+  "gemini_native",
+];
 
 /**
  * Claude Code subcommand handler
@@ -128,7 +136,7 @@ ${pc.bold("Create profile (interactive):")}
   ${pc.green(`swixter ${CODER_NAME} create`)}
 
 ${pc.bold("Create profile (non-interactive):")}
-  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--anthropic-model <model>] [--default-haiku-model <model>] [--default-opus-model <model>] [--default-sonnet-model <model>] [--apply]`)}
+  ${pc.green(`swixter ${CODER_NAME} create --quiet --name <name> --provider <id> --api-key <key> [--base-url <url>] [--anthropic-model <model>] [--default-haiku-model <model>] [--default-opus-model <model>] [--default-sonnet-model <model>] [--api-format <format>] [--apply]`)}
 
 ${pc.bold("Examples:")}
   ${pc.dim("# Interactive profile creation")}
@@ -384,7 +392,7 @@ async function cmdCreateInteractive(): Promise<void> {
 async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise<void> {
   if (!params.name || !params.provider) {
     console.log(pc.red("Error: Missing required parameters"));
-    console.log(pc.dim("Usage: swixter claude create --quiet --name <name> --provider <id> [--api-key <key>] [--auth-token <token>] [--base-url <url>] [--anthropic-model <model>] [--default-haiku-model <model>] [--default-opus-model <model>] [--default-sonnet-model <model>] [--apply]"));
+    console.log(pc.dim("Usage: swixter claude create --quiet --name <name> --provider <id> [--api-key <key>] [--auth-token <token>] [--base-url <url>] [--anthropic-model <model>] [--default-haiku-model <model>] [--default-opus-model <model>] [--default-sonnet-model <model>] [--api-format <format>] [--apply]"));
     process.exit(1);
   }
 
@@ -393,6 +401,14 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
     console.log(pc.red(`Error: Unknown provider ID: ${params.provider}`));
     console.log(pc.dim("Run 'swixter providers' to see all supported providers"));
     process.exit(1);
+  }
+
+  // Validate apiFormat if provided
+  const apiFormat = params["api-format"] as string;
+  if (apiFormat && !VALID_API_FORMATS.includes(apiFormat)) {
+    console.log(pc.red(`Invalid apiFormat: ${apiFormat}`));
+    console.log(pc.dim(`Valid values: ${VALID_API_FORMATS.join(", ")}`));
+    process.exit(EXIT_CODES.invalidArguments);
   }
 
   try {
@@ -428,6 +444,11 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
         ...(defaultOpusModel && { defaultOpusModel }),
         ...(defaultSonnetModel && { defaultSonnetModel }),
       };
+    }
+
+    // Add apiFormat if provided
+    if (apiFormat) {
+      profile.apiFormat = apiFormat as ApiFormat;
     }
 
     await upsertProfile(profile, CODER_NAME);
@@ -809,6 +830,11 @@ async function cmdEdit(profileName?: string): Promise<void> {
     } else if (profile.models) {
       // Keep existing models
       updatedProfile.models = profile.models;
+    }
+
+    // Handle apiFormat
+    if (profile.apiFormat) {
+      updatedProfile.apiFormat = profile.apiFormat;
     }
 
     const finalBaseURL = updatedProfile.baseURL || newPreset?.baseURL || "";
