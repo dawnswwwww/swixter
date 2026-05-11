@@ -7,6 +7,7 @@ export interface ProxyConfig {
   port: number;
   timeout?: number; // ms, default 3000000
   groupName?: string;
+  profileName?: string;
 }
 
 export interface ProxyStatus {
@@ -25,6 +26,7 @@ export interface ProxyStatus {
    * Mirrors `activeGroup` while both fields are required for compatibility.
    */
   groupName?: string;
+  profileName?: string;
   pid?: number;
   requestCount: number;
   errorCount: number;

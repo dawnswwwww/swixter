@@ -244,7 +244,12 @@ export async function startProxyServer(config: ProxyConfig): Promise<ProxyStatus
     throw new Error(`Port ${config.port} already in use by instance "${existing.instanceId}"`);
   }
 
-  const handler = new ProxyHandler(config.timeout, config.instanceId, config.groupName);
+  const handler = new ProxyHandler(
+    config.timeout,
+    config.instanceId,
+    config.groupName,
+    config.profileName
+  );
 
   const server = http.createServer(async (req, res) => {
     const status = statuses.get(instanceId);
@@ -289,6 +294,7 @@ export async function startProxyServer(config: ProxyConfig): Promise<ProxyStatus
     port: config.port,
     groupName: config.groupName,
     activeGroup: config.groupName,
+    profileName: config.profileName,
     pid: process.pid,
     startTime: new Date().toISOString(),
     requestCount: 0,

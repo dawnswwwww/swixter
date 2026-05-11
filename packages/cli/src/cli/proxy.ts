@@ -157,6 +157,7 @@ export async function handleProxyCommand(args: string[]): Promise<void> {
 
 async function cmdStart(args: string[]): Promise<void> {
   let groupName: string | undefined;
+  let profileName: string | undefined;
   let port: number | undefined;
   let host = "127.0.0.1";
   let timeout = 3000000;
@@ -165,6 +166,9 @@ async function cmdStart(args: string[]): Promise<void> {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--group" && args[i + 1]) {
       groupName = args[i + 1];
+      i++;
+    } else if (args[i] === "--profile" && args[i + 1]) {
+      profileName = args[i + 1];
       i++;
     } else if (args[i] === "--port" && args[i + 1]) {
       port = parseInt(args[i + 1], 10);
@@ -180,10 +184,25 @@ async function cmdStart(args: string[]): Promise<void> {
     }
   }
 
+  if (groupName && profileName) {
+    console.log(pc.red("Cannot specify both --group and --profile"));
+    process.exit(EXIT_CODES.invalidArguments);
+    return;
+  }
+
   if (groupName) {
     const group = await getGroup(groupName);
     if (!group) {
       console.log(pc.red(`Group "${groupName}" not found`));
+      process.exit(EXIT_CODES.notFound);
+      return;
+    }
+  }
+
+  if (profileName) {
+    const profile = await getProfile(profileName);
+    if (!profile) {
+      console.log(pc.red(`Profile "${profileName}" not found`));
       process.exit(EXIT_CODES.notFound);
       return;
     }
@@ -207,13 +226,13 @@ async function cmdStart(args: string[]): Promise<void> {
   const resolvedPort = port || DEFAULT_PROXY_PORT;
 
   if (daemon) {
-    await cmdStartDaemon({ host, port: resolvedPort, timeout, groupName });
+    await cmdStartDaemon({ host, port: resolvedPort, timeout, groupName, profileName });
   } else {
-    await cmdStartBlocking({ host, port: resolvedPort, timeout, groupName });
+    await cmdStartBlocking({ host, port: resolvedPort, timeout, groupName, profileName });
   }
 }
 
-async function cmdStartBlocking(config: { host: string; port: number; timeout: number; groupName?: string }): Promise<void> {
+async function cmdStartBlocking(config: { host: string; port: number; timeout: number; groupName?: string; profileName?: string }): Promise<void> {
   console.log(pc.cyan("Starting proxy server..."));
 
   await startProxyServer({
@@ -223,6 +242,7 @@ async function cmdStartBlocking(config: { host: string; port: number; timeout: n
     port: config.port,
     timeout: config.timeout,
     groupName: config.groupName,
+    profileName: config.profileName,
   });
 
   console.log();
@@ -231,6 +251,7 @@ async function cmdStartBlocking(config: { host: string; port: number; timeout: n
   console.log(`  Address: ${config.host}:${config.port}`);
   console.log(`  Timeout: ${config.timeout}ms`);
   console.log(pc.dim(`  Group: ${config.groupName || "none"}`));
+  console.log(pc.dim(`  Profile: ${config.profileName || "none"}`));
   console.log(pc.dim(`  Endpoints:`));
   console.log(pc.dim(`    - /v1/chat/completions (OpenAI)`));
   console.log(pc.dim(`    - /v1/messages (Anthropic)`));
@@ -241,7 +262,7 @@ async function cmdStartBlocking(config: { host: string; port: number; timeout: n
   console.log(pc.dim("Press Ctrl+C to stop"));
 }
 
-async function cmdStartDaemon(config: { host: string; port: number; timeout: number; groupName?: string }): Promise<void> {
+async function cmdStartDaemon(config: { host: string; port: number; timeout: number; groupName?: string; profileName?: string }): Promise<void> {
   const defaultStatus = getProxyStatus("default");
   if (defaultStatus.running) {
     console.log(pc.yellow(`Default proxy already running on ${defaultStatus.host}:${defaultStatus.port}`));
@@ -260,6 +281,10 @@ async function cmdStartDaemon(config: { host: string; port: number; timeout: num
 
   if (config.groupName) {
     args.push("--group", config.groupName);
+  }
+
+  if (config.profileName) {
+    args.push("--profile", config.profileName);
   }
 
   const child = spawn(process.execPath, [process.argv[1], ...args], {
@@ -436,6 +461,7 @@ async function cmdStatus(): Promise<void> {
     console.log(`  ${pc.green("●")} ${pc.bold(status.instanceId)} (${typeLabel})`);
     console.log(`    Address: ${status.host}:${status.port}`);
     console.log(`    Group: ${status.groupName || "none"}`);
+    console.log(`    Profile: ${status.profileName || "none"}`);
     console.log(`    Requests: ${status.requestCount} | Errors: ${status.errorCount}`);
     if (status.startTime) {
       console.log(`    Started: ${status.startTime}`);
@@ -459,6 +485,7 @@ ${pc.bold("Commands:")}
 
 ${pc.bold("Options:")}
   ${pc.dim("--group <name>")}      Use specified group
+  ${pc.dim("--profile <name>")}    Use specified profile (single-profile gateway mode)
   ${pc.dim("--port <port>")}       Proxy port (default: 15721)
   ${pc.dim("--host <host>")}       Proxy host (default: 127.0.0.1)
   ${pc.dim("--timeout <ms>")}      Request timeout in ms (default: 3000000)
@@ -468,6 +495,7 @@ ${pc.bold("Examples:")}
   ${pc.green("swixter proxy start")}
   ${pc.green("swixter proxy start --daemon")}
   ${pc.green("swixter proxy start --group my-group")}
+  ${pc.green("swixter proxy start --profile my-profile")}
   ${pc.green("swixter proxy run --group my-group -- claude")}
   ${pc.green("swixter proxy stop")}
   ${pc.green("swixter proxy stop run-15722")}
