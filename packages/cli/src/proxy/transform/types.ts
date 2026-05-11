@@ -26,7 +26,9 @@ export interface TransformContext {
 
 /** Result of request transformation — body may change and endpoint may be remapped */
 export interface TransformedRequest {
+  /** Transformed request body — typically a JSON-serializable object or array */
   body: unknown
+  /** Remapped target endpoint if conversion requires URL changes (e.g., /v1/messages → /v1/chat/completions) */
   targetEndpoint?: string
 }
 
@@ -42,7 +44,10 @@ export type ResponseTransformer = (
   ctx: TransformContext
 ) => unknown
 
-/** Stream transformer: converts SSE stream from provider format to client format */
+/**
+ * Stream transformer: converts SSE stream from provider format to client format.
+ * Implementations must handle their own TextEncoder/TextDecoder logic.
+ */
 export type StreamTransformer = (
   sourceStream: ReadableStream<Uint8Array>,
   ctx: TransformContext
@@ -50,9 +55,14 @@ export type StreamTransformer = (
 
 /** Registered transformer entry */
 export interface TransformerEntry {
+  /** Format of the incoming client request (e.g., 'anthropic_messages') */
   clientFormat: ApiFormat
+  /** Format expected by the upstream provider (e.g., 'openai_chat') */
   targetFormat: ApiFormat
+  /** Converts client request body to target format */
   requestTransform: RequestTransformer
+  /** Converts provider response body back to client format */
   responseTransform: ResponseTransformer
+  /** Converts provider SSE stream to client format */
   streamTransform: StreamTransformer
 }
