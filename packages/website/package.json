@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "dev": "bunx astro dev",
+    "build": "bunx astro build",
+    "preview": "bunx astro preview"
   },
   "dependencies": {
     "astro": "^6.1.10"
