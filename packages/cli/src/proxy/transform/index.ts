@@ -42,10 +42,8 @@ export function inferTargetApiFormat(
   profile: ClaudeCodeProfile,
   preset: ProviderPreset
 ): ApiFormat {
-  // Temporary type assertion until Task 8 adds apiFormat to ClaudeCodeProfile
-  const profileWithApiFormat = profile as ClaudeCodeProfile & { apiFormat?: ApiFormat };
-  if (profileWithApiFormat.apiFormat) {
-    return profileWithApiFormat.apiFormat;
+  if (profile.apiFormat) {
+    return profile.apiFormat;
   }
   switch (preset.wire_api) {
     case "chat":

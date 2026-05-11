@@ -13,6 +13,16 @@ export type AuthType = "bearer" | "api-key" | "custom";
 export type ApiKeyEnvVar = "ANTHROPIC_API_KEY" | "ANTHROPIC_AUTH_TOKEN";
 
 /**
+ * Supported API formats for proxy format conversion
+ */
+export type ApiFormat =
+  | "anthropic_messages"
+  | "anthropic_responses"
+  | "openai_chat"
+  | "openai_responses"
+  | "gemini_native"
+
+/**
  * Model family grouping
  * Used to organize models into hierarchical families (e.g., Claude's Sonnet/Haiku/Opus)
  */
@@ -120,6 +130,8 @@ export interface ClaudeCodeProfile {
   envKey?: string;
   /** Custom request headers (can extend preset) */
   headers?: Record<string, string>;
+  /** Explicitly specify target API format, overriding provider auto-detection */
+  apiFormat?: ApiFormat;
   /** Creation time */
   createdAt: string;
   /** Update time */
@@ -219,6 +231,13 @@ export const ClaudeCodeProfileSchema = z.object({
   }).optional(),
   envKey: z.string().optional(), // Custom env var name for Codex (no validation)
   headers: z.record(z.string(), z.string()).optional(),
+  apiFormat: z.enum([
+    "anthropic_messages",
+    "anthropic_responses",
+    "openai_chat",
+    "openai_responses",
+    "gemini_native",
+  ]).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
