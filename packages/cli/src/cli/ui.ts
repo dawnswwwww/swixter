@@ -72,6 +72,7 @@ async function showStatus(): Promise<void> {
     console.log(`  URL:  ${pc.cyan(`http://127.0.0.1:${data.port}`)}`);
     console.log(`  Started: ${pc.dim(data.startTime)}`);
   } else {
+    await removePidFile();
     console.log(pc.yellow("⚠ Swixter UI is not running (stale PID file removed)."));
   }
   console.log();
@@ -115,6 +116,9 @@ async function startDaemon(portArg?: number): Promise<void> {
 
   child.unref();
 
+  // Write PID file immediately to prevent concurrent starts from spawning duplicate instances
+  await writePidFile(child.pid!, port);
+
   // Poll for server startup (max 10 seconds)
   const url = `http://127.0.0.1:${port}`;
   const started = await waitForServer(url, 10000);
@@ -123,14 +127,12 @@ async function startDaemon(portArg?: number): Promise<void> {
     try {
       process.kill(child.pid!, "SIGTERM");
     } catch {}
+    await removePidFile();
     console.log();
     console.log(pc.red("✗ Failed to start daemon (timed out waiting for server)."));
     console.log();
     process.exit(1);
   }
-
-  // Write PID file
-  await writePidFile(child.pid!, port);
 
   console.log();
   console.log(pc.green("✓ Swixter UI daemon started"));
@@ -179,6 +181,18 @@ async function runForeground(portArg?: number): Promise<void> {
 
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
+
+  // Clean up PID file on unexpected crashes
+  process.on("uncaughtException", async (err) => {
+    console.error("Unexpected error:", err);
+    await removePidFile();
+    process.exit(1);
+  });
+  process.on("unhandledRejection", async (err) => {
+    console.error("Unhandled rejection:", err);
+    await removePidFile();
+    process.exit(1);
+  });
 
   process.stdin.resume();
 }

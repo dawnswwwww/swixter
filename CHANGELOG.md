@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-05-11
+
+### Fixed
+- **Daemon PID race condition** — PID file is now written immediately after spawning the child process, preventing concurrent `swixter ui --daemon` calls from creating duplicate instances
+- **Stale PID file not removed on status check** — `swixter ui --status` now actually removes the stale PID file instead of just printing a "removed" message
+- **Daemon stop not waiting for process exit** — `swixter ui --stop` now waits up to 5 seconds for the process to exit after SIGTERM, and force-kills (SIGKILL) if it doesn't respond
+- **PID file leak on crashes** — Added `uncaughtException` and `unhandledRejection` handlers to clean up the PID file when the UI server crashes unexpectedly
+
 ## [0.1.6] - 2026-04-29
 
 ### Added

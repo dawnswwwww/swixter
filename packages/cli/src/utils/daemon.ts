@@ -82,10 +82,24 @@ export async function stopDaemon(): Promise<{ success: boolean; message: string 
 
   try {
     process.kill(data.pid, "SIGTERM");
-    await removePidFile();
-    return { success: true, message: `Daemon process ${data.pid} stopped.` };
   } catch {
     await removePidFile();
     return { success: false, message: "Failed to stop daemon process (PID file removed)." };
   }
+
+  // Wait for process to actually exit (up to 5 seconds)
+  for (let i = 0; i < 50; i++) {
+    if (!isProcessAlive(data.pid)) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  // Force kill if still alive
+  if (isProcessAlive(data.pid)) {
+    try {
+      process.kill(data.pid, "SIGKILL");
+    } catch {}
+  }
+
+  await removePidFile();
+  return { success: true, message: `Daemon process ${data.pid} stopped.` };
 }
