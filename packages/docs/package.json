@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bunx astro dev",
-    "build": "bun install && astro build",
+    "build": "astro build",
     "preview": "bunx astro preview"
   },
   "dependencies": {

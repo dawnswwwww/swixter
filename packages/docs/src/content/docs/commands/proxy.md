@@ -1,11 +1,11 @@
 ---
 title: Proxy Gateway
-description: Configure and use the Swixter proxy gateway to route AI API requests, with custom routing and advanced configuration.
+description: Configure and use the Swixter proxy gateway to route AI API requests, with automatic API format conversion, failover, and advanced configuration.
 ---
 
 # Proxy Gateway
 
-Swixter includes a local proxy gateway that can intercept and route API requests from AI coders.
+Swixter includes a local proxy gateway that can intercept and route API requests from AI coders. It supports **automatic API format conversion**, enabling Claude Code (Anthropic Messages API) to call OpenAI-compatible providers transparently.
 
 ## `start`
 
@@ -20,6 +20,17 @@ The proxy listens on a local port (default: auto-assigned) and forwards requests
 - **Inspect traffic**: View request/response logs
 - **Switch backends**: Change the provider without restarting the coder
 - **Add headers**: Inject custom authentication or routing headers
+- **Format conversion**: Automatically convert between Anthropic Messages and OpenAI Chat Completions APIs
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--group <name>` | Use a specific failover group |
+| `--profile <name>` | Use a single profile (gateway mode, no failover) |
+| `--port <number>` | Custom listen port (default: auto-assigned) |
+| `--daemon` | Run as background service |
+| `--log-level <level>` | `debug`, `info`, `warn`, `error` |
 
 ## `stop`
 
@@ -93,6 +104,63 @@ Full proxy configuration in `~/.config/swixter/config.json`:
 | `timeout` | Request timeout in ms | `30000` |
 | `maxBodyLogSize` | Max bytes to log per request/response body | `4096` |
 | `headers` | Additional headers to inject on all requests | `{}` |
+
+## API Format Conversion
+
+The proxy automatically converts between API formats based on the request endpoint and the target provider's supported format.
+
+### How It Works
+
+When Claude Code sends a request to `/v1/messages` (Anthropic Messages API) but the target provider expects OpenAI Chat Completions format, the proxy transparently converts:
+
+```
+Claude Code (Anthropic) ──▶ Proxy ──▶ Groq (OpenAI)
+     /v1/messages              converts    /v1/chat/completions
+     Anthropic format          request     OpenAI format
+                               + response
+```
+
+**Supported conversions:**
+
+| Client Format | Target Format | Direction |
+|---------------|---------------|-----------|
+| Anthropic Messages | OpenAI Chat Completions | Request + Response + SSE Streaming |
+
+More conversions (OpenAI Responses, Gemini) will be added in future releases.
+
+### Target Format Detection
+
+The proxy infers the target format automatically:
+
+1. **Profile-level override** — If `apiFormat` is set on the profile, it takes priority
+2. **Provider `wire_api`** — `chat` → OpenAI Chat, `responses` → Anthropic Messages
+
+To set a custom API format on a profile:
+
+```bash
+swixter claude create groq-local --provider groq --api-key $GROQ_KEY --api-format openai_chat
+```
+
+Or edit an existing profile:
+
+```bash
+swixter claude edit groq-local
+# Select "API Format" and choose from the list
+```
+
+### Single-Profile Gateway Mode
+
+Use `--profile` to start the proxy with a single profile, bypassing group failover logic. This is useful when you want to route all traffic through one provider with format conversion.
+
+```bash
+# Start proxy with a specific profile
+swixter proxy start --profile groq-local --port 3456
+
+# Claude Code will use http://localhost:3456/v1/messages
+# Proxy converts to OpenAI Chat Completions and forwards to Groq
+```
+
+This mode does not use groups or circuit breakers — it forwards directly to the specified profile.
 
 ## Custom Routing
 

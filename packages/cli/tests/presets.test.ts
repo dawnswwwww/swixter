@@ -258,4 +258,31 @@ describe("Provider Presets", () => {
     expect(responsesIds).not.toContain("groq");
     expect(responsesIds).not.toContain("deepseek");
   });
+
+  test("all non-custom presets should have defaultApiFormat", () => {
+    const withoutApiFormat = allPresets.filter(p => p.id !== "custom" && !p.defaultApiFormat);
+    expect(withoutApiFormat).toEqual([]);
+  });
+
+  test("defaultApiFormat should be set for all chat providers (except custom and dual-format)", () => {
+    // DeepSeek and OpenRouter have wire_api=chat but defaultApiFormat=anthropic_messages
+    // because their default baseURL uses Anthropic format. This is correct — they serve
+    // Anthropic format by default but also have baseURLChat for OpenAI Chat.
+    const dualFormatPresets = ["deepseek", "openrouter"];
+    const chatPresets = allPresets.filter(p => p.wire_api === "chat" && p.id !== "custom" && !dualFormatPresets.includes(p.id));
+    chatPresets.forEach(preset => {
+      expect(preset.defaultApiFormat).toBe("openai_chat");
+    });
+
+    // Dual-format presets should have anthropic_messages as default (their primary baseURL)
+    dualFormatPresets.forEach(id => {
+      const preset = getPresetById(id);
+      expect(preset?.defaultApiFormat).toBe("anthropic_messages");
+      expect(preset?.baseURLChat).toBeDefined();
+    });
+  });
+
+  test("custom preset should NOT have defaultApiFormat", () => {
+    expect(customPreset.defaultApiFormat).toBeUndefined();
+  });
 });

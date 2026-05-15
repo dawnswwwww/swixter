@@ -3,6 +3,7 @@ import type { ClaudeCodeProfile } from "../types.js";
 import { getPresetByIdAsync } from "../providers/presets.js";
 import type { ForwardResponse } from "./types.js";
 import { proxyLogger } from "./logger.js";
+import { inferTargetApiFormat } from "./transform/index.js";
 
 export interface ForwardRequest {
   method: string;
@@ -34,11 +35,12 @@ export class ProxyForwarder {
     const credential = profile.authToken || profile.apiKey || "";
 
     if (credential) {
-      if (preset?.wire_api === "responses") {
+      const targetFormat = inferTargetApiFormat(profile, preset || {} as NonNullable<typeof preset>);
+      if (targetFormat === "anthropic_messages" || targetFormat === "anthropic_responses") {
         // Anthropic-style API key
         headers["x-api-key"] = credential;
       } else {
-        // OpenAI-style Bearer token
+        // OpenAI-style Bearer token (also used for gemini_native via adapter)
         headers.authorization = `Bearer ${credential}`;
       }
     }

@@ -37,14 +37,43 @@ export function inferClientFormat(endpoint: string): ApiFormat {
   return "anthropic_messages";
 }
 
+/** Infer API format from a base URL path (e.g. /anthropic → anthropic_messages) */
+export function inferApiFormatFromBaseURL(baseURL: string): ApiFormat | null {
+  try {
+    const url = new URL(baseURL);
+    const path = url.pathname.toLowerCase();
+    if (path.includes("/anthropic")) return "anthropic_messages";
+    if (path.includes("/responses")) return "anthropic_responses";
+    if (path.includes("/openai")) return "openai_chat";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Infer the target API format from profile configuration */
 export function inferTargetApiFormat(
   profile: ClaudeCodeProfile,
   preset: ProviderPreset
 ): ApiFormat {
+  // 1. User explicit override
   if (profile.apiFormat) {
     return profile.apiFormat;
   }
+
+  // 2. Infer from baseURL path
+  const baseURL = profile.baseURL || preset?.baseURL || "";
+  const fromURL = inferApiFormatFromBaseURL(baseURL);
+  if (fromURL) {
+    return fromURL;
+  }
+
+  // 3. Preset defaultApiFormat (new field)
+  if (preset?.defaultApiFormat) {
+    return preset.defaultApiFormat;
+  }
+
+  // 4. Legacy wire_api fallback
   switch (preset.wire_api) {
     case "chat":
       return "openai_chat";

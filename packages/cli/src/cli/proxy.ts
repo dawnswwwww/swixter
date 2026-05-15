@@ -20,7 +20,8 @@ import {
 import { getActiveGroup, getGroup } from "../groups/manager.js";
 
 export function resolveProxyRuntimeBinding(input: {
-  groupName: string;
+  groupName?: string;
+  profileName?: string;
   requestedPort?: number;
   allInstances: ReturnType<typeof listProxyInstances>;
 }): { host: string; port: number; reuseExisting: boolean; reuseInstanceId?: string } {
@@ -37,9 +38,12 @@ export function resolveProxyRuntimeBinding(input: {
     };
   }
 
-  // Check if any existing instance already serves this group
+  // Check if any existing instance already serves this group or profile
   const existing = input.allInstances.find(
-    (s) => s.running && s.groupName === input.groupName
+    (s) => s.running && (
+      (input.groupName && s.groupName === input.groupName) ||
+      (input.profileName && s.profileName === input.profileName)
+    )
   );
   if (existing) {
     return {
@@ -215,7 +219,7 @@ async function cmdStart(args: string[]): Promise<void> {
     return;
   }
 
-  if (!groupName) {
+  if (!groupName && !profileName) {
     const activeGroup = await getActiveGroup();
     if (activeGroup) {
       groupName = activeGroup.name;
@@ -327,43 +331,66 @@ async function cmdStop(args: string[]): Promise<void> {
 
 async function cmdRun(args: string[]): Promise<void> {
   const doubleDash = args.indexOf("--");
-  let groupArgs: string[] = [];
+  let proxyArgs: string[] = [];
   let coderArgs: string[] = [];
 
   if (doubleDash >= 0) {
-    groupArgs = args.slice(0, doubleDash);
+    proxyArgs = args.slice(0, doubleDash);
     coderArgs = args.slice(doubleDash + 1);
   } else {
-    groupArgs = args;
+    proxyArgs = args;
   }
 
   let groupName: string | undefined;
+  let profileName: string | undefined;
   let requestedPort: number | undefined;
-  for (let i = 0; i < groupArgs.length; i++) {
-    if (groupArgs[i] === "--group" && groupArgs[i + 1]) {
-      groupName = groupArgs[i + 1];
+  for (let i = 0; i < proxyArgs.length; i++) {
+    if (proxyArgs[i] === "--group" && proxyArgs[i + 1]) {
+      groupName = proxyArgs[i + 1];
       i++;
-    } else if (groupArgs[i] === "--port" && groupArgs[i + 1]) {
-      requestedPort = parseInt(groupArgs[i + 1], 10);
+    } else if (proxyArgs[i] === "--profile" && proxyArgs[i + 1]) {
+      profileName = proxyArgs[i + 1];
+      i++;
+    } else if (proxyArgs[i] === "--port" && proxyArgs[i + 1]) {
+      requestedPort = parseInt(proxyArgs[i + 1], 10);
       i++;
     }
   }
 
-  if (!groupName) {
+  if (groupName && profileName) {
+    console.log(pc.red("Cannot specify both --group and --profile"));
+    process.exit(EXIT_CODES.invalidArguments);
+    return;
+  }
+
+  // Validate group/profile if specified
+  if (groupName) {
+    const group = await getGroup(groupName);
+    if (!group) {
+      console.log(pc.red(`Group "${groupName}" not found`));
+      process.exit(EXIT_CODES.notFound);
+      return;
+    }
+  }
+
+  if (profileName) {
+    const profile = await getProfile(profileName);
+    if (!profile) {
+      console.log(pc.red(`Profile "${profileName}" not found`));
+      process.exit(EXIT_CODES.notFound);
+      return;
+    }
+  }
+
+  // Default to active group if neither group nor profile specified
+  if (!groupName && !profileName) {
     const activeGroup = await getActiveGroup();
     groupName = activeGroup?.name;
   }
 
-  if (!groupName) {
-    console.log(pc.red("No group specified and no default group set"));
-    console.log(pc.dim("Use --group or create a default group first"));
-    return;
-  }
-
-  const group = await getGroup(groupName);
-  if (!group) {
-    console.log(pc.red(`Group "${groupName}" not found`));
-    process.exit(EXIT_CODES.notFound);
+  if (!groupName && !profileName) {
+    console.log(pc.red("No group or profile specified, and no default group set"));
+    console.log(pc.dim("Use --group, --profile, or create a default group first"));
     return;
   }
 
@@ -371,6 +398,7 @@ async function cmdRun(args: string[]): Promise<void> {
   const allInstances = listProxyInstances();
   const runtimeBinding = resolveProxyRuntimeBinding({
     groupName,
+    profileName,
     requestedPort,
     allInstances,
   });
@@ -384,6 +412,7 @@ async function cmdRun(args: string[]): Promise<void> {
       host: runtimeBinding.host,
       port: runtimeBinding.port,
       groupName,
+      profileName,
     });
   }
 
@@ -400,16 +429,30 @@ async function cmdRun(args: string[]): Promise<void> {
   console.log(pc.green(`✓ Running: ${coder} ${coderArgs.slice(1).join(" ")}`));
   console.log(pc.dim(`  Instance: ${instanceId} (run)`));
   console.log(pc.dim(`  Proxy: ${runtimeBinding.host}:${runtimeBinding.port}`));
+  if (groupName) {
+    console.log(pc.dim(`  Group: ${groupName}`));
+  }
+  if (profileName) {
+    console.log(pc.dim(`  Profile: ${profileName}`));
+  }
 
   if (coder === "claude") {
-    const firstProfile = group.profiles[0] ? await getProfile(group.profiles[0]) : null;
+    // Use the first profile from group, or the specified profile
+    const targetProfile = profileName
+      ? await getProfile(profileName)
+      : groupName
+        ? (await getGroup(groupName))?.profiles[0]
+          ? await getProfile((await getGroup(groupName))!.profiles[0])
+          : null
+        : null;
+
     const proxyProfile: ClaudeCodeProfile = {
-      name: `proxy-${groupName}`,
+      name: profileName ? `proxy-${profileName}` : `proxy-${groupName}`,
       providerId: "anthropic",
       apiKey: "",
       authToken: SWIXTER_PROXY_AUTH_TOKEN,
       baseURL: `http://${runtimeBinding.host}:${runtimeBinding.port}`,
-      models: firstProfile ? buildClaudeProxyMarkerModels(firstProfile) : undefined,
+      models: targetProfile ? buildClaudeProxyMarkerModels(targetProfile) : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -497,6 +540,7 @@ ${pc.bold("Examples:")}
   ${pc.green("swixter proxy start --group my-group")}
   ${pc.green("swixter proxy start --profile my-profile")}
   ${pc.green("swixter proxy run --group my-group -- claude")}
+  ${pc.green("swixter proxy run --profile my-profile -- claude")}
   ${pc.green("swixter proxy stop")}
   ${pc.green("swixter proxy stop run-15722")}
   ${pc.dim("  # Stop a specific run instance")}

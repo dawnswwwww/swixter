@@ -34,8 +34,9 @@ describe("Proxy Integration", () => {
     // Create test profile
     await upsertProfile({
       name: "test-provider-failover",
-      providerId: "openai",
+      providerId: "custom",
       apiKey: "test-key",
+      apiFormat: "anthropic_messages",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -166,9 +167,10 @@ describe("Proxy Integration", () => {
 
     await upsertProfile({
       name: "test-provider-failover",
-      providerId: "openai",
+      providerId: "custom",
       apiKey: "test-key",
       baseURL: "http://127.0.0.1:18740",
+      apiFormat: "anthropic_messages",
       models: {
         defaultHaikuModel: "claude-haiku-4-20250506",
       },
@@ -223,9 +225,10 @@ describe("Proxy Integration", () => {
 
     await upsertProfile({
       name: "test-provider-failover",
-      providerId: "openai",
+      providerId: "custom",
       apiKey: "test-key",
       baseURL: "http://127.0.0.1:18742",
+      apiFormat: "openai_chat",
       model: "gpt-4.1-mini",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -381,8 +384,9 @@ describe("Proxy Integration — Event Bus", () => {
 
     await upsertProfile({
       name: "test-provider-events",
-      providerId: "openai",
+      providerId: "custom",
       apiKey: "test-key",
+      apiFormat: "openai_chat",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

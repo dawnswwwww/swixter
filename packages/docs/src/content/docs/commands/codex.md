@@ -27,6 +27,7 @@ The interactive prompt includes an additional `envKey` option for customizing th
 | `-u, --base-url <url>` | Custom base URL |
 | `-m, --model <model>` | Default model |
 | `-e, --env-key <key>` | Custom environment variable name |
+| `--api-format <format>` | Target API format (`anthropic_messages`, `openai_chat`, etc.) |
 
 ## `switch`
 

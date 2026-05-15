@@ -25,6 +25,7 @@ The interactive prompt asks for provider, API key, base URL, model, and optional
 | `-u, --base-url <url>` | Custom base URL |
 | `-m, --model <model>` | Default model |
 | `-t, --auth-token <token>` | Auth token for ANTHROPIC_AUTH_TOKEN |
+| `--api-format <format>` | Target API format (`anthropic_messages`, `openai_chat`, etc.) |
 
 ```bash
 # Non-interactive

@@ -110,6 +110,22 @@ export async function createProfile(): Promise<void> {
           },
         }),
 
+      apiFormat: async ({ results }) => {
+        if (results.provider !== "custom") {
+          return null;
+        }
+        return p.select({
+          message: "Select the API format for this provider",
+          options: [
+            { value: "openai_chat", label: "OpenAI Chat", hint: "OpenAI-compatible /v1/chat/completions" },
+            { value: "anthropic_messages", label: "Anthropic Messages", hint: "Anthropic /v1/messages" },
+            { value: "openai_responses", label: "OpenAI Responses", hint: "OpenAI Responses API" },
+            { value: "anthropic_responses", label: "Anthropic Responses", hint: "Anthropic Responses API" },
+            { value: "gemini_native", label: "Gemini Native", hint: "Google Gemini API" },
+          ],
+        });
+      },
+
       confirm: async ({ results }) => {
         const preset = await getPresetByIdAsync(results.provider as string);
         return p.confirm({
@@ -147,6 +163,10 @@ export async function createProfile(): Promise<void> {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+
+    if (group.apiFormat) {
+      profile.apiFormat = group.apiFormat as import("../types.js").ApiFormat;
+    }
 
     await upsertProfile(profile, "claude");
     await setActiveProfileForCoder("claude", profile.name);

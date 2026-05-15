@@ -66,6 +66,7 @@ describe("inferTargetApiFormat", () => {
   it("infers anthropic_messages from wire_api=responses", () => {
     const preset: ProviderPreset = {
       ...mockPreset,
+      baseURL: "https://api.anthropic.com",
       wire_api: "responses",
     };
     const profile: ClaudeCodeProfile = {
@@ -76,6 +77,75 @@ describe("inferTargetApiFormat", () => {
       updatedAt: "2024-01-01",
     };
     expect(inferTargetApiFormat(profile, preset)).toBe("anthropic_messages");
+  });
+
+  it("uses defaultApiFormat when baseURL has no strong signal", () => {
+    const preset: ProviderPreset = {
+      ...mockPreset,
+      baseURL: "https://api.siliconflow.cn",
+      defaultApiFormat: "anthropic_messages",
+      wire_api: "responses",
+    };
+    const profile: ClaudeCodeProfile = {
+      name: "test",
+      providerId: "siliconflow-cn",
+      apiKey: "test",
+      createdAt: "2024-01-01",
+      updatedAt: "2024-01-01",
+    };
+    expect(inferTargetApiFormat(profile, preset)).toBe("anthropic_messages");
+  });
+
+  it("infers anthropic_messages from baseURL containing /anthropic", () => {
+    const preset: ProviderPreset = {
+      ...mockPreset,
+      baseURL: "https://api.deepseek.com/anthropic",
+      defaultApiFormat: "anthropic_messages",
+      wire_api: "chat",
+    };
+    const profile: ClaudeCodeProfile = {
+      name: "test",
+      providerId: "deepseek",
+      apiKey: "test",
+      createdAt: "2024-01-01",
+      updatedAt: "2024-01-01",
+    };
+    expect(inferTargetApiFormat(profile, preset)).toBe("anthropic_messages");
+  });
+
+  it("infers openai_chat from baseURL containing /openai", () => {
+    const preset: ProviderPreset = {
+      ...mockPreset,
+      baseURL: "https://api.groq.com/openai/v1",
+      defaultApiFormat: "openai_chat",
+      wire_api: "chat",
+    };
+    const profile: ClaudeCodeProfile = {
+      name: "test",
+      providerId: "groq",
+      apiKey: "test",
+      createdAt: "2024-01-01",
+      updatedAt: "2024-01-01",
+    };
+    expect(inferTargetApiFormat(profile, preset)).toBe("openai_chat");
+  });
+
+  it("profile.apiFormat overrides all other inference", () => {
+    const preset: ProviderPreset = {
+      ...mockPreset,
+      baseURL: "https://api.deepseek.com/anthropic",
+      defaultApiFormat: "anthropic_messages",
+      wire_api: "chat",
+    };
+    const profile: ClaudeCodeProfile = {
+      name: "test",
+      providerId: "deepseek",
+      apiKey: "test",
+      apiFormat: "openai_chat",
+      createdAt: "2024-01-01",
+      updatedAt: "2024-01-01",
+    };
+    expect(inferTargetApiFormat(profile, preset)).toBe("openai_chat");
   });
 });
 

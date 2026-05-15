@@ -22,6 +22,15 @@ export type ApiFormat =
   | "openai_responses"
   | "gemini_native"
 
+/** All valid ApiFormat values, for validation and prompts */
+export const API_FORMATS: readonly ApiFormat[] = [
+  "anthropic_messages",
+  "anthropic_responses",
+  "openai_chat",
+  "openai_responses",
+  "gemini_native",
+];
+
 /**
  * Model family grouping
  * Used to organize models into hierarchical families (e.g., Claude's Sonnet/Haiku/Opus)
@@ -64,7 +73,9 @@ export interface ProviderPreset {
   docs?: string;
   /** Whether it's a Chinese domestic service */
   isChinese?: boolean;
-  /** API wire protocol type (for Codex) */
+  /** Default API format this provider uses (replaces wire_api for clarity) */
+  defaultApiFormat?: "anthropic_messages" | "anthropic_responses" | "openai_chat" | "openai_responses" | "gemini_native";
+  /** Legacy alias for defaultApiFormat — kept for backward compatibility */
   wire_api?: "chat" | "responses";
   /** Environment variable name for API key (for Codex) */
   env_key?: string;
@@ -206,6 +217,14 @@ export const ProviderPresetSchema = z.object({
   }).optional(),
   docs: z.string().url().optional(),
   isChinese: z.boolean().optional(),
+  defaultApiFormat: z.enum([
+    "anthropic_messages",
+    "anthropic_responses",
+    "openai_chat",
+    "openai_responses",
+    "gemini_native",
+  ]).optional(),
+  baseURLChat: z.string().optional(),
   wire_api: z.enum(["chat", "responses"]).optional(),
   env_key: z.string().optional(),
   modelFamilies: z.array(z.object({

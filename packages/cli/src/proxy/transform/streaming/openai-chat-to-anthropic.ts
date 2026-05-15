@@ -12,12 +12,13 @@ export class OpenAIChatToAnthropicStreamTransformer extends SSEStreamTransformer
   private contentBlockIndex: number = 0;
   private currentTextBlockIndex: number = -1;
   private currentThinkingBlockIndex: number = -1;
+  private hasStartedTextBlock: boolean = false;
+  private hasStartedThinkingBlock: boolean = false;
   private toolBlockIndexMap: Map<number, number> = new Map();
   private openToolBlockIndices: Set<number> = new Set();
   private pendingToolData: Map<number, { id: string; name: string; args: string }> = new Map();
+  private lastEmittedArgsLength: Map<number, number> = new Map();
   private hasEmittedMessageDelta: boolean = false;
-  private emittedTextDeltas: Set<number> = new Set();
-  private emittedThinkingDeltas: Set<number> = new Set();
 
   protected convertEvent(event: SSEEvent): SSEEvent | SSEEvent[] | null {
     if (event.data === "[DONE]") {
@@ -65,6 +66,17 @@ export class OpenAIChatToAnthropicStreamTransformer extends SSEStreamTransformer
     if (delta) {
       if (typeof delta.content === "string" && delta.content.length > 0) {
         const textBlockIndex = this.ensureTextBlock();
+        if (!this.hasStartedTextBlock) {
+          this.hasStartedTextBlock = true;
+          events.push({
+            event: "content_block_start",
+            data: {
+              type: "content_block_start",
+              index: textBlockIndex,
+              content_block: { type: "text" },
+            },
+          });
+        }
         events.push({
           event: "content_block_delta",
           data: {
@@ -77,6 +89,17 @@ export class OpenAIChatToAnthropicStreamTransformer extends SSEStreamTransformer
 
       if (typeof delta.reasoning_content === "string" && delta.reasoning_content.length > 0) {
         const thinkingBlockIndex = this.ensureThinkingBlock();
+        if (!this.hasStartedThinkingBlock) {
+          this.hasStartedThinkingBlock = true;
+          events.push({
+            event: "content_block_start",
+            data: {
+              type: "content_block_start",
+              index: thinkingBlockIndex,
+              content_block: { type: "thinking" },
+            },
+          });
+        }
         events.push({
           event: "content_block_delta",
           data: {
@@ -186,14 +209,19 @@ export class OpenAIChatToAnthropicStreamTransformer extends SSEStreamTransformer
     }
 
     if (this.openToolBlockIndices.has(toolIndex) && pending.args.length > 0) {
-      events.push({
-        event: "content_block_delta",
-        data: {
-          type: "content_block_delta",
-          index: toolIndex,
-          delta: { type: "input_json_delta", partial_json: pending.args },
-        },
-      });
+      const lastEmitted = this.lastEmittedArgsLength.get(index) || 0;
+      if (pending.args.length > lastEmitted) {
+        const newArgs = pending.args.slice(lastEmitted);
+        this.lastEmittedArgsLength.set(index, pending.args.length);
+        events.push({
+          event: "content_block_delta",
+          data: {
+            type: "content_block_delta",
+            index: toolIndex,
+            delta: { type: "input_json_delta", partial_json: newArgs },
+          },
+        });
+      }
     }
 
     return events;
@@ -215,6 +243,8 @@ export class OpenAIChatToAnthropicStreamTransformer extends SSEStreamTransformer
       case "length":
         return "max_tokens";
       case "tool_calls":
+        return "tool_use";
+      case "function_call":
         return "tool_use";
       case "content_filter":
         return "end_turn";

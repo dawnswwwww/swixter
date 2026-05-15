@@ -80,6 +80,8 @@ describe("OpenAIChatToAnthropicStreamTransformer", () => {
     const output = transformer.transformChunk(chunk2);
     const outputText = new TextDecoder().decode(output);
 
+    expect(outputText).toContain("event: content_block_start");
+    expect(outputText).toContain('"type":"text"');
     expect(outputText).toContain("event: content_block_delta");
     expect(outputText).toContain('"type":"text_delta"');
     expect(outputText).toContain('"text":"Hello"');

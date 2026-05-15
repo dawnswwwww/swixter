@@ -10,6 +10,7 @@ import {
 import { getPresetByIdAsync } from "../providers/presets.js";
 import { getAdapter } from "../adapters/index.js";
 import type { ClaudeCodeProfile, ApiFormat } from "../types.js";
+import { API_FORMATS } from "../types.js";
 import {
   CODER_REGISTRY,
   ERRORS,
@@ -36,14 +37,6 @@ import { buildProfileEnv } from "../utils/model-helper.js";
 
 const CODER_NAME = "claude";
 const CODER_CONFIG = CODER_REGISTRY[CODER_NAME];
-
-const VALID_API_FORMATS = [
-  "anthropic_messages",
-  "anthropic_responses",
-  "openai_chat",
-  "openai_responses",
-  "gemini_native",
-];
 
 /**
  * Claude Code subcommand handler
@@ -262,6 +255,26 @@ async function cmdCreateInteractive(): Promise<void> {
     process.exit(EXIT_CODES.cancelled);
   }
 
+  // 5b. API Format (required for custom provider)
+  let apiFormat: string | symbol | null = null;
+  if (providerId === "custom") {
+    apiFormat = await p.select({
+      message: "Select the API format for this provider",
+      options: [
+        { value: "openai_chat", label: "OpenAI Chat", hint: "OpenAI-compatible /v1/chat/completions" },
+        { value: "anthropic_messages", label: "Anthropic Messages", hint: "Anthropic /v1/messages" },
+        { value: "openai_responses", label: "OpenAI Responses", hint: "OpenAI Responses API" },
+        { value: "anthropic_responses", label: "Anthropic Responses", hint: "Anthropic Responses API" },
+        { value: "gemini_native", label: "Gemini Native", hint: "Google Gemini API" },
+      ],
+    });
+
+    if (p.isCancel(apiFormat)) {
+      p.cancel(ERRORS.cancelled);
+      process.exit(EXIT_CODES.cancelled);
+    }
+  }
+
   // 6. Configure models? (for all Claude Code profiles)
   let models: ClaudeCodeProfile["models"] = undefined;
   const configureModels = await p.confirm({
@@ -365,6 +378,11 @@ async function cmdCreateInteractive(): Promise<void> {
       profile.models = models;
     }
 
+    // Add apiFormat (required for custom provider)
+    if (apiFormat) {
+      profile.apiFormat = apiFormat as ApiFormat;
+    }
+
     await upsertProfile(profile, CODER_NAME);
     spinner.stop("Profile created successfully!");
 
@@ -405,9 +423,9 @@ async function cmdCreateQuiet(params: Record<string, string | boolean>): Promise
 
   // Validate apiFormat if provided
   const apiFormat = params["api-format"] as string;
-  if (apiFormat && !VALID_API_FORMATS.includes(apiFormat)) {
+  if (apiFormat && !API_FORMATS.includes(apiFormat)) {
     console.log(pc.red(`Invalid apiFormat: ${apiFormat}`));
-    console.log(pc.dim(`Valid values: ${VALID_API_FORMATS.join(", ")}`));
+    console.log(pc.dim(`Valid values: ${API_FORMATS.join(", ")}`));
     process.exit(EXIT_CODES.invalidArguments);
   }
 
@@ -705,7 +723,26 @@ async function cmdEdit(profileName?: string): Promise<void> {
     return;
   }
 
-  // 5. Configure models?
+  // 5. Edit API Format
+  const currentApiFormat = profile.apiFormat || "auto-detect";
+  const apiFormatOptions = [
+    { value: "", label: "Keep current" },
+    { value: "clear", label: "Auto-detect (clear explicit format)" },
+    ...API_FORMATS.map((f) => ({ value: f, label: f })),
+  ];
+
+  const newApiFormat = await p.select({
+    message: `Select target API format (current: ${currentApiFormat})`,
+    options: apiFormatOptions,
+    initialValue: profile.apiFormat || "",
+  });
+
+  if (p.isCancel(newApiFormat)) {
+    p.cancel(ERRORS.cancelled);
+    return;
+  }
+
+  // 6. Configure models?
   let models: ClaudeCodeProfile["models"] = undefined;
   let editedModels = false;
 
@@ -833,8 +870,17 @@ async function cmdEdit(profileName?: string): Promise<void> {
     }
 
     // Handle apiFormat
-    if (profile.apiFormat) {
-      updatedProfile.apiFormat = profile.apiFormat;
+    if (newApiFormat === "clear") {
+      // Clear explicit apiFormat, use auto-detection
+      // Don't set apiFormat field
+    } else if (newApiFormat) {
+      // Use new explicit apiFormat
+      updatedProfile.apiFormat = newApiFormat as string;
+    } else {
+      // Keep existing apiFormat
+      if (profile.apiFormat) {
+        updatedProfile.apiFormat = profile.apiFormat;
+      }
     }
 
     const finalBaseURL = updatedProfile.baseURL || newPreset?.baseURL || "";

@@ -1,6 +1,8 @@
 // src/proxy/handler.ts
 import type { ClaudeCodeProfile } from "../types.js";
 import { SWIXTER_PROXY_AUTH_TOKEN } from "../constants/proxy.js";
+// Load transformer registrations (side-effect: populates TRANSFORMER_REGISTRY)
+import "./transform/streaming/openai-chat-to-anthropic.js";
 import {
   getGeneralProxyModel,
   isSwixterClaudeProxyMarker,
@@ -16,6 +18,7 @@ import { getPresetById } from "../providers/presets.js";
 import {
   inferClientFormat,
   inferTargetApiFormat,
+  getTransformer,
   transformRequest,
   transformResponse,
   transformStream,
@@ -345,15 +348,17 @@ export class ProxyHandler {
 
       const preset = getPresetById(profile.providerId);
 
-      // wire_api filtering: chat endpoints skip responses-only providers
-      if (format === "chat" && preset?.wire_api === "responses") {
-        this.logger.info("Skipping responses-only provider for chat endpoint", { profileId, wire_api: preset.wire_api });
-        continue;
-      }
-
       const endpoint = new URL(request.url).pathname + new URL(request.url).search;
       const clientFormat = inferClientFormat(endpoint);
       const targetFormat = inferTargetApiFormat(profile, preset || {} as NonNullable<typeof preset>);
+
+      // Skip provider if formats don't match and no transformer is available
+      if (clientFormat !== targetFormat) {
+        if (!getTransformer(clientFormat, targetFormat)) {
+          this.logger.info("Skipping provider: no transformer for format pair", { profileId, clientFormat, targetFormat });
+          continue;
+        }
+      }
 
       let transformedBodyBuffer = bodyBuffer;
       let targetEndpoint = endpoint;

@@ -185,6 +185,7 @@ Key capabilities:
 - **Failover** - Tries profiles in group priority order, returns first successful response
 - **Circuit Breaker** - Skips providers that failed 3 consecutive times, auto-recovers after 60s
 - **Streaming** - Transparently forwards SSE/NDJSON streaming responses
+- **API Format Conversion** - Automatically converts between Anthropic Messages and OpenAI Chat Completions APIs
 - **Multi-format** - Supports both OpenAI Chat (`/v1/chat/completions`) and Anthropic (`/v1/messages`, `/v1/responses`) APIs
 - **Model Rewriting** - Different providers in a group can use different model names; the proxy rewrites them automatically
 
@@ -194,6 +195,7 @@ Key capabilities:
 # Start proxy as a background service
 swixter proxy start                        # Start with default group
 swixter proxy start --group ha-group       # Start with specific group
+swixter proxy start --profile groq-local   # Start with single profile (gateway mode)
 swixter proxy start --port 8080            # Custom port (default: 15721)
 swixter proxy start --daemon               # Run in background
 
@@ -222,6 +224,23 @@ The easiest way to use the proxy. It:
 ```bash
 swixter proxy run -- claude    # One command, everything automatic
 ```
+
+### API Format Conversion
+
+The proxy automatically converts between API formats. When Claude Code sends Anthropic Messages API requests to `/v1/messages`, but the target provider uses OpenAI Chat Completions format, the proxy handles the bidirectional conversion transparently — including request body, response body, and SSE streaming.
+
+```bash
+# Create a profile with explicit API format
+swixter claude create groq-local \
+  --provider groq \
+  --api-key $GROQ_API_KEY \
+  --api-format openai_chat
+
+# Start proxy in single-profile gateway mode
+swixter proxy start --profile groq-local --port 3456
+```
+
+Supported conversions: Anthropic Messages ↔ OpenAI Chat Completions (request, response, and SSE streaming).
 
 ### Circuit Breaker
 
