@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-05-16
+
+### Added
+- **defaultApiFormat for all presets** — All 41 built-in provider presets now include a `defaultApiFormat` field for reliable API format auto-detection
+- **Custom provider apiFormat prompt** — Creating profiles with custom providers now requires selecting an API format interactively or via `--api-format` flag
+- **Shared API_FORMATS constant** — Deduplicated API format validation list into `types.ts`
+- **Comprehensive tests** — New tests for defaultApiFormat coverage, inference priority chain, and dual-format provider handling
+
+### Fixed
+- **API format inference from URL** — `inferApiFormatFromBaseURL` now parses URL and matches only pathname, preventing false positives on domain names like `anthropic-proxy.example.com`
+- **ProviderPresetSchema completeness** — Added `defaultApiFormat` and `baseURLChat` to Zod schema so user-defined providers can persist these fields
+- **Streaming transformer protocol** — Added `content_block_start` event emission before deltas, and fixed incremental tool argument output with `lastEmittedArgsLength`
+- **ProxyHandler redundant import** — Replaced dynamic `import()` inside provider loop with static top-level import
+
 ## [0.1.7] - 2026-05-11
 
 ### Fixed
