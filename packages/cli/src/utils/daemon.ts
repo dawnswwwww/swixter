@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { readFile, writeFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { getConfigDir } from "../constants/paths.js";
 
 export interface PidFileData {
@@ -31,6 +31,7 @@ export async function readPidFile(): Promise<PidFileData | null> {
 export async function writePidFile(pid: number, port: number): Promise<void> {
   const path = getPidFilePath();
   const data: PidFileData = { pid, port, startTime: new Date().toISOString() };
+  await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(data, null, 2), "utf-8");
 }
 

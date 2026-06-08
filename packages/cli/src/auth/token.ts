@@ -4,8 +4,8 @@
  */
 
 import { existsSync } from "node:fs";
-import { readFile, writeFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { getConfigDir } from "../constants/paths.js";
 import type { AuthState } from "./types.js";
 import { refreshToken as apiRefresh } from "./client.js";
@@ -36,6 +36,7 @@ export async function loadAuthState(): Promise<AuthState | null> {
  */
 export async function saveAuthState(state: AuthState): Promise<void> {
   const authPath = getAuthFilePath();
+  await mkdir(dirname(authPath), { recursive: true });
   await writeFile(authPath, JSON.stringify(state, null, 2), { mode: 0o600, encoding: "utf-8" });
 }
 

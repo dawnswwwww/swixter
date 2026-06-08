@@ -1,5 +1,5 @@
 import http from "node:http";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DEFAULT_PROXY_HOST, DEFAULT_PROXY_PORT } from "../constants/proxy.js";
 import { getConfigPath } from "../config/manager.js";
@@ -38,10 +38,12 @@ function loadRegistry(): InstanceRegistry {
 }
 
 function saveRegistry(registry: InstanceRegistry): void {
-  writeFileSync(getRegistryPath(), JSON.stringify(registry, null, 2), "utf-8");
+  const path = getRegistryPath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(registry, null, 2), "utf-8");
 }
 
-function updateInstanceInRegistry(status: ProxyStatus): void {
+export function updateInstanceInRegistry(status: ProxyStatus): void {
   const registry = loadRegistry();
   registry.instances[status.instanceId] = status;
   saveRegistry(registry);

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Auth login on fresh install** — `swixter auth login` now ensures `~/.config/swixter/` exists before writing `auth.json`, fixing `ENOENT` on machines that have never run swixter
+- **Daemon PID file write on fresh install** — `writePidFile` now ensures `~/.config/swixter/` exists before writing `ui.pid` (same `ENOENT` root cause as the auth fix; surfaced after the auth test cleanup was strengthened and removed the side-effect dir creation that previously masked the bug)
+- **Proxy instance registry write on fresh install** — `saveRegistry` now ensures `~/.config/swixter/` exists before writing `proxy-instances.json` (same `ENOENT` root cause as the other two fixes; surfaced by code review)
+
 ## [0.1.8] - 2026-05-16
 
 ### Added

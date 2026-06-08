@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync } from "node:fs";
-import { unlink } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { getConfigDir } from "../../src/constants/paths.js";
 import {
@@ -15,7 +15,8 @@ import {
 } from "../../src/auth/token.js";
 import type { AuthState } from "../../src/auth/types.js";
 
-const AUTH_PATH = join(getConfigDir("swixter"), "auth.json");
+const SWIXTER_DIR = getConfigDir("swixter");
+const AUTH_PATH = join(SWIXTER_DIR, "auth.json");
 
 const mockAuth: AuthState = {
   accessToken: "test-access-token",
@@ -28,16 +29,12 @@ const mockAuth: AuthState = {
 
 describe("Auth Token Management", () => {
   beforeEach(async () => {
-    // Clean up before each test
-    if (existsSync(AUTH_PATH)) {
-      await unlink(AUTH_PATH);
-    }
+    // Simulate fresh install: remove the entire swixter config dir
+    await rm(SWIXTER_DIR, { recursive: true, force: true });
   });
 
   afterEach(async () => {
-    if (existsSync(AUTH_PATH)) {
-      await unlink(AUTH_PATH);
-    }
+    await rm(SWIXTER_DIR, { recursive: true, force: true });
   });
 
   it("should return null when no auth file exists", async () => {
@@ -76,5 +73,18 @@ describe("Auth Token Management", () => {
     await clearAuthState();
     const state = await loadAuthState();
     expect(state).toBeNull();
+  });
+
+  it("should create parent dir when saving auth state on a fresh install", async () => {
+    // Bug: on a fresh install, the swixter config dir does not exist,
+    // and saveAuthState() did not create it, so writeFile threw ENOENT.
+    expect(existsSync(SWIXTER_DIR)).toBe(false);
+
+    await saveAuthState(mockAuth);
+
+    expect(existsSync(AUTH_PATH)).toBe(true);
+    const loaded = await loadAuthState();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.email).toBe("test@example.com");
   });
 });

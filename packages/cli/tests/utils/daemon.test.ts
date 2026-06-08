@@ -1,6 +1,8 @@
 import { test, expect, describe, beforeEach, afterEach } from "bun:test";
 import { existsSync } from "node:fs";
-import { unlink } from "node:fs/promises";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+import { getConfigDir } from "../../src/constants/paths.js";
 import {
   getPidFilePath,
   getLogFilePath,
@@ -12,19 +14,23 @@ import {
   stopDaemon,
 } from "../../src/utils/daemon.js";
 
+const SWIXTER_DIR = getConfigDir("swixter");
+const PID_PATH = join(SWIXTER_DIR, "ui.pid");
+
 describe("Daemon Utilities", () => {
   const testPidFile = getPidFilePath();
 
   beforeEach(async () => {
-    if (existsSync(testPidFile)) {
-      await unlink(testPidFile).catch(() => {});
-    }
+    // Simulate fresh install: remove the entire swixter config dir.
+    // The auth test does the same — necessary because the daemon tests
+    // call writePidFile(), which writes into SWIXTER_DIR. If the dir
+    // was wiped before the auth test ran, writePidFile would previously
+    // throw ENOENT on the freshly-empty dir.
+    await rm(SWIXTER_DIR, { recursive: true, force: true });
   });
 
   afterEach(async () => {
-    if (existsSync(testPidFile)) {
-      await unlink(testPidFile).catch(() => {});
-    }
+    await rm(SWIXTER_DIR, { recursive: true, force: true });
   });
 
   test("getPidFilePath should return path in swixter config dir", () => {
@@ -91,5 +97,22 @@ describe("Daemon Utilities", () => {
     expect(result.success).toBe(false);
     expect(result.message).toContain("not running");
     expect(existsSync(testPidFile)).toBe(false);
+  });
+
+  test("should create parent dir when writing pid file on a fresh install", async () => {
+    // Bug: on a fresh install, the swixter config dir does not exist,
+    // and writePidFile() did not create it, so writeFile threw ENOENT.
+    // Same latent bug as the auth token saveAuthState() fix (commit 601cdc8).
+    expect(existsSync(SWIXTER_DIR)).toBe(false);
+    expect(existsSync(PID_PATH)).toBe(false);
+
+    await writePidFile(4242, 3141);
+
+    expect(existsSync(SWIXTER_DIR)).toBe(true);
+    expect(existsSync(PID_PATH)).toBe(true);
+    const result = await readPidFile();
+    expect(result).not.toBeNull();
+    expect(result!.pid).toBe(4242);
+    expect(result!.port).toBe(3141);
   });
 });
