@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-06-08
+
+### Added
+- **`--yolo` flag for `claude run`/`r`** — Short alias for Claude Code's `--dangerously-skip-permissions`. Pass `--yolo` (alone or alongside other args) to skip all permission prompts; swixter rewrites it internally and forwards the official flag to the underlying CLI. Deduplication is built in: passing both `--yolo` and `--dangerously-skip-permissions` results in a single forwarded flag.
+
 ### Fixed
 - **Auth login on fresh install** — `swixter auth login` now ensures `~/.config/swixter/` exists before writing `auth.json`, fixing `ENOENT` on machines that have never run swixter
 - **Daemon PID file write on fresh install** — `writePidFile` now ensures `~/.config/swixter/` exists before writing `ui.pid` (same `ENOENT` root cause as the auth fix; surfaced after the auth test cleanup was strengthened and removed the side-effect dir creation that previously masked the bug)

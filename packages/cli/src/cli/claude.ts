@@ -155,6 +155,9 @@ ${pc.bold("Examples:")}
 
   ${pc.dim(`# Run ${CODER_CONFIG.displayName} and pass other arguments`)}
   ${pc.green(`swixter ${CODER_NAME} r --print "What is 2+2?"`)}
+
+  ${pc.dim(`# Run ${CODER_CONFIG.displayName} in yolo mode (skips all permission prompts)`)}
+  ${pc.green(`swixter ${CODER_NAME} r --yolo`)}
 `);
 }
 
@@ -1135,6 +1138,7 @@ export async function spawnClaudeWithEnv(
     profileName?: string;
     providerDisplayName?: string;
     baseURL?: string;
+    yolo?: boolean;
     onExit?: () => void | Promise<void>;
   }
 ): Promise<void> {
@@ -1146,6 +1150,10 @@ export async function spawnClaudeWithEnv(
     }
     if (idx > 0 && args[idx - 1] === "--profile") {
       // Skip --profile value
+      return false;
+    }
+    if (arg === "--yolo") {
+      // Skip --yolo (rewritten to --dangerously-skip-permissions below)
       return false;
     }
     return true;
@@ -1162,6 +1170,12 @@ export async function spawnClaudeWithEnv(
   const tmpFile = path.join(tmp.tmpdir(), `swixter-settings-${Date.now()}.json`);
   await fs.writeFile(tmpFile, settingsContent, "utf-8");
   claudeArgs.push("--settings", tmpFile);
+
+  if (options?.yolo === true) {
+    if (!claudeArgs.includes("--dangerously-skip-permissions")) {
+      claudeArgs.push("--dangerously-skip-permissions");
+    }
+  }
 
   if (options?.profileName) {
     console.log();
@@ -1239,6 +1253,7 @@ async function cmdRun(args: string[]): Promise<void> {
     profileName: profile.name,
     providerDisplayName: preset?.displayName,
     baseURL,
+    yolo: params.yolo === true,
   });
 }
 
