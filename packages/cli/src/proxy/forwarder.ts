@@ -21,8 +21,14 @@ export class ProxyForwarder {
     timeoutMs?: number
   ): Promise<ForwardResponse> {
     const preset = await getPresetByIdAsync(profile.providerId);
-    const baseURL = profile.baseURL || preset?.baseURL || "";
-    const url = `${baseURL}${request.path}`;
+    const baseURL = (profile.baseURL || preset?.baseURL || "").replace(/\/+$/, "");
+    // Avoid "<base>/v1" + "/v1/..." duplication: chat presets/profiles store
+    // the OpenAI root (.../v1) while transformers emit absolute /v1/... paths.
+    const path =
+      baseURL.endsWith("/v1") && request.path.startsWith("/v1/")
+        ? request.path.slice(3)
+        : request.path;
+    const url = `${baseURL}${path}`;
     const timeout = timeoutMs || this.defaultTimeout;
 
     // Inject upstream credential based on provider type

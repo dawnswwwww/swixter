@@ -111,4 +111,42 @@ describe("ProxyForwarder auth selection", () => {
 
     expect(fetchSpy).toHaveBeenCalled();
   });
+
+  test("does not duplicate /v1 when base URL already ends with it", async () => {
+    const forwarder = new ProxyForwarder();
+    const fetchSpy = global.fetch as ReturnType<typeof mock>;
+
+    await forwarder.forward(
+      { method: "POST", path: "/v1/chat/completions", headers: {}, body: JSON.stringify({}) },
+      {
+        name: "minimax-chat",
+        providerId: "custom",
+        baseURL: "https://api.minimaxi.com/v1",
+        apiKey: "provider-api-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+    );
+
+    expect(fetchSpy.mock.calls[0][0]).toBe("https://api.minimaxi.com/v1/chat/completions");
+  });
+
+  test("keeps absolute /v1 path when base URL has no version suffix", async () => {
+    const forwarder = new ProxyForwarder();
+    const fetchSpy = global.fetch as ReturnType<typeof mock>;
+
+    await forwarder.forward(
+      { method: "POST", path: "/v1/chat/completions", headers: {}, body: JSON.stringify({}) },
+      {
+        name: "deepseek-chat",
+        providerId: "custom",
+        baseURL: "https://api.deepseek.com",
+        apiKey: "provider-api-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+    );
+
+    expect(fetchSpy.mock.calls[0][0]).toBe("https://api.deepseek.com/v1/chat/completions");
+  });
 });
