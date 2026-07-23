@@ -1,0 +1,23 @@
+{
+  "model": "kimi-for-coding",
+  "instructions": "You are a coding agent.",
+  "input": [
+    { "type": "message", "role": "developer", "content": [{ "type": "input_text", "text": "<dev instructions>" }] },
+    { "type": "message", "role": "user", "content": [{ "type": "input_text", "text": "Reply with exactly: pong" }] }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "name": "exec_command",
+      "description": "Runs a command.",
+      "strict": false,
+      "parameters": { "type": "object", "properties": { "cmd": { "type": "string" } }, "required": ["cmd"], "additionalProperties": false }
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": false,
+  "reasoning": null,
+  "store": false,
+  "stream": true,
+  "include": []
+}

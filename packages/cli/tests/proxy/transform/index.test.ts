@@ -19,8 +19,8 @@ describe("inferClientFormat", () => {
     expect(inferClientFormat("/v1/chat/completions")).toBe("openai_chat");
   });
 
-  it("returns anthropic_responses for /v1/responses", () => {
-    expect(inferClientFormat("/v1/responses")).toBe("anthropic_responses");
+  it("returns openai_responses for /v1/responses (Codex / OpenAI Responses)", () => {
+    expect(inferClientFormat("/v1/responses")).toBe("openai_responses");
   });
 
   it("returns anthropic_messages for /anthropic/", () => {

@@ -76,7 +76,7 @@ describe("Proxy Integration", () => {
     expect(body.uptime).toBeGreaterThan(0);
   });
 
-  test("chat endpoint rejects missing proxy auth token over HTTP", async () => {
+  test("chat endpoint accepts request with no auth token (auth disabled)", async () => {
     await startProxyServer({
       instanceId: "default",
       type: "service",
@@ -94,13 +94,12 @@ describe("Proxy Integration", () => {
       }),
     });
 
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({
-      error: "Invalid or missing proxy authentication",
-    });
+    // Auth disabled for local-only use. The proxy will then try to forward
+    // and fail (no real provider) but the point is: no 401 from the auth check.
+    expect(res.status).not.toBe(401);
   });
 
-  test("messages endpoint rejects missing proxy auth token over HTTP", async () => {
+  test("messages endpoint accepts request with no auth token (auth disabled)", async () => {
     await startProxyServer({
       instanceId: "default",
       type: "service",
@@ -118,10 +117,7 @@ describe("Proxy Integration", () => {
       }),
     });
 
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({
-      error: "Invalid or missing proxy authentication",
-    });
+    expect(res.status).not.toBe(401);
   });
 
   test("proxy requests are written to proxy-default.log instead of relying on terminal output", async () => {

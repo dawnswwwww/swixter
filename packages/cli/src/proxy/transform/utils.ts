@@ -7,6 +7,11 @@ export interface SSEEvent {
 /**
  * Parse SSE text chunks into structured events.
  * Handles partial chunks gracefully — incomplete events are discarded.
+ *
+ * Per the SSE spec, the colon may be followed by an optional single space,
+ * i.e. both `data: {...}` and `data:{...}` are valid field lines. Some
+ * providers (e.g. kimi) emit `data:` without the space, so we strip one
+ * leading space if present after the colon.
  */
 export function parseSSEEvents(chunk: string): SSEEvent[] {
   const events: SSEEvent[] = [];
@@ -18,11 +23,17 @@ export function parseSSEEvents(chunk: string): SSEEvent[] {
   function flushEvent(): void {
     if (currentDataLines.length > 0) {
       const dataStr = currentDataLines.join("\n");
-      try {
-        const data = JSON.parse(dataStr);
-        events.push({ event: currentEvent, data });
-      } catch {
-        // Incomplete JSON — discard this event
+      // kimi (and others) terminate streams with the literal `data: [DONE]`,
+      // which is not JSON — preserve it as a raw string sentinel.
+      if (dataStr === "[DONE]") {
+        events.push({ event: currentEvent, data: "[DONE]" });
+      } else {
+        try {
+          const data = JSON.parse(dataStr);
+          events.push({ event: currentEvent, data });
+        } catch {
+          // Incomplete JSON — discard this event
+        }
       }
     }
     currentEvent = "";
@@ -30,10 +41,10 @@ export function parseSSEEvents(chunk: string): SSEEvent[] {
   }
 
   for (const line of lines) {
-    if (line.startsWith("event: ")) {
-      currentEvent = line.slice("event: ".length);
-    } else if (line.startsWith("data: ")) {
-      currentDataLines.push(line.slice("data: ".length));
+    if (line.startsWith("event:")) {
+      currentEvent = line.slice("event:".length).replace(/^ /, "");
+    } else if (line.startsWith("data:")) {
+      currentDataLines.push(line.slice("data:".length).replace(/^ /, ""));
     } else if (line === "") {
       flushEvent();
     }

@@ -28,8 +28,11 @@ export function inferClientFormat(endpoint: string): ApiFormat {
   if (endpoint.includes("/v1/chat/completions")) {
     return "openai_chat";
   }
+  // Codex drives the OpenAI Responses API at /v1/responses. (Anthropic clients
+  // use /v1/messages; there is no real anthropic_responses client, so /v1/responses
+  // is unambiguously OpenAI Responses.)
   if (endpoint.includes("/v1/responses")) {
-    return "anthropic_responses";
+    return "openai_responses";
   }
   if (endpoint.includes("/anthropic/") || endpoint.includes("/v1/messages")) {
     return "anthropic_messages";

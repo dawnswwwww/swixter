@@ -1,8 +1,8 @@
 // src/proxy/handler.ts
 import type { ClaudeCodeProfile } from "../types.js";
-import { SWIXTER_PROXY_AUTH_TOKEN } from "../constants/proxy.js";
 // Load transformer registrations (side-effect: populates TRANSFORMER_REGISTRY)
 import "./transform/streaming/openai-chat-to-anthropic.js";
+import "./transform/streaming/openai-chat-to-openai-responses.js";
 import {
   getGeneralProxyModel,
   isSwixterClaudeProxyMarker,
@@ -102,16 +102,11 @@ export class ProxyHandler {
     if (this.isHealthRequest(request)) {
       return null;
     }
-
-    const token = this.getBearerToken(request);
-    if (token === SWIXTER_PROXY_AUTH_TOKEN) {
-      return null;
-    }
-
-    return new Response(JSON.stringify({ error: "Invalid or missing proxy authentication" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+    // Auth check disabled — the proxy is bound to localhost (127.0.0.1) and
+    // intended for local single-user use. Any process on this machine can
+    // submit requests under the active swixter profile's credentials, so
+    // only run this on a trusted workstation.
+    return null;
   }
 
   private async handleChatCompletions(request: Request): Promise<Response> {
