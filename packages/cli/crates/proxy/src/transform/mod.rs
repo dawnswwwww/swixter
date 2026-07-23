@@ -100,3 +100,13 @@ pub fn transform_request(
         }),
     }
 }
+
+/// TS: transformResponse —— 响应从 target 格式转回 client 格式
+pub fn transform_response(body: &Value, ctx: &TransformCtx) -> Result<Value, ProxyError> {
+    use ApiFormat::*;
+    match (ctx.client_format, ctx.target_format) {
+        (AnthropicMessages, OpenaiChat) => response::openai_chat_to_anthropic(body),
+        (OpenaiResponses, OpenaiChat) => response::openai_chat_to_openai_responses(body),
+        _ => Ok(body.clone()),
+    }
+}

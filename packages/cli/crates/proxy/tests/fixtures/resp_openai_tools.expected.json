@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-tools",
+  "type": "message",
+  "role": "assistant",
+  "model": "kimi-k2",
+  "content": [
+    {
+      "type": "tool_use",
+      "id": "call_1",
+      "name": "get_weather",
+      "input": { "city": "Paris" }
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "usage": { "input_tokens": 50, "output_tokens": 12 }
+}
