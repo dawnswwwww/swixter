@@ -32,8 +32,3 @@ fn install_with_invalid_method_index_exits_2() {
                 .or(predicate::str::contains("Invalid")),
         );
 }
-
-#[test]
-fn get_cli_version_parses() {
-    // 单测在 commands/install.rs 内联：见 Step 3 的 #[cfg(test)]
-}

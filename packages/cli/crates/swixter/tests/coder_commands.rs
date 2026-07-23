@@ -175,3 +175,68 @@ fn switch_unknown_profile_exits_3() {
         .assert()
         .code(3);
 }
+
+#[test]
+fn delete_unknown_profile_exits_3() {
+    let dir = tempfile::tempdir().unwrap();
+    swixter(&dir)
+        .args(["claude", "delete", "ghost"])
+        .assert()
+        .code(3);
+}
+
+#[test]
+fn delete_profile_referenced_by_group_fails_without_adapter_cleanup() {
+    let dir = tempfile::tempdir().unwrap();
+    // codex profile + apply → ~/.codex/config.toml 写入 swixter-gp1
+    swixter(&dir)
+        .args([
+            "codex",
+            "create",
+            "--quiet",
+            "--name",
+            "gp1",
+            "--provider",
+            "ollama",
+        ])
+        .assert()
+        .success();
+    swixter(&dir).args(["codex", "apply"]).assert().success();
+    let codex_config = dir.path().join(".codex/config.toml");
+    let before = std::fs::read_to_string(&codex_config).unwrap();
+    assert!(before.contains("swixter-gp1"));
+    // group 引用 gp1
+    swixter(&dir)
+        .args(["group", "create", "g1", "--profiles", "gp1"])
+        .assert()
+        .success();
+    // delete 必须先预检失败（exit 1），且外部配置未被清理
+    swixter(&dir)
+        .args(["codex", "delete", "gp1"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("used in group(s)"));
+    let after = std::fs::read_to_string(&codex_config).unwrap();
+    assert!(
+        after.contains("swixter-gp1"),
+        "adapter config must be untouched"
+    );
+    assert!(dir.path().join(".codex/swixter-gp1.config.toml").exists());
+    // profile 仍在
+    swixter(&dir)
+        .args(["codex", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("gp1"));
+    // 移出 group 后删除成功
+    swixter(&dir)
+        .args(["group", "delete", "g1", "--force"])
+        .assert()
+        .success();
+    swixter(&dir)
+        .args(["codex", "delete", "gp1"])
+        .assert()
+        .success();
+    let cleaned = std::fs::read_to_string(&codex_config).unwrap();
+    assert!(!cleaned.contains("swixter-gp1"));
+}

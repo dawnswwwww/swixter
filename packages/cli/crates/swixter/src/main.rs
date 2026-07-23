@@ -17,7 +17,13 @@ fn main() {
 
 fn run() -> i32 {
     let cli = Cli::parse();
-    match cli.command {
+    let Some(command) = cli.command else {
+        // TS: 无参数 → 打印全局 help 并 exit 0
+        let _ = Cli::command().print_help();
+        println!();
+        return EXIT_SUCCESS;
+    };
+    match command {
         Commands::Proxy(_) | Commands::Ui(_) | Commands::Auth(_) | Commands::Sync(_) => {
             eprintln!(
                 "This command is not yet available in the Rust build (coming in milestone M2/M3)."

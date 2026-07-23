@@ -212,12 +212,3 @@ fn which_path(exe: &str) -> Option<std::path::PathBuf> {
         .map(|dir| dir.join(exe))
         .find(|p| p.is_file())
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn version_regex() {
-        // get_cli_version 的正则逻辑通过 fake executable 集成测试覆盖；
-        // 此处测 semver 过滤：非 semver 提取应被丢弃——见 tests/install_command.rs
-    }
-}

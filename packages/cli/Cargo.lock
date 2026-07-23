@@ -785,6 +785,7 @@ dependencies = [
  "console",
  "dialoguer",
  "predicates",
+ "rand",
  "regex",
  "semver",
  "serde",

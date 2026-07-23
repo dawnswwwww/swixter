@@ -106,7 +106,8 @@ fn remove(id: Option<String>, quiet: bool) -> i32 {
                 .interact()
             {
                 Ok(i) => user[i].id.clone(),
-                Err(_) => return crate::EXIT_CANCELLED,
+                // TS: 交互选择 cancel → exit 0
+                Err(_) => return EXIT_SUCCESS,
             }
         }
     };

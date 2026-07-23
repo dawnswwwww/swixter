@@ -33,6 +33,12 @@ pub fn create(
             "group must contain at least one profile".into(),
         ));
     }
+    // TS cli/group.ts:76 —— 重名拒绝（exit 2 由 CLI 层映射）
+    if mgr.config().groups.values().any(|g| g.name == name) {
+        return Err(CoreError::Validation(format!(
+            "Group \"{name}\" already exists"
+        )));
+    }
     for p in &profiles {
         if !mgr.config().profiles.contains_key(p) {
             return Err(CoreError::NotFound(format!(
@@ -117,9 +123,15 @@ pub fn set_default(mgr: &mut ConfigManager, id: &str) -> Result<(), CoreError> {
     if !mgr.config().groups.contains_key(id) {
         return Err(CoreError::NotFound(format!("Group \"{id}\" not found")));
     }
+    // TS groups/manager.ts:72-79 —— 只刷新目标 group 的 updatedAt，
+    // 其余 group 仅就地置 is_default=false
     for g in mgr.config_mut_for_test().groups.values_mut() {
-        g.is_default = g.id == id;
-        g.updated_at = now_iso();
+        if g.id == id {
+            g.is_default = true;
+            g.updated_at = now_iso();
+        } else {
+            g.is_default = false;
+        }
     }
     mgr.mark_dirty();
     mgr.save()
@@ -177,14 +189,35 @@ mod tests {
     }
 
     #[test]
+    fn create_rejects_duplicate_name() {
+        let (_d, mut m) = mgr_with_profiles();
+        crate::groups::create(&mut m, "main", vec!["p1".into()]).unwrap();
+        let err = crate::groups::create(&mut m, "main", vec!["p2".into()]).unwrap_err();
+        match err {
+            crate::CoreError::Validation(msg) => {
+                assert_eq!(msg, "Group \"main\" already exists");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn set_default_is_exclusive() {
         let (_d, mut m) = mgr_with_profiles();
         let g1 = crate::groups::create(&mut m, "a", vec!["p1".into()]).unwrap();
         let g2 = crate::groups::create(&mut m, "b", vec!["p2".into()]).unwrap();
         crate::groups::set_default(&mut m, &g1.id).unwrap();
+        // 哨兵值：若第二次 set_default 误刷新非目标 group 的 updated_at，哨兵会被覆盖
+        m.config_mut_for_test()
+            .groups
+            .get_mut(&g1.id)
+            .unwrap()
+            .updated_at = "sentinel".into();
         crate::groups::set_default(&mut m, &g2.id).unwrap();
         assert!(!m.config().groups[&g1.id].is_default);
         assert!(m.config().groups[&g2.id].is_default);
+        // 只对目标 group 刷新 updated_at；其余仅就地置 is_default=false
+        assert_eq!(m.config().groups[&g1.id].updated_at, "sentinel");
     }
 
     #[test]

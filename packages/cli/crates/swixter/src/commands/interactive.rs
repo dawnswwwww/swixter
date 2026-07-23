@@ -22,115 +22,110 @@ const MENU: &[(&str, &str)] = &[
 ];
 
 pub fn main_menu(coder: &CoderSpec) -> i32 {
-    loop {
-        let items: Vec<&str> = MENU.iter().map(|(_, label)| *label).collect();
-        let sel = match Select::new()
-            .with_prompt(format!(
-                "{} — what would you like to do?",
-                coder.display_name
-            ))
-            .items(&items)
-            .interact()
-        {
-            Ok(i) => i,
-            Err(_) => return EXIT_CANCELLED,
-        };
-        let (cmd, _) = MENU[sel];
-        let code = match cmd {
-            "run" => crate::commands::run::run(
-                coder,
-                crate::cli::RunArgs {
-                    profile: None,
-                    yolo: false,
-                    args: vec![],
-                },
-            ),
-            "create" => create_wizard(
-                coder,
-                CreateArgs {
-                    name: None,
-                    provider: None,
-                    api_key: None,
-                    auth_token: None,
-                    base_url: None,
-                    model: None,
-                    env_key: None,
-                    anthropic_model: None,
-                    default_haiku_model: None,
-                    default_opus_model: None,
-                    default_sonnet_model: None,
-                    api_format: None,
-                    quiet: false,
-                    apply: false,
-                },
-            ),
-            "list" => crate::commands::coder::dispatch(
+    // TS cli/claude.ts:1018-1052 —— 执行一个子命令后即返回（exit 子命令的码），不循环
+    let items: Vec<&str> = MENU.iter().map(|(_, label)| *label).collect();
+    let sel = match Select::new()
+        .with_prompt(format!(
+            "{} — what would you like to do?",
+            coder.display_name
+        ))
+        .items(&items)
+        .interact()
+    {
+        Ok(i) => i,
+        Err(_) => return EXIT_CANCELLED,
+    };
+    let (cmd, _) = MENU[sel];
+    match cmd {
+        "run" => crate::commands::run::run(
+            coder,
+            crate::cli::RunArgs {
+                profile: None,
+                yolo: false,
+                args: vec![],
+            },
+        ),
+        "create" => create_wizard(
+            coder,
+            CreateArgs {
+                name: None,
+                provider: None,
+                api_key: None,
+                auth_token: None,
+                base_url: None,
+                model: None,
+                env_key: None,
+                anthropic_model: None,
+                default_haiku_model: None,
+                default_opus_model: None,
+                default_sonnet_model: None,
+                api_format: None,
+                quiet: false,
+                apply: false,
+            },
+        ),
+        "list" => crate::commands::coder::dispatch(
+            coder.id,
+            crate::cli::CoderArgs {
+                command: Some(crate::cli::CoderCommand::List),
+            },
+        ),
+        "switch" => match pick_profile(&ConfigManager::load(), "Switch to which profile?") {
+            Some(name) => crate::commands::coder::dispatch(
                 coder.id,
                 crate::cli::CoderArgs {
-                    command: Some(crate::cli::CoderCommand::List),
+                    command: Some(crate::cli::CoderCommand::Switch {
+                        name,
+                        apply: false,
+                        no_apply: false,
+                    }),
                 },
             ),
-            "switch" => match pick_profile(&ConfigManager::load(), "Switch to which profile?") {
-                Some(name) => crate::commands::coder::dispatch(
-                    coder.id,
-                    crate::cli::CoderArgs {
-                        command: Some(crate::cli::CoderCommand::Switch {
-                            name,
-                            apply: false,
-                            no_apply: false,
-                        }),
-                    },
-                ),
-                None => EXIT_CANCELLED,
+            None => EXIT_CANCELLED,
+        },
+        "edit" => edit_wizard(coder, None),
+        "apply" => match apply_active(coder) {
+            Ok(()) => {
+                println!("✓ Applied to {}", coder.display_name);
+                EXIT_SUCCESS
+            }
+            Err(e) => {
+                eprintln!("✗ {e}");
+                EXIT_GENERAL
+            }
+        },
+        "current" => crate::commands::coder::dispatch(
+            coder.id,
+            crate::cli::CoderArgs {
+                command: Some(crate::cli::CoderCommand::Current),
             },
-            "edit" => edit_wizard(coder, None),
-            "apply" => match apply_active(coder) {
-                Ok(()) => {
-                    println!("✓ Applied to {}", coder.display_name);
+        ),
+        "delete" => match pick_profile(&ConfigManager::load(), "Delete which profile?") {
+            Some(name) => {
+                let ok = Confirm::new()
+                    .with_prompt(format!("Delete profile \"{name}\"?"))
+                    .default(false)
+                    .interact()
+                    .unwrap_or(false);
+                if ok {
+                    crate::commands::coder::dispatch(
+                        coder.id,
+                        crate::cli::CoderArgs {
+                            command: Some(crate::cli::CoderCommand::Delete { name }),
+                        },
+                    )
+                } else {
                     EXIT_SUCCESS
                 }
-                Err(e) => {
-                    eprintln!("✗ {e}");
-                    EXIT_GENERAL
-                }
-            },
-            "current" => crate::commands::coder::dispatch(
-                coder.id,
-                crate::cli::CoderArgs {
-                    command: Some(crate::cli::CoderCommand::Current),
-                },
-            ),
-            "delete" => match pick_profile(&ConfigManager::load(), "Delete which profile?") {
-                Some(name) => {
-                    let ok = Confirm::new()
-                        .with_prompt(format!("Delete profile \"{name}\"?"))
-                        .default(false)
-                        .interact()
-                        .unwrap_or(false);
-                    if ok {
-                        crate::commands::coder::dispatch(
-                            coder.id,
-                            crate::cli::CoderArgs {
-                                command: Some(crate::cli::CoderCommand::Delete { name }),
-                            },
-                        )
-                    } else {
-                        EXIT_SUCCESS
-                    }
-                }
-                None => EXIT_CANCELLED,
-            },
-            "install" => crate::commands::install::install(coder, None, false),
-            "update-cli" => crate::commands::install::update(coder),
-            _ => {
-                println!("Goodbye!");
-                return EXIT_CANCELLED;
-            } // "exit"
-        };
-        if code == EXIT_CANCELLED && cmd == "run" {
-            return code;
-        }
-        // 其他命令结束后回到主菜单（TS 行为：菜单循环）
+            }
+            None => EXIT_CANCELLED,
+        },
+        "install" => crate::commands::install::install(coder, None, false),
+        "update-cli" => crate::commands::install::update(coder),
+        _ => {
+            println!("Goodbye!");
+            EXIT_CANCELLED
+        } // "exit"
     }
 }
 
@@ -217,7 +212,8 @@ fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
             .map_err(|_| EXIT_CANCELLED)
     };
 
-    let needs_key = provider_id != "ollama";
+    // apiKey 必填只对 codex/qwen 且 provider != ollama 生效；claude 一律可选
+    let needs_key = coder.id != "claude" && provider_id != "ollama";
     let api_key = if needs_key {
         input_req("API Key")?
     } else {

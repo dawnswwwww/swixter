@@ -300,7 +300,31 @@ pub fn apply_active(coder: &CoderSpec) -> Result<(), String> {
 }
 
 fn cmd_delete(_coder: &CoderSpec, name: &str) -> i32 {
-    // TS: deleteProfile 先对所有 coder 做 adapter 清理（失败仅 warn），再删配置
+    // 先做存在性 + group 引用预检（直接读配置，不触碰外部文件）：
+    // 预检失败就不得执行 adapter 清理，否则被 group 引用的 profile
+    // 会出现"配置删除失败但 ~/.codex 等外部配置已被清"的半完成状态
+    {
+        let mgr = ConfigManager::load();
+        if !mgr.config().profiles.contains_key(name) {
+            eprintln!("✗ Profile \"{name}\" does not exist");
+            return EXIT_NOT_FOUND;
+        }
+        let referencing: Vec<&str> = mgr
+            .config()
+            .groups
+            .values()
+            .filter(|g| g.profiles.iter().any(|p| p == name))
+            .map(|g| g.name.as_str())
+            .collect();
+        if !referencing.is_empty() {
+            eprintln!(
+                "✗ Profile \"{name}\" is used in group(s): {}. Remove it from the group(s) first.",
+                referencing.join(", ")
+            );
+            return EXIT_GENERAL;
+        }
+    }
+    // TS: deleteProfile 对所有 coder 做 adapter 清理（失败仅 warn），再删配置
     for c in swixter_core::coder::CODERS {
         let adapter = get_adapter(c.adapter);
         if let Err(e) = adapter.remove(name) {

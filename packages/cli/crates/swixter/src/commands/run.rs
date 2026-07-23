@@ -47,15 +47,26 @@ pub fn run(coder: &CoderSpec, args: RunArgs) -> i32 {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis();
-            let tmp = std::env::temp_dir().join(format!("swixter-settings-{millis}.json"));
+            // millis + 6 位随机后缀，避免并发/残留冲突
+            let rand6: u32 = rand::random::<u32>() % 1_000_000;
+            let tmp =
+                std::env::temp_dir().join(format!("swixter-settings-{millis}-{rand6:06}.json"));
             let env_map: serde_json::Map<String, serde_json::Value> = env
                 .into_iter()
                 .map(|(k, v)| (k, serde_json::Value::String(v)))
                 .collect();
+            // 有意偏差（比 TS 更安全）：临时 settings 只写当前 profile 的 env，
+            // 不合并用户已有 settings.json 的其他段
             let json = serde_json::json!({ "env": env_map });
             if let Err(e) = std::fs::write(&tmp, serde_json::to_string_pretty(&json).unwrap()) {
                 eprintln!("✗ failed to write temp settings: {e}");
                 return EXIT_GENERAL;
+            }
+            // 内含 API key，权限收紧为 0600（unix）
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
             }
             cmd.arg("--settings").arg(&tmp);
             if args.yolo {
@@ -78,20 +89,29 @@ pub fn run(coder: &CoderSpec, args: RunArgs) -> i32 {
             }
         }
         "qwen" => {
-            // TS: 注入三个 openai 参数（在透传参数之前）
+            // TS cli/qwen.ts: base 回退链 profile.baseURL || preset.baseURLChat || preset.baseURL
+            let base = profile
+                .base_url
+                .as_deref()
+                .or(preset.as_ref().and_then(|p| p.base_url_chat.as_deref()))
+                .or(preset.as_ref().map(|p| p.base_url.as_str()))
+                .unwrap_or("");
+            // qwen 场景 model 直接取 model/openaiModel 字段（不看 models 对象，
+            // 与 get_openai_model 不同，对齐 TS `profile.model || profile.openaiModel`）
+            let model = profile
+                .model
+                .as_deref()
+                .or(profile.openai_model.as_deref())
+                .filter(|s| !s.is_empty());
+            // TS: 同时注入三个 openai 参数（在透传参数之前）
             let mut pre: Vec<String> = vec![];
             if !profile.api_key.is_empty() {
                 pre.extend(["--openai-api-key".into(), profile.api_key.clone()]);
             }
-            let base = profile
-                .base_url
-                .as_deref()
-                .or(preset.as_ref().map(|p| p.base_url.as_str()))
-                .unwrap_or("");
             if !base.is_empty() {
                 pre.extend(["--openai-base-url".into(), base.to_string()]);
             }
-            if let Some(m) = get_openai_model(&profile) {
+            if let Some(m) = model {
                 pre.extend(["--model".into(), m.to_string()]);
             }
             // 重建参数顺序：注入参数在前
@@ -101,6 +121,16 @@ pub fn run(coder: &CoderSpec, args: RunArgs) -> i32 {
                 .stdin(std::process::Stdio::inherit())
                 .stdout(std::process::Stdio::inherit())
                 .stderr(std::process::Stdio::inherit());
+            // 注入子进程 env
+            if !profile.api_key.is_empty() {
+                cmd2.env("OPENAI_API_KEY", &profile.api_key);
+            }
+            if !base.is_empty() {
+                cmd2.env("OPENAI_BASE_URL", base);
+            }
+            if let Some(m) = model {
+                cmd2.env("OPENAI_MODEL", m);
+            }
             cmd = cmd2;
         }
         _ => {}

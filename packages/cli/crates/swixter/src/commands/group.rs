@@ -1,5 +1,5 @@
 use crate::cli::{GroupArgs, GroupCommand};
-use crate::{EXIT_GENERAL, EXIT_INVALID_ARG, EXIT_NOT_FOUND, EXIT_SUCCESS};
+use crate::{EXIT_CANCELLED, EXIT_GENERAL, EXIT_INVALID_ARG, EXIT_NOT_FOUND, EXIT_SUCCESS};
 use swixter_core::config::ConfigManager;
 use swixter_core::groups;
 
@@ -60,6 +60,10 @@ fn create(name: Option<String>, profiles: Option<String>) -> i32 {
             eprintln!("✗ {e}");
             EXIT_NOT_FOUND
         }
+        Err(swixter_core::CoreError::Validation(e)) => {
+            eprintln!("✗ {e}");
+            EXIT_INVALID_ARG
+        }
         Err(e) => {
             eprintln!("✗ {e}");
             EXIT_GENERAL
@@ -116,7 +120,8 @@ fn delete(name: &str, force: bool) -> i32 {
             .interact()
             .unwrap_or(false);
         if !ok {
-            return EXIT_SUCCESS;
+            // TS: 确认框 cancel → exit 130
+            return EXIT_CANCELLED;
         }
     }
     match groups::delete(&mut mgr, &group.id) {

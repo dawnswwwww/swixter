@@ -51,13 +51,16 @@ impl ConfigManager {
         Ok(())
     }
 
-    /// TS: upsertProfile — createdAt 保留，updatedAt 由调用方设置；
+    /// TS: upsertProfile — createdAt 保留旧值，updatedAt 统一刷新为 now；
     /// coder 指定时：首个 profile 或当前无激活 → 自动设为激活
     pub fn upsert_profile(
         &mut self,
         mut profile: Profile,
         coder: Option<&str>,
     ) -> Result<(), CoreError> {
+        // TS manager.ts:173 —— updatedAt 由 upsert 统一设置，
+        // 调用方即便自己塞了值也会被覆盖（重复设置无害，值同为 now）
+        profile.updated_at = crate::types::now_iso();
         if let Some(existing) = self.config.profiles.get(&profile.name) {
             profile.created_at = existing.created_at.clone();
         }
@@ -155,13 +158,19 @@ impl ConfigManager {
     }
 }
 
-/// 先解析为 Value 以支持 v1 迁移；解析/校验失败整体回退默认空配置。
+/// 先解析为 Value 以支持 v1 迁移与严格校验；解析/校验失败整体回退默认空配置。
 fn parse_and_migrate(raw: &str) -> ConfigFile {
     let mut v: serde_json::Value = match serde_json::from_str(raw) {
         Ok(v) => v,
         Err(_) => return ConfigFile::empty(),
     };
-    if v.get("version").and_then(|x| x.as_str()) == Some("1.0.0") {
+    // TS manager.ts:57 —— 仅当 version=="1.0.0" 且存在顶层 activeProfile（非空）才迁移；
+    // v1 但无 activeProfile → 后续严格校验不过，整体回退默认空配置
+    if v.get("version").and_then(|x| x.as_str()) == Some("1.0.0")
+        && v.get("activeProfile")
+            .and_then(|x| x.as_str())
+            .is_some_and(|s| !s.is_empty())
+    {
         let active = v
             .get("activeProfile")
             .and_then(|x| x.as_str())
@@ -179,6 +188,12 @@ fn parse_and_migrate(raw: &str) -> ConfigFile {
         obj.entry("groups".to_string())
             .or_insert_with(|| serde_json::json!({}));
     }
+    // 对齐 TS zod schema 的必填项，缺失则整体回退默认：
+    // 顶层 version/profiles/coders/groups；每个 profile 的
+    // name/providerId/apiKey/createdAt/updatedAt（均须为 string）
+    if !has_required_keys(&v) {
+        return ConfigFile::empty();
+    }
     let cfg: ConfigFile = match serde_json::from_value(v) {
         Ok(c) => c,
         Err(_) => return ConfigFile::empty(),
@@ -190,6 +205,26 @@ fn parse_and_migrate(raw: &str) -> ConfigFile {
         Ok(()) => cfg,
         Err(_) => ConfigFile::empty(),
     }
+}
+
+/// serde 解析前的必需键检查（TS zod 严格性；serde 的 default 会静默容忍缺失）
+fn has_required_keys(v: &serde_json::Value) -> bool {
+    let Some(obj) = v.as_object() else {
+        return false;
+    };
+    for k in ["version", "profiles", "coders", "groups"] {
+        if !obj.contains_key(k) {
+            return false;
+        }
+    }
+    let Some(profiles) = obj.get("profiles").and_then(|p| p.as_object()) else {
+        return false;
+    };
+    profiles.values().all(|p| {
+        ["name", "providerId", "apiKey", "createdAt", "updatedAt"]
+            .iter()
+            .all(|k| p.get(*k).and_then(|x| x.as_str()).is_some())
+    })
 }
 
 // 注：本测试与 presets/groups 测试一样依赖磁盘临时目录，不含共享环境变量；
@@ -290,5 +325,76 @@ mod tests {
         assert_eq!(m.config().sync_meta.as_ref().unwrap().dirty, Some(true));
         m.clear_sync_meta().unwrap();
         assert!(m.config().sync_meta.is_none());
+    }
+
+    #[test]
+    fn upsert_refreshes_updated_at() {
+        // TS manager.ts:173 —— updatedAt 由 upsert 统一刷新，调用方给的旧值被覆盖
+        let (_d, mut m) = mgr();
+        m.upsert_profile(profile("p1"), None).unwrap();
+        let mut p2 = profile("p1");
+        p2.updated_at = "1999-01-01T00:00:00.000Z".into();
+        m.upsert_profile(p2, None).unwrap();
+        let saved = &m.config().profiles["p1"];
+        assert_eq!(saved.created_at, "2025-01-01T00:00:00.000Z"); // createdAt 保留
+        assert_ne!(saved.updated_at, "1999-01-01T00:00:00.000Z");
+        assert_ne!(saved.updated_at, "2025-01-01T00:00:00.000Z"); // 已是刷新后的 now
+    }
+
+    #[test]
+    fn v1_without_active_profile_falls_back_to_default() {
+        // TS manager.ts:57 —— version=="1.0.0" 且存在 activeProfile 才迁移
+        let raw = r#"{
+            "version": "1.0.0",
+            "profiles": {"p1": {"name":"p1","providerId":"ollama","apiKey":"k",
+                "createdAt":"2025-01-01T00:00:00.000Z","updatedAt":"2025-01-01T00:00:00.000Z"}},
+            "groups": {}
+        }"#;
+        let cfg = parse_and_migrate(raw);
+        assert_eq!(cfg.version, CONFIG_VERSION);
+        assert!(cfg.profiles.is_empty()); // 整体回退默认空配置
+    }
+
+    #[test]
+    fn v1_with_active_profile_migrates() {
+        let raw = r#"{
+            "version": "1.0.0",
+            "activeProfile": "p1",
+            "profiles": {"p1": {"name":"p1","providerId":"ollama","apiKey":"k",
+                "createdAt":"2025-01-01T00:00:00.000Z","updatedAt":"2025-01-01T00:00:00.000Z"}}
+        }"#;
+        let cfg = parse_and_migrate(raw);
+        assert_eq!(cfg.version, CONFIG_VERSION);
+        assert_eq!(cfg.coders["claude"].active_profile, "p1");
+        assert!(cfg.profiles.contains_key("p1"));
+        assert!(cfg.groups.is_empty());
+    }
+
+    #[test]
+    fn v2_missing_coders_falls_back_to_default() {
+        // TS zod：顶层 version/profiles/coders/groups 必填
+        let raw = r#"{
+            "version": "2.0.0",
+            "profiles": {},
+            "groups": {}
+        }"#;
+        let cfg = parse_and_migrate(raw);
+        assert!(cfg.profiles.is_empty());
+        assert!(cfg.coders.is_empty());
+        assert_eq!(cfg.version, CONFIG_VERSION);
+    }
+
+    #[test]
+    fn profile_missing_api_key_falls_back_to_default() {
+        // TS zod：profile 的 name/providerId/apiKey/createdAt/updatedAt 必填
+        let raw = r#"{
+            "version": "2.0.0",
+            "profiles": {"p1": {"name":"p1","providerId":"ollama",
+                "createdAt":"2025-01-01T00:00:00.000Z","updatedAt":"2025-01-01T00:00:00.000Z"}},
+            "coders": {},
+            "groups": {}
+        }"#;
+        let cfg = parse_and_migrate(raw);
+        assert!(cfg.profiles.is_empty()); // 整体回退，而非宽容地接受
     }
 }

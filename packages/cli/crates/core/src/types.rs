@@ -3,12 +3,13 @@ use std::collections::HashMap;
 
 pub const CONFIG_VERSION: &str = "2.0.0";
 
-/// TS 用 new Date().toISOString()（毫秒精度）；统一的时间戳来源，
-/// groups.rs 与后续 CLI create/edit 都调用它。
+/// TS 用 new Date().toISOString()（固定 3 位毫秒，如 2025-01-01T00:00:00.000Z）；
+/// 统一的时间戳来源，groups.rs 与后续 CLI create/edit 都调用它。
 pub fn now_iso() -> String {
-    time::OffsetDateTime::now_utc()
-        .format(&time::format_description::well_known::Iso8601::DEFAULT)
-        .unwrap()
+    const FORMAT: &[time::format_description::FormatItem<'_>] = time::macros::format_description!(
+        "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z"
+    );
+    time::OffsetDateTime::now_utc().format(&FORMAT).unwrap()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -181,4 +182,36 @@ pub struct ModelFamily {
     pub id: String,
     pub name: String,
     pub models: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn now_iso_is_millis_precision() {
+        // TS new Date().toISOString()：^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+        // （固定 3 位毫秒 + Z 后缀，非 9 位纳秒）
+        let ts = now_iso();
+        let b = ts.as_bytes();
+        assert_eq!(b.len(), 24, "unexpected timestamp format: {ts}");
+        let digit = |i: usize| b[i].is_ascii_digit();
+        assert!(
+            (0..4).all(digit)
+                && b[4] == b'-'
+                && (5..7).all(digit)
+                && b[7] == b'-'
+                && (8..10).all(digit)
+                && b[10] == b'T'
+                && (11..13).all(digit)
+                && b[13] == b':'
+                && (14..16).all(digit)
+                && b[16] == b':'
+                && (17..19).all(digit)
+                && b[19] == b'.'
+                && (20..23).all(digit)
+                && b[23] == b'Z',
+            "unexpected timestamp format: {ts}"
+        );
+    }
 }

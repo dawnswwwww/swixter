@@ -12,6 +12,8 @@ pub struct ExportFile {
     pub profiles: Vec<Profile>,
     pub exported_at: String,
     pub version: String,
+    // 早期导出文件可能缺 sanitized 字段；缺省按 false 处理以便导入
+    #[serde(default)]
     pub sanitized: bool,
 }
 
@@ -29,23 +31,34 @@ pub struct ExportFileInfo {
 
 /// TS: API_KEY_FORMAT sanitizeLength=8, prefixLength=4, suffixLength=4
 pub fn sanitize_api_key(key: &str) -> String {
-    if key.len() <= 8 { return "***".into(); }
+    if key.len() <= 8 {
+        return "***".into();
+    }
     format!("{}***{}", &key[..4], &key[key.len() - 4..])
 }
 
-pub fn export_config(config: &ConfigFile, path: &Path, sanitize: bool,
-                     names: Option<&[String]>) -> Result<(), CoreError> {
+pub fn export_config(
+    config: &ConfigFile,
+    path: &Path,
+    sanitize: bool,
+    names: Option<&[String]>,
+) -> Result<(), CoreError> {
     let mut profiles: Vec<Profile> = match names {
-        Some(ns) if !ns.is_empty() => ns.iter()
+        Some(ns) if !ns.is_empty() => ns
+            .iter()
             .filter_map(|n| config.profiles.get(n).cloned())
             .collect(),
         _ => config.profiles.values().cloned().collect(),
     };
     if profiles.is_empty() {
-        return Err(CoreError::Validation("No profiles available to export".into()));
+        return Err(CoreError::Validation(
+            "No profiles available to export".into(),
+        ));
     }
     if sanitize {
-        for p in &mut profiles { p.api_key = sanitize_api_key(&p.api_key); }
+        for p in &mut profiles {
+            p.api_key = sanitize_api_key(&p.api_key);
+        }
     }
     let data = ExportFile {
         profiles,
@@ -57,10 +70,17 @@ pub fn export_config(config: &ConfigFile, path: &Path, sanitize: bool,
     Ok(())
 }
 
-pub fn import_config(mgr: &mut ConfigManager, path: &Path, overwrite: bool,
-                     skip_sanitized: bool) -> Result<ImportStats, CoreError> {
+pub fn import_config(
+    mgr: &mut ConfigManager,
+    path: &Path,
+    overwrite: bool,
+    skip_sanitized: bool,
+) -> Result<ImportStats, CoreError> {
     if !path.exists() {
-        return Err(CoreError::InvalidImport(format!("File does not exist: {}", path.display())));
+        return Err(CoreError::InvalidImport(format!(
+            "File does not exist: {}",
+            path.display()
+        )));
     }
     let raw = std::fs::read_to_string(path)?;
     let data: ExportFile = serde_json::from_str(&raw)
@@ -68,9 +88,15 @@ pub fn import_config(mgr: &mut ConfigManager, path: &Path, overwrite: bool,
     if data.sanitized && skip_sanitized {
         return Err(CoreError::InvalidImport(
             "Import file contains sanitized API Keys and cannot be imported. \
-             Please use the complete configuration file or set skipSanitized=false".into()));
+             Please use the complete configuration file or set skipSanitized=false"
+                .into(),
+        ));
     }
-    let mut stats = ImportStats { imported: 0, skipped: 0, errors: vec![] };
+    let mut stats = ImportStats {
+        imported: 0,
+        skipped: 0,
+        errors: vec![],
+    };
     let now = now_iso();
     for profile in data.profiles {
         let existing = mgr.config().profiles.get(&profile.name);
@@ -79,7 +105,9 @@ pub fn import_config(mgr: &mut ConfigManager, path: &Path, overwrite: bool,
             continue;
         }
         let mut p = profile.clone();
-        p.created_at = existing.map(|e| e.created_at.clone()).unwrap_or_else(|| now.clone());
+        p.created_at = existing
+            .map(|e| e.created_at.clone())
+            .unwrap_or_else(|| now.clone());
         p.updated_at = now.clone();
         mgr.config_mut_for_test().profiles.insert(p.name.clone(), p);
         stats.imported += 1;
@@ -94,9 +122,12 @@ pub fn import_config(mgr: &mut ConfigManager, path: &Path, overwrite: bool,
 pub fn validate_export_file(path: &Path) -> Result<ExportFileInfo, CoreError> {
     let raw = std::fs::read_to_string(path)
         .map_err(|_| CoreError::InvalidImport("File does not exist".into()))?;
-    let data: ExportFile = serde_json::from_str(&raw)
-        .map_err(|e| CoreError::InvalidImport(e.to_string()))?;
-    Ok(ExportFileInfo { profile_count: data.profiles.len(), sanitized: data.sanitized })
+    let data: ExportFile =
+        serde_json::from_str(&raw).map_err(|e| CoreError::InvalidImport(e.to_string()))?;
+    Ok(ExportFileInfo {
+        profile_count: data.profiles.len(),
+        sanitized: data.sanitized,
+    })
 }
 
 #[cfg(test)]
@@ -106,15 +137,20 @@ mod tests {
     use crate::types::Profile;
 
     fn profile(name: &str, key: &str) -> Profile {
-        Profile { name: name.into(), provider_id: "ollama".into(), api_key: key.into(),
-                  created_at: "2025-01-01T00:00:00.000Z".into(), updated_at: "2025-01-01T00:00:00.000Z".into(),
-                  ..Default::default() }
+        Profile {
+            name: name.into(),
+            provider_id: "ollama".into(),
+            api_key: key.into(),
+            created_at: "2025-01-01T00:00:00.000Z".into(),
+            updated_at: "2025-01-01T00:00:00.000Z".into(),
+            ..Default::default()
+        }
     }
 
     #[test]
     fn sanitize_rules() {
-        assert_eq!(sanitize_api_key("short"), "***");            // ≤8
-        assert_eq!(sanitize_api_key("12345678"), "***");         // 恰好 8
+        assert_eq!(sanitize_api_key("short"), "***"); // ≤8
+        assert_eq!(sanitize_api_key("12345678"), "***"); // 恰好 8
         assert_eq!(sanitize_api_key("sk-1234567890abcd"), "sk-1***abcd");
     }
 
@@ -122,10 +158,12 @@ mod tests {
     fn export_sanitized_roundtrip_and_skip() {
         let dir = tempfile::tempdir().unwrap();
         let mut mgr = ConfigManager::load_from(dir.path().join("config.json"));
-        mgr.upsert_profile(profile("p1", "sk-1234567890abcd"), None).unwrap();
+        mgr.upsert_profile(profile("p1", "sk-1234567890abcd"), None)
+            .unwrap();
         let out = dir.path().join("export.json");
         export_config(mgr.config(), &out, true, None).unwrap();
-        let raw: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
+        let raw: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
         assert_eq!(raw["version"], "1.0.0");
         assert_eq!(raw["sanitized"], true);
         assert_eq!(raw["profiles"][0]["apiKey"], "sk-1***abcd");
@@ -135,17 +173,43 @@ mod tests {
     }
 
     #[test]
+    fn import_without_sanitized_field_defaults_false() {
+        // 缺 sanitized 字段的导出文件可导入（按 false 处理）
+        let dir = tempfile::tempdir().unwrap();
+        let mut mgr = ConfigManager::load_from(dir.path().join("config.json"));
+        let out = dir.path().join("export.json");
+        std::fs::write(
+            &out,
+            serde_json::json!({
+                "profiles": [serde_json::to_value(profile("p1", "sk-1234567890abcd")).unwrap()],
+                "exportedAt": "2025-01-01T00:00:00.000Z",
+                "version": "1.0.0"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let stats = import_config(&mut mgr, &out, false, true).unwrap();
+        assert_eq!(stats.imported, 1);
+        assert_eq!(mgr.get_profile("p1").unwrap().api_key, "sk-1234567890abcd");
+        assert_eq!(validate_export_file(&out).unwrap().sanitized, false);
+    }
+
+    #[test]
     fn import_skip_existing_and_overwrite() {
         let dir = tempfile::tempdir().unwrap();
         let mut mgr = ConfigManager::load_from(dir.path().join("config.json"));
-        mgr.upsert_profile(profile("p1", "old-key-00000000"), None).unwrap();
+        mgr.upsert_profile(profile("p1", "old-key-00000000"), None)
+            .unwrap();
         let out = dir.path().join("export.json");
         // 导出（不 sanitize），改 key 后重新导入
         export_config(mgr.config(), &out, false, None).unwrap();
-        let mut data: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
+        let mut data: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
         data["profiles"][0]["apiKey"] = "new-key-11111111".into();
-        data["profiles"].as_array_mut().unwrap().push(
-            serde_json::to_value(profile("p2", "k2-22222222")).unwrap());
+        data["profiles"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::to_value(profile("p2", "k2-22222222")).unwrap());
         std::fs::write(&out, serde_json::to_string_pretty(&data).unwrap()).unwrap();
 
         let stats = import_config(&mut mgr, &out, false, true).unwrap();
@@ -156,7 +220,13 @@ mod tests {
         assert_eq!((stats.imported, stats.skipped), (2, 0));
         assert_eq!(mgr.get_profile("p1").unwrap().api_key, "new-key-11111111");
         // createdAt 保留，updatedAt 更新
-        assert_eq!(mgr.get_profile("p1").unwrap().created_at, "2025-01-01T00:00:00.000Z");
-        assert_ne!(mgr.get_profile("p1").unwrap().updated_at, "2025-01-01T00:00:00.000Z");
+        assert_eq!(
+            mgr.get_profile("p1").unwrap().created_at,
+            "2025-01-01T00:00:00.000Z"
+        );
+        assert_ne!(
+            mgr.get_profile("p1").unwrap().updated_at,
+            "2025-01-01T00:00:00.000Z"
+        );
     }
 }

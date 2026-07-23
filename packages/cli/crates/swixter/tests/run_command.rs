@@ -36,6 +36,10 @@ fn setup(dir: &tempfile::TempDir) -> Command {
 fn claude_run_passes_settings_and_yolo() {
     let dir = tempfile::tempdir().unwrap();
     fake_cli(&dir, "claude");
+    // 临时 settings 写在 std::env::temp_dir()（unix 读取 TMPDIR）：
+    // 指向隔离目录，便于断言"已清理"
+    let tmpdir = dir.path().join("tmp");
+    std::fs::create_dir_all(&tmpdir).unwrap();
     setup(&dir)
         .args([
             "claude",
@@ -51,6 +55,7 @@ fn claude_run_passes_settings_and_yolo() {
         .assert()
         .success();
     setup(&dir)
+        .env("TMPDIR", &tmpdir)
         .args(["claude", "run", "--yolo", "chat"])
         .assert()
         .success();
@@ -58,8 +63,8 @@ fn claude_run_passes_settings_and_yolo() {
     assert!(args.contains("--dangerously-skip-permissions"));
     assert!(args.contains("--settings"));
     assert!(args.contains("chat"));
-    // 临时 settings 文件已清理
-    let leftovers: Vec<_> = std::fs::read_dir(dir.path())
+    // 临时 settings 文件已清理（按前缀扫描隔离的 TMPDIR）
+    let leftovers: Vec<_> = std::fs::read_dir(&tmpdir)
         .unwrap()
         .filter_map(|e| e.ok())
         .filter(|e| {
@@ -68,7 +73,10 @@ fn claude_run_passes_settings_and_yolo() {
                 .starts_with("swixter-settings-")
         })
         .collect();
-    assert!(leftovers.is_empty());
+    assert!(
+        leftovers.is_empty(),
+        "leftover temp settings: {leftovers:?}"
+    );
 }
 
 #[test]
@@ -125,6 +133,43 @@ fn qwen_run_injects_openai_args() {
     let args = std::fs::read_to_string(dir.path().join("out.args")).unwrap();
     assert!(args.contains("--openai-base-url http://localhost:11434"));
     assert!(args.contains("--model qwen2.5-coder:7b"));
+    // 子进程 env 同步注入
+    let env = std::fs::read_to_string(dir.path().join("out.env")).unwrap();
+    assert!(env.contains("OPENAI_BASE_URL=http://localhost:11434"));
+    assert!(env.contains("OPENAI_MODEL=qwen2.5-coder:7b"));
+}
+
+#[test]
+#[cfg(unix)]
+fn qwen_run_base_url_falls_back_to_preset_base_url_chat() {
+    let dir = tempfile::tempdir().unwrap();
+    fake_cli(&dir, "qwen");
+    // deepseek: baseURL=https://api.deepseek.com/anthropic, baseURLChat=https://api.deepseek.com
+    // profile 不带 --base-url → 回退链取 preset.baseURLChat
+    setup(&dir)
+        .args([
+            "qwen",
+            "create",
+            "--quiet",
+            "--name",
+            "r4",
+            "--provider",
+            "deepseek",
+            "--model",
+            "deepseek-chat",
+            "--api-key",
+            "sk-deepseek-run",
+        ])
+        .assert()
+        .success();
+    setup(&dir).args(["qwen", "run", "chat"]).assert().success();
+    let args = std::fs::read_to_string(dir.path().join("out.args")).unwrap();
+    assert!(args.contains("--openai-base-url https://api.deepseek.com"));
+    assert!(!args.contains("--openai-base-url https://api.deepseek.com/anthropic"));
+    let env = std::fs::read_to_string(dir.path().join("out.env")).unwrap();
+    assert!(env.contains("OPENAI_BASE_URL=https://api.deepseek.com"));
+    assert!(env.contains("OPENAI_API_KEY=sk-deepseek-run"));
+    assert!(env.contains("OPENAI_MODEL=deepseek-chat"));
 }
 
 #[test]

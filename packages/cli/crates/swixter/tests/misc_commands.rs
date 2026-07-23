@@ -99,6 +99,68 @@ fn group_lifecycle() {
 }
 
 #[test]
+fn group_create_duplicate_name_exits_2() {
+    let dir = tempfile::tempdir().unwrap();
+    setup(&dir)
+        .args([
+            "claude",
+            "create",
+            "--quiet",
+            "--name",
+            "dp1",
+            "--provider",
+            "ollama",
+        ])
+        .assert()
+        .success();
+    setup(&dir)
+        .args(["group", "create", "dup", "--profiles", "dp1"])
+        .assert()
+        .success();
+    setup(&dir)
+        .args(["group", "create", "dup", "--profiles", "dp1"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("Group \"dup\" already exists"));
+}
+
+#[test]
+fn group_delete_confirm_cancel_exits_130() {
+    let dir = tempfile::tempdir().unwrap();
+    setup(&dir)
+        .args([
+            "claude",
+            "create",
+            "--quiet",
+            "--name",
+            "cp1",
+            "--provider",
+            "ollama",
+        ])
+        .assert()
+        .success();
+    setup(&dir)
+        .args(["group", "create", "c1", "--profiles", "cp1"])
+        .assert()
+        .success();
+    // 无 --force 且非 TTY：确认框 cancel → exit 130，group 保留
+    setup(&dir)
+        .args(["group", "delete", "c1"])
+        .assert()
+        .code(130);
+    setup(&dir).args(["group", "show", "c1"]).assert().success();
+}
+
+#[test]
+fn no_args_prints_help_and_exits_0() {
+    let dir = tempfile::tempdir().unwrap();
+    setup(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Usage: swixter"));
+}
+
+#[test]
 fn export_import_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     setup(&dir)
