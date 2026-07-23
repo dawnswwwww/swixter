@@ -39,7 +39,7 @@ describe("ProxyHandler", () => {
     expect(body.uptime).toBeDefined();
   });
 
-  test("chat endpoint accepts request with no auth token (auth disabled)", async () => {
+  test("chat endpoint rejects request with no auth token", async () => {
     const handler = new ProxyHandler();
     const request = new Request("http://localhost/v1/chat/completions", {
       method: "POST",
@@ -49,14 +49,11 @@ describe("ProxyHandler", () => {
 
     const response = await handler.handleRequest(request);
 
-    // Auth is disabled for local-only use: no 401, request passes through to
-    // the chat handler (which will then 5xx because the test has no real
-    // provider, but the point is: not 401).
-    expect(response.status).not.toBe(401);
-    expect(getActiveGroupSpy).toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    expect(getActiveGroupSpy).not.toHaveBeenCalled();
   });
 
-  test("chat endpoint accepts request with arbitrary auth token (auth disabled)", async () => {
+  test("chat endpoint rejects request with a wrong auth token", async () => {
     const handler = new ProxyHandler();
     const request = new Request("http://localhost/v1/chat/completions", {
       method: "POST",
@@ -69,8 +66,8 @@ describe("ProxyHandler", () => {
 
     const response = await handler.handleRequest(request);
 
-    expect(response.status).not.toBe(401);
-    expect(getActiveGroupSpy).toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    expect(getActiveGroupSpy).not.toHaveBeenCalled();
   });
 
   test("chat endpoint accepts valid proxy auth token and reaches group resolution", async () => {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Proxy bearer auth restored** — The proxy again rejects requests without `Authorization: Bearer swixter-local-proxy` with 401 (matching the documented gateway-token model and the E2E expectation); it had been silently disabled
+- **Windows test compatibility** — The kimi streaming fixture test normalizes CRLF line endings, fixing failures on Windows runners where git checks text files out with `core.autocrlf`
+
 ## [0.1.11] - 2026-07-23
 
 ### Added

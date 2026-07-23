@@ -219,7 +219,9 @@ describe("openAIChatToOpenAIResponsesStream", () => {
   });
 
   test("regression: real kimi fixture (with reasoning_content + no-space data:) parses without throwing and reaches completed", async () => {
-    const raw = readFileSync(join(fixtureDir, "kimi-chat-stream.txt"), "utf-8");
+    // Normalize CRLF: git may check the fixture out with Windows line endings
+    // (core.autocrlf), while SSE framing is defined in terms of LF.
+    const raw = readFileSync(join(fixtureDir, "kimi-chat-stream.txt"), "utf-8").replace(/\r\n/g, "\n");
     const stream = createOpenAIChatToOpenAIResponsesStream(new TextEncoder().encode(raw), streamCtx);
     const events = await drain(stream);
     expect(events.some((e) => e.includes("response.completed"))).toBe(true);
