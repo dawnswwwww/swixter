@@ -1,0 +1,41 @@
+{
+  "model": "gpt-5-codex",
+  "max_tokens": 4096,
+  "stream": true,
+  "parallel_tool_calls": true,
+  "reasoning_effort": "medium",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "shell",
+        "description": "Run a shell command",
+        "parameters": { "type": "object", "properties": {} }
+      }
+    }
+  ],
+  "tool_choice": { "type": "function", "function": { "name": "shell" } },
+  "messages": [
+    { "role": "system", "content": "You are a coder." },
+    { "role": "system", "content": "Use tools." },
+    {
+      "role": "user",
+      "content": [
+        { "type": "text", "text": "list " },
+        { "type": "text", "text": "files" }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "type": "function",
+          "function": { "name": "shell", "arguments": "{\"cmd\":\"ls\"}" }
+        }
+      ]
+    },
+    { "role": "tool", "tool_call_id": "call_1", "content": "file.txt" }
+  ]
+}
