@@ -1,5 +1,6 @@
 mod cli;
 mod commands;
+mod install_data;
 
 use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};

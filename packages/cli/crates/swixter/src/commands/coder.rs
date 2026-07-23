@@ -278,7 +278,7 @@ pub fn handle_apply_prompt(coder: &CoderSpec, apply: bool, no_apply: bool) -> i3
     }
 }
 
-fn is_tty() -> bool {
+pub fn is_tty() -> bool {
     // 简单判定：stdin 是终端。用 std::io::IsTerminal（Rust 1.70+）。
     std::io::IsTerminal::is_terminal(&std::io::stdin())
 }
