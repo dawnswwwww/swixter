@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-07-23
+
+### Added
+- **Codex ↔ chat-only provider bridge** — New `openai_responses ↔ openai_chat` transformer pair in the local proxy: request, non-streaming response, and streaming SSE translation (including `function_call` / `function_call_output` round-trips keyed by upstream `tool_call.id`). Codex, which only speaks `/v1/responses`, can now drive chat-completions-only providers (Kimi, GLM, MiniMax, …) through `swixter proxy start --profile <name>`. Verified end-to-end with Codex 0.145.0 against MiniMax's OpenAI-compatible API (text turn + tool-using turn)
+- **Codex proxy-bridge helpers** — `resolveProviderEndpoints` decides when a profile should route through the local proxy (chat-only target format), plus proxy-status check and GUI env helpers (`SWIXTER_PROXY_KEY`). Auto-wiring on `codex apply` is intentionally not enabled yet; bridging is opt-in
+- **MiniMax OpenAI-compatible endpoints** — `minimax-cn` and `minimax-global` presets now carry `baseURLChat` (`https://api.minimaxi.com/v1`, `https://api.minimax.io/v1`), following the DeepSeek dual-endpoint pattern; Claude Code keeps using the native `/anthropic` endpoint
+
+### Fixed
+- **`inferClientFormat` misclassification** — `/v1/responses` was classified as `anthropic_responses`; it is unambiguously OpenAI Responses (Codex)
+- **Proxy `/v1` duplication** — Forwarding joined a base URL ending in `/v1` with absolute `/v1/...` transformer paths, producing `/v1/v1/...` and upstream 404s for every chat-format provider
+- **Request transformer robustness** — Accepts bare-string `input` (Responses API shorthand for one user message) and defaults missing tool `parameters` to an empty object schema, which upstreams like MiniMax require
+
 ## [0.1.10] - 2026-06-08
 
 ### Added
