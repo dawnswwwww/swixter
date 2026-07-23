@@ -24,9 +24,9 @@ fn run() -> i32 {
         return EXIT_SUCCESS;
     };
     match command {
-        Commands::Proxy(_) | Commands::Ui(_) | Commands::Auth(_) | Commands::Sync(_) => {
+        Commands::Ui(_) | Commands::Auth(_) | Commands::Sync(_) => {
             eprintln!(
-                "This command is not yet available in the Rust build (coming in milestone M2/M3)."
+                "This command is not yet available in the Rust build (coming in milestone M3)."
             );
             EXIT_GENERAL
         }
@@ -45,6 +45,7 @@ fn run() -> i32 {
         Commands::Qwen(a) => commands::coder::dispatch("qwen", a),
         Commands::Providers(a) => commands::providers::dispatch(a),
         Commands::Group(a) => commands::group::dispatch(a),
+        Commands::Proxy(a) => commands::proxy::dispatch(a),
         Commands::Export { file } => commands::transfer::export_cmd(&file),
         Commands::Import { file } => commands::transfer::import_cmd(&file),
     }

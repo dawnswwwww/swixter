@@ -30,8 +30,8 @@ pub enum Commands {
     Import { file: PathBuf },
     /// Print shell completion script
     Completion { shell: ShellKind },
-    /// [M2] Local proxy with failover
-    Proxy(StubArgs),
+    /// Local proxy with failover
+    Proxy(ProxyArgs),
     /// [M3] Web UI
     Ui(StubArgs),
     /// [M3] Cloud auth
@@ -42,6 +42,53 @@ pub enum Commands {
 
 #[derive(Args)]
 pub struct StubArgs {
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    pub args: Vec<String>,
+}
+
+#[derive(Args)]
+pub struct ProxyArgs {
+    #[command(subcommand)]
+    pub command: ProxyCommand,
+}
+
+#[derive(Subcommand)]
+pub enum ProxyCommand {
+    /// Start proxy server (default instance)
+    Start(ProxyStartArgs),
+    /// Stop proxy instance (default: "default")
+    Stop { instance_id: Option<String> },
+    /// Show all proxy instances
+    Status,
+    /// Start proxy and run coder with env vars
+    Run(ProxyRunArgs),
+}
+
+#[derive(Args)]
+pub struct ProxyStartArgs {
+    #[arg(long)]
+    pub group: Option<String>,
+    #[arg(long)]
+    pub profile: Option<String>,
+    #[arg(long, default_value_t = 15721)]
+    pub port: u16,
+    #[arg(long, default_value = "127.0.0.1")]
+    pub host: String,
+    #[arg(long, default_value_t = 3000000)]
+    pub timeout: u64,
+    #[arg(long)]
+    pub daemon: bool,
+}
+
+#[derive(Args)]
+pub struct ProxyRunArgs {
+    #[arg(long)]
+    pub group: Option<String>,
+    #[arg(long)]
+    pub profile: Option<String>,
+    #[arg(long)]
+    pub port: Option<u16>,
+    /// Coder command and args after --
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub args: Vec<String>,
 }

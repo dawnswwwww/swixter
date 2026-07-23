@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 swixter-core = { path = "../core" }
+swixter-proxy = { path = "../proxy" }
 clap.workspace = true
 clap_complete.workspace = true
 dialoguer.workspace = true
@@ -19,6 +20,8 @@ regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 rand.workspace = true
+tokio.workspace = true
+libc.workspace = true
 
 [dev-dependencies]
 assert_cmd.workspace = true

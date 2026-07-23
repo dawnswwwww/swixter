@@ -1,4 +1,53 @@
-use crate::types::{Profile, ProviderPreset};
+use crate::types::{ModelsConfig, Profile, ProviderPreset};
+
+// Claude proxy marker 模型名：proxy 请求体里的占位 model，handler 侧再解析回真实模型。
+// Task 10 从 swixter-proxy 上移到 core（proxy profile 构造需要），
+// swixter-proxy lib.rs re-export 保持既有引用不变。
+pub const SWIXTER_CLAUDE_MODEL: &str = "SWIXTER_CLAUDE_MODEL";
+pub const SWIXTER_CLAUDE_HAIKU_MODEL: &str = "SWIXTER_CLAUDE_HAIKU_MODEL";
+pub const SWIXTER_CLAUDE_SONNET_MODEL: &str = "SWIXTER_CLAUDE_SONNET_MODEL";
+pub const SWIXTER_CLAUDE_OPUS_MODEL: &str = "SWIXTER_CLAUDE_OPUS_MODEL";
+
+/// TS: buildClaudeProxyMarkerModels —— 有对应真实模型才写 marker；全无可配 → None
+pub fn build_claude_proxy_marker_models(p: &Profile) -> Option<ModelsConfig> {
+    let m = ModelsConfig {
+        anthropic_model: if p
+            .models
+            .as_ref()
+            .and_then(|x| x.anthropic_model.as_deref())
+            .or(p.model.as_deref())
+            .is_some()
+        {
+            Some(SWIXTER_CLAUDE_MODEL.into())
+        } else {
+            None
+        },
+        default_haiku_model: p
+            .models
+            .as_ref()
+            .and_then(|x| x.default_haiku_model.as_deref())
+            .map(|_| SWIXTER_CLAUDE_HAIKU_MODEL.into()),
+        default_sonnet_model: p
+            .models
+            .as_ref()
+            .and_then(|x| x.default_sonnet_model.as_deref())
+            .map(|_| SWIXTER_CLAUDE_SONNET_MODEL.into()),
+        default_opus_model: p
+            .models
+            .as_ref()
+            .and_then(|x| x.default_opus_model.as_deref())
+            .map(|_| SWIXTER_CLAUDE_OPUS_MODEL.into()),
+    };
+    if m.anthropic_model.is_none()
+        && m.default_haiku_model.is_none()
+        && m.default_sonnet_model.is_none()
+        && m.default_opus_model.is_none()
+    {
+        None
+    } else {
+        Some(m)
+    }
+}
 
 /// TS: model-helper.ts getOpenAIModel — 有 models 对象时返回 None
 pub fn get_openai_model(p: &Profile) -> Option<&str> {
@@ -98,4 +147,68 @@ pub fn build_profile_env(p: &Profile, m: &EnvVarMapping, base_url: &str) -> Vec<
         }
     }
     env
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn profile(model: Option<&str>, models: Option<ModelsConfig>) -> Profile {
+        Profile {
+            model: model.map(Into::into),
+            models,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn marker_models_follow_available_real_models() {
+        // 只有 model 字段 → 只有主 marker
+        let m = build_claude_proxy_marker_models(&profile(Some("glm-4"), None)).unwrap();
+        assert_eq!(m.anthropic_model.as_deref(), Some(SWIXTER_CLAUDE_MODEL));
+        assert!(m.default_haiku_model.is_none());
+
+        // models 全配 → 4 个 marker 全写
+        let full = ModelsConfig {
+            anthropic_model: Some("a".into()),
+            default_haiku_model: Some("h".into()),
+            default_sonnet_model: Some("s".into()),
+            default_opus_model: Some("o".into()),
+        };
+        let m = build_claude_proxy_marker_models(&profile(None, Some(full))).unwrap();
+        assert_eq!(m.anthropic_model.as_deref(), Some(SWIXTER_CLAUDE_MODEL));
+        assert_eq!(
+            m.default_haiku_model.as_deref(),
+            Some(SWIXTER_CLAUDE_HAIKU_MODEL)
+        );
+        assert_eq!(
+            m.default_sonnet_model.as_deref(),
+            Some(SWIXTER_CLAUDE_SONNET_MODEL)
+        );
+        assert_eq!(
+            m.default_opus_model.as_deref(),
+            Some(SWIXTER_CLAUDE_OPUS_MODEL)
+        );
+
+        // 部分配置：只有 sonnet → 只有 sonnet marker
+        let partial = ModelsConfig {
+            default_sonnet_model: Some("s".into()),
+            ..Default::default()
+        };
+        let m = build_claude_proxy_marker_models(&profile(None, Some(partial))).unwrap();
+        assert!(m.anthropic_model.is_none());
+        assert_eq!(
+            m.default_sonnet_model.as_deref(),
+            Some(SWIXTER_CLAUDE_SONNET_MODEL)
+        );
+    }
+
+    #[test]
+    fn marker_models_none_when_nothing_configurable() {
+        assert!(build_claude_proxy_marker_models(&profile(None, None)).is_none());
+        assert!(
+            build_claude_proxy_marker_models(&profile(None, Some(ModelsConfig::default())))
+                .is_none()
+        );
+    }
 }
