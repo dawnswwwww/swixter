@@ -7,28 +7,52 @@ import type { CoderAdapter } from "./base.js";
 import type { ClaudeCodeProfile } from "../types.js";
 import { getPresetByIdAsync } from "../providers/presets.js";
 import { getOpenAIModel } from "../utils/model-helper.js";
-import { getEnvKey, getEnvExportCommands as getEnvExports } from "../utils/env-key-helper.js";
+import { getEnvExportCommands as getEnvExports } from "../utils/env-key-helper.js";
+import { getEnvKey } from "../utils/env-key-helper.js";
 
 /**
  * Codex configuration adapter
  *
- * Handles reading/writing ~/.codex/config.toml and ~/.codex/auth.json
+ * Handles reading/writing ~/.codex/config.toml and standalone profile files
+ * (~/.codex/swixter-<name>.config.toml, per Codex 0.134.0+).
  *
  * Key features:
  * - TOML format support for config.toml
- * - auth.json support for API key storage (Codex reads keys via requires_openai_auth)
- * - Provider table management [model_providers.<name>]
- * - Profile table management [profiles.<name>]
+ * - Provider table management [model_providers.<name>] with env_key auth
+ * - Standalone profile files selected via `codex --profile swixter-<name>`
  * - Smart merge: preserves MCP servers, approval policies, etc.
+ *
+ * Authentication model: providers use `env_key` to reference an environment
+ * variable (e.g. OPENAI_API_KEY). The user must export that variable, or run
+ * `swixter codex run` which injects it automatically. swixter does NOT write
+ * API keys to auth.json — `requires_openai_auth` is reserved for providers
+ * backed by OpenAI-managed auth and is mutually exclusive with env_key.
+ *
+ * Note: the swixter proxy (with openai_responses ↔ openai_chat transformer)
+ * exists as separate infrastructure (`swixter proxy start --profile X`).
+ * The adapter does not auto-wire codex through the proxy — users opt in
+ * explicitly by configuring their codex base_url / env_key manually, or via
+ * a future dedicated command. See src/utils/codex-bridge.ts for the available
+ * helpers (resolveProviderEndpoints / ensureProxyRunning / setProxyAuthEnvForGUI).
  */
 export class CodexAdapter implements CoderAdapter {
   name = "codex";
   configPath: string;
-  authPath: string;
 
   constructor() {
-    this.configPath = join(homedir(), ".codex", "config.toml");
-    this.authPath = join(homedir(), ".codex", "auth.json");
+    const codexHome = join(homedir(), ".codex");
+    this.configPath = join(codexHome, "config.toml");
+  }
+
+  /**
+   * Path to the standalone profile file for a given swixter profile name.
+   *
+   * Codex 0.134.0+ loads `<CODEX_HOME>/<name>.config.toml` when selected with
+   * `codex --profile <name>`. swixter writes one file per profile. Derived from
+   * `configPath`'s directory so test overrides of configPath Just Work.
+   */
+  private getProfileFilePath(profileName: string): string {
+    return join(dirname(this.configPath), `swixter-${profileName}.config.toml`);
   }
 
   /**
@@ -37,10 +61,9 @@ export class CodexAdapter implements CoderAdapter {
    * Strategy:
    * 1. Read existing config.toml (or create empty object)
    * 2. Create/update provider table [model_providers.swixter-<profileName>]
-   * 3. Create/update profile table [profiles.swixter-<profileName>]
-   * 4. Set top-level profile = "swixter-<profileName>"
+   * 3. Set top-level model_provider = "swixter-<profileName>"
+   * 4. Write standalone profile file ~/.codex/swixter-<name>.config.toml
    * 5. Smart merge to preserve user's other configurations
-   * 6. Write back to config.toml
    */
   async apply(profile: ClaudeCodeProfile): Promise<void> {
     try {
@@ -83,26 +106,26 @@ export class CodexAdapter implements CoderAdapter {
       // Create/update provider table
       config.model_providers[providerName] = await this.createProviderTable(profile, preset);
 
-      // Initialize profiles table if not exists
-      if (!config.profiles) {
-        config.profiles = {};
-      }
-
-      // Create/update profile table
-      config.profiles[profileName] = await this.createProfileTable(profile, providerName);
-
-      // Set active profile at root level
-      config.profile = profileName;
-
-      // Also set model_provider for backward compatibility
+      // swixter does NOT use the deprecated [profiles.xxx] table or the top-level
+      // `profile =` selector (removed in Codex 0.134.0+). Profile settings live in
+      // a standalone file selected via `codex --profile swixter-<name>`. We do set
+      // the root `model_provider` so running plain `codex` still uses the provider.
       config.model_provider = providerName;
+      // Clean up any legacy swixter-written keys from older versions.
+      delete config.profile;
+      if (config.profiles) {
+        delete config.profiles[profileName];
+        if (Object.keys(config.profiles).length === 0) {
+          delete config.profiles;
+        }
+      }
 
       // Write config back
       const tomlContent = stringifyToml(config);
       await writeFile(this.configPath, tomlContent, "utf-8");
 
-      // Write auth.json so codex can read API key directly
-      await this.writeAuthJson(profile);
+      // Write the standalone profile file (~/.codex/swixter-<name>.config.toml)
+      await this.writeProfileFile(profile, providerName);
 
     } catch (error) {
       throw new Error(`Failed to apply Codex configuration: ${error instanceof Error ? error.message : String(error)}`);
@@ -121,40 +144,28 @@ export class CodexAdapter implements CoderAdapter {
       const content = await readFile(this.configPath, "utf-8");
       const config = parseToml(content);
 
-      const profileName = `swixter-${profile.name}`;
+      const providerName = `swixter-${profile.name}`;
 
-      // Check if profile is active
-      if (config.profile !== profileName) {
+      // config.toml must point model_provider at our provider table
+      if (config.model_provider !== providerName) {
         return false;
       }
-
-      // Check if profile exists in profiles table
-      if (!config.profiles || !config.profiles[profileName]) {
-        return false;
-      }
-
-      // Check if provider exists
-      const providerName = config.profiles[profileName].model_provider;
       if (!config.model_providers || !config.model_providers[providerName]) {
         return false;
       }
 
-      // If profile has API key, check auth.json
-      if (profile.apiKey) {
-        const envKey = await getEnvKey(profile);
-        if (existsSync(this.authPath)) {
-          try {
-            const authContent = await readFile(this.authPath, "utf-8");
-            const auth = JSON.parse(authContent);
-            if (auth[envKey] !== profile.apiKey) {
-              return false;
-            }
-          } catch {
-            return false;
-          }
-        } else {
+      // Standalone profile file must exist and reference the provider
+      const profileFilePath = this.getProfileFilePath(profile.name);
+      if (!existsSync(profileFilePath)) {
+        return false;
+      }
+      try {
+        const profileFile = parseToml(await readFile(profileFilePath, "utf-8"));
+        if (profileFile.model_provider !== providerName) {
           return false;
         }
+      } catch {
+        return false;
       }
 
       return true;
@@ -166,8 +177,11 @@ export class CodexAdapter implements CoderAdapter {
   /**
    * Create provider table configuration
    *
-   * Always uses env_key to reference environment variables (per official Codex spec)
-   * API keys should be set as environment variables before running Codex
+   * Uses env_key to reference an environment variable (per official Codex spec).
+   * The API key itself is NOT stored — the user exports the env var, or runs
+   * `swixter codex run` which injects it. We deliberately do NOT set
+   * requires_openai_auth: that flag is for OpenAI-managed auth and is mutually
+   * exclusive with env_key.
    */
   private async createProviderTable(profile: ClaudeCodeProfile, preset: any): Promise<any> {
     // Use baseURLChat if available (for chat-compatible Codex/Qwen), otherwise fall back to baseURL
@@ -176,7 +190,6 @@ export class CodexAdapter implements CoderAdapter {
       name: preset.displayName,
       base_url: profile.baseURL || baseUrl,
       wire_api: "responses",
-      requires_openai_auth: true,
     };
 
     // Use centralized env_key logic
@@ -191,63 +204,30 @@ export class CodexAdapter implements CoderAdapter {
   }
 
   /**
-   * Create profile table configuration
+   * Write the standalone profile file (~/.codex/swixter-<name>.config.toml).
+   *
+   * Per Codex 0.134.0+, a profile is a separate file with top-level config keys
+   * (NOT nested under [profiles.<name>]), selected via `codex --profile <name>`.
    */
-  private async createProfileTable(profile: ClaudeCodeProfile, providerName: string): Promise<any> {
-    const profileTable: any = {
+  private async writeProfileFile(profile: ClaudeCodeProfile, providerName: string): Promise<void> {
+    const profileContent: any = {
       model_provider: providerName,
     };
 
     // Use model from profile if specified (with backward compatibility)
     const modelValue = getOpenAIModel(profile);
     if (modelValue) {
-      profileTable.model = modelValue;
+      profileContent.model = modelValue;
     } else {
       // Fallback to first default model from preset
       const preset = await getPresetByIdAsync(profile.providerId);
       if (preset && preset.defaultModels && preset.defaultModels.length > 0) {
-        profileTable.model = preset.defaultModels[0];
+        profileContent.model = preset.defaultModels[0];
       }
     }
 
-    return profileTable;
-  }
-
-  /**
-   * Write auth.json with the API key so codex can read it directly
-   * without requiring environment variables.
-   */
-  private async writeAuthJson(profile: ClaudeCodeProfile): Promise<void> {
-    const envKey = await getEnvKey(profile);
-
-    // Read existing auth.json or start fresh
-    let auth: Record<string, string> = {};
-    if (existsSync(this.authPath)) {
-      try {
-        const content = await readFile(this.authPath, "utf-8");
-        const parsed = JSON.parse(content);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          auth = parsed;
-        }
-      } catch {
-        // If auth.json is corrupted, start fresh
-        auth = {};
-      }
-    }
-
-    // Set or remove the API key
-    if (profile.apiKey) {
-      auth[envKey] = profile.apiKey;
-    } else {
-      delete auth[envKey];
-    }
-
-    // Write back if there are keys; remove file if empty
-    if (Object.keys(auth).length > 0) {
-      await writeFile(this.authPath, JSON.stringify(auth, null, 2), "utf-8");
-    } else if (existsSync(this.authPath)) {
-      await unlink(this.authPath);
-    }
+    const profileFilePath = this.getProfileFilePath(profile.name);
+    await writeFile(profileFilePath, stringifyToml(profileContent), "utf-8");
   }
 
   /**
@@ -267,10 +247,15 @@ export class CodexAdapter implements CoderAdapter {
 
   /**
    * Remove profile from Codex configuration
-   * Removes the provider and profile entries with swixter- prefix
-   * and cleans up the corresponding API key from auth.json
+   * Removes the provider entry and the standalone profile file.
    */
   async remove(profileName: string): Promise<void> {
+    // Always remove the standalone profile file if it exists
+    const profileFilePath = this.getProfileFilePath(profileName);
+    if (existsSync(profileFilePath)) {
+      try { await unlink(profileFilePath); } catch { /* ignore */ }
+    }
+
     if (!existsSync(this.configPath)) {
       return;
     }
@@ -280,27 +265,28 @@ export class CodexAdapter implements CoderAdapter {
       const config = parseToml(content);
 
       const providerKey = `swixter-${profileName}`;
-      const profileKey = `swixter-${profileName}`;
 
       let modified = false;
-      let envKeyToRemove: string | undefined;
 
-      // Read env_key from provider table before deleting it
       if (config.model_providers && config.model_providers[providerKey]) {
-        envKeyToRemove = config.model_providers[providerKey].env_key;
         delete config.model_providers[providerKey];
         modified = true;
       }
 
-      // Remove from profiles
-      if (config.profiles && config.profiles[profileKey]) {
-        delete config.profiles[profileKey];
+      // Clean up legacy [profiles.xxx] table / profile= selector from older swixter
+      if (config.profiles && config.profiles[providerKey]) {
+        delete config.profiles[providerKey];
+        if (Object.keys(config.profiles).length === 0) {
+          delete config.profiles;
+        }
         modified = true;
       }
-
-      // If the active profile is the one being deleted, clear it
-      if (config.profile === profileKey) {
+      if (config.profile === providerKey) {
         delete config.profile;
+        modified = true;
+      }
+      // Clear root model_provider if it pointed at the removed provider
+      if (config.model_provider === providerKey) {
         delete config.model_provider;
         modified = true;
       }
@@ -309,18 +295,6 @@ export class CodexAdapter implements CoderAdapter {
       if (modified) {
         const tomlContent = stringifyToml(config);
         await writeFile(this.configPath, tomlContent, "utf-8");
-      }
-
-      // Clean up auth.json
-      if (envKeyToRemove && existsSync(this.authPath)) {
-        try {
-          const authContent = await readFile(this.authPath, "utf-8");
-          const auth = JSON.parse(authContent) as Record<string, string>;
-          delete auth[envKeyToRemove];
-          await writeFile(this.authPath, JSON.stringify(auth, null, 2), "utf-8");
-        } catch {
-          // Silently ignore auth.json cleanup errors
-        }
       }
     } catch (error) {
       // Silently fail - config might be corrupted or in unexpected format

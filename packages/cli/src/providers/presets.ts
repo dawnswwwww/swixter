@@ -184,12 +184,15 @@ export const zeroonePreset: ProviderPreset = {
 
 /**
  * MiniMax CN - Chinese AI coding assistant (Token Plan)
+ * Anthropic API: https://api.minimaxi.com/anthropic (Claude Code)
+ * OpenAI compatible: https://api.minimaxi.com/v1 (chat, for Codex/bridge)
  */
 export const minimaxCnPreset: ProviderPreset = {
   id: "minimax-cn",
   name: "MiniMax CN",
   displayName: "MiniMax (CN)",
   baseURL: "https://api.minimaxi.com/anthropic",
+  baseURLChat: "https://api.minimaxi.com/v1",
   defaultModels: [
     "MiniMax-M2.7",
   ],
@@ -203,12 +206,15 @@ export const minimaxCnPreset: ProviderPreset = {
 
 /**
  * MiniMax Global - International AI coding assistant (Token Plan)
+ * Anthropic API: https://api.minimax.io/anthropic (Claude Code)
+ * OpenAI compatible: https://api.minimax.io/v1 (chat, for Codex/bridge)
  */
 export const minimaxGlobalPreset: ProviderPreset = {
   id: "minimax-global",
   name: "MiniMax Global",
   displayName: "MiniMax (Global)",
   baseURL: "https://api.minimax.io/anthropic",
+  baseURLChat: "https://api.minimax.io/v1",
   defaultModels: [
     "MiniMax-M2.7",
   ],

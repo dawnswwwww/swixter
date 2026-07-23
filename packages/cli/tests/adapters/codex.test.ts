@@ -1,6 +1,18 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { CodexAdapter } from "../../src/adapters/codex.js";
-import type { ClaudeCodeProfile } from "../../src/types.js";
+import * as codexBridge from "../../src/utils/codex-bridge.js";
+import {
+  resolveProviderEndpoints,
+  setProxyAuthEnvForGUI,
+  ensureProxyRunning,
+} from "../../src/utils/codex-bridge.js";
+import {
+  DEFAULT_PROXY_HOST,
+  DEFAULT_PROXY_PORT,
+  SWIXTER_PROXY_AUTH_TOKEN,
+  SWIXTER_PROXY_ENV_KEY,
+} from "../../src/constants/proxy.js";
+import type { ClaudeCodeProfile, ProviderPreset } from "../../src/types.js";
 import { existsSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { parse as parseToml } from "smol-toml";
 
@@ -11,17 +23,31 @@ const TEST_AUTH_PATH = `${TEST_CONFIG_DIR}/auth.json`;
 describe("CodexAdapter", () => {
   let adapter: CodexAdapter;
 
+  let ensureProxySpy: ReturnType<typeof spyOn> | null = null;
+  let setEnvSpy: ReturnType<typeof spyOn> | null = null;
+
   beforeEach(() => {
     // Create adapter and override paths for testing
     adapter = new CodexAdapter();
     (adapter as any).configPath = TEST_CONFIG_PATH;
-    (adapter as any).authPath = TEST_AUTH_PATH;
 
     // Clean up and create test directory
     if (existsSync(TEST_CONFIG_DIR)) {
       rmSync(TEST_CONFIG_DIR, { recursive: true });
     }
     mkdirSync(TEST_CONFIG_DIR, { recursive: true });
+
+    // Stub proxy/launchctl side-effects globally so adapter.apply() never
+    // actually starts a daemon or touches launchd during tests. The adapter
+    // calls these via the `codexBridge` namespace import, so spyOn on the
+    // namespace object intercepts them. Individual tests that want to
+    // exercise the real side-effects restore these.
+    ensureProxySpy = spyOn(codexBridge, "ensureProxyRunning").mockReturnValue(
+      Promise.resolve(true) as never,
+    );
+    setEnvSpy = spyOn(codexBridge, "setProxyAuthEnvForGUI").mockReturnValue(
+      undefined as never,
+    );
   });
 
   afterEach(() => {
@@ -33,6 +59,10 @@ describe("CodexAdapter", () => {
     // Clean up environment variables
     delete process.env.OPENAI_API_KEY;
     delete process.env.OLLAMA_API_KEY;
+
+    // Restore stubs
+    ensureProxySpy?.mockRestore();
+    setEnvSpy?.mockRestore();
   });
 
   describe("apply - Basic Functionality", () => {
@@ -41,6 +71,7 @@ describe("CodexAdapter", () => {
         name: "test",
         providerId: "ollama",
         apiKey: "test-key",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -53,12 +84,16 @@ describe("CodexAdapter", () => {
       const content = await file.text();
       const config = parseToml(content);
 
-      // Verify profile is active
-      expect(config.profile).toBe("swixter-test");
+      // Verify model_provider points at our provider (no deprecated profile= selector)
+      expect(config.profile).toBeUndefined();
+      expect(config.model_provider).toBe("swixter-test");
 
-      // Verify profile table exists
-      expect(config.profiles["swixter-test"]).toBeDefined();
-      expect(config.profiles["swixter-test"].model_provider).toBe("swixter-test");
+      // Verify NO [profiles.xxx] table is written (Codex 0.134.0+ uses standalone files)
+      expect(config.profiles).toBeUndefined();
+
+      // Verify standalone profile file exists
+      const profileFile = parseToml(await Bun.file(`${TEST_CONFIG_DIR}/swixter-test.config.toml`).text());
+      expect(profileFile.model_provider).toBe("swixter-test");
 
       // Verify provider table exists
       expect(config.model_providers["swixter-test"]).toBeDefined();
@@ -73,6 +108,7 @@ describe("CodexAdapter", () => {
         providerId: "custom",
         apiKey: "custom-key",
         baseURL: "https://api.example.com/v1",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -92,6 +128,7 @@ describe("CodexAdapter", () => {
         providerId: "ollama",
         apiKey: "key1",
         baseURL: "http://localhost:11434",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -146,8 +183,8 @@ model_provider = "user-provider"
       expect(config.model_providers["user-provider"].name).toBe("User Provider");
       expect(config.model_providers["swixter-test"]).toBeDefined();
 
-      // Verify Swixter profile is now active
-      expect(config.profile).toBe("swixter-test");
+      // Verify model_provider points at our provider (no deprecated profile= selector)
+      expect(config.model_provider).toBe("swixter-test");
     });
   });
 
@@ -157,6 +194,7 @@ model_provider = "user-provider"
         name: "test",
         providerId: "ollama",
         apiKey: "my-api-key",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -176,6 +214,7 @@ model_provider = "user-provider"
         name: "test",
         providerId: "custom",
         apiKey: "custom-key",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -197,6 +236,7 @@ model_provider = "user-provider"
         name: "test",
         providerId: "ollama",
         apiKey: "test-key",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -301,13 +341,15 @@ model_provider = "openai"
       const file = Bun.file(TEST_CONFIG_PATH);
       const config = parseToml(await file.text());
 
-      // Original profiles should still exist
+      // User's own [profiles.*] tables are preserved (we don't touch foreign profiles)
       expect(config.profiles["my-work"]).toBeDefined();
       expect(config.profiles["my-work"].model).toBe("gpt-4");
       expect(config.profiles["my-personal"]).toBeDefined();
 
-      // Swixter profile should also exist
-      expect(config.profiles["swixter-test"]).toBeDefined();
+      // swixter does NOT add itself to [profiles]; it uses a standalone file
+      expect(config.profiles["swixter-test"]).toBeUndefined();
+      const swixterProfileFile = `${TEST_CONFIG_DIR}/swixter-test.config.toml`;
+      expect(existsSync(swixterProfileFile)).toBe(true);
     });
 
     test("should preserve unknown/custom fields", async () => {
@@ -346,6 +388,121 @@ log_user_prompt = false
       expect(config.features.web_search_request).toBe(true);
       expect(config.otel).toBeDefined();
       expect(config.otel.environment).toBe("production");
+    });
+  });
+
+  describe("apply - Standalone profile file (Codex 0.134.0+)", () => {
+    test("should write profile to a standalone .config.toml file, not [profiles.xxx] in config.toml", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "kimi-codex",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        baseURL: "https://api.kimi.com/coding/v1",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      // Standalone profile file exists
+      const profileFilePath = `${TEST_CONFIG_DIR}/swixter-kimi-codex.config.toml`;
+      expect(existsSync(profileFilePath)).toBe(true);
+
+      const profileFile = parseToml(await Bun.file(profileFilePath).text());
+      // Per Codex spec: top-level keys in profile file, NOT nested under [profiles.xxx]
+      expect(profileFile.profiles).toBeUndefined();
+      expect(profileFile.model_provider).toBe("swixter-kimi-codex");
+      expect(profileFile.model).toBeUndefined(); // no model set on this profile
+    });
+
+    test("should NOT write top-level profile= selector or [profiles.xxx] table in config.toml", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "kimi-codex",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const config = parseToml(await Bun.file(TEST_CONFIG_PATH).text());
+      // config.toml must not contain the deprecated selector/table
+      expect(config.profile).toBeUndefined();
+      expect(config.profiles).toBeUndefined();
+      // but model_provider at root still points at the provider table
+      expect(config.model_provider).toBe("swixter-kimi-codex");
+    });
+
+    test("should write model into standalone profile file when profile has a model", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "kimi-codex",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        model: "kimi-for-coding",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const profileFilePath = `${TEST_CONFIG_DIR}/swixter-kimi-codex.config.toml`;
+      const profileFile = parseToml(await Bun.file(profileFilePath).text());
+      expect(profileFile.model).toBe("kimi-for-coding");
+      expect(profileFile.model_provider).toBe("swixter-kimi-codex");
+    });
+
+    test("verify should pass when standalone profile file and provider table exist", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "kimi-codex",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        model: "kimi-for-coding",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+      expect(await adapter.verify(profile)).toBe(true);
+    });
+
+    test("verify should fail when standalone profile file is missing", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "kimi-codex",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      // Delete the standalone profile file
+      rmSync(`${TEST_CONFIG_DIR}/swixter-kimi-codex.config.toml`);
+
+      expect(await adapter.verify(profile)).toBe(false);
+    });
+
+    test("remove should delete the standalone profile file and clean config.toml", async () => {
+      const profile: ClaudeCodeProfile = {
+        name: "kimi-codex",
+        providerId: "custom",
+        apiKey: "sk-test-key",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adapter.apply(profile);
+
+      const profileFilePath = `${TEST_CONFIG_DIR}/swixter-kimi-codex.config.toml`;
+      expect(existsSync(profileFilePath)).toBe(true);
+
+      await adapter.remove("kimi-codex");
+
+      // File gone
+      expect(existsSync(profileFilePath)).toBe(false);
+      const config = parseToml(await Bun.file(TEST_CONFIG_PATH).text());
+      expect(config.model_providers?.["swixter-kimi-codex"]).toBeUndefined();
     });
   });
 
@@ -413,6 +570,7 @@ args = ["server.js", "--port", "8080"]
         providerId: "custom",
         apiKey: 'key-with-"quotes"',
         baseURL: "https://api.example.com/path?param=value&other=test",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -452,7 +610,7 @@ args = ["server.js", "--port", "8080"]
       const file = Bun.file(TEST_CONFIG_PATH);
       const config = parseToml(await file.text());
 
-      expect(config.profile).toBe("swixter-test");
+      expect(config.model_provider).toBe("swixter-test");
 
       // Backup file should exist
       const backupFiles = require("node:fs").readdirSync(TEST_CONFIG_DIR).filter((f: string) => f.includes("backup"));
@@ -493,7 +651,7 @@ args = ["server.js", "--port", "8080"]
       const file = Bun.file(TEST_CONFIG_PATH);
       const config = parseToml(await file.text());
 
-      expect(config.profile).toBe("swixter-test");
+      expect(config.model_provider).toBe("swixter-test");
     });
 
     test("should handle config with only comments", async () => {
@@ -512,7 +670,7 @@ args = ["server.js", "--port", "8080"]
       const file = Bun.file(TEST_CONFIG_PATH);
       const config = parseToml(await file.text());
 
-      expect(config.profile).toBe("swixter-test");
+      expect(config.model_provider).toBe("swixter-test");
     });
 
     test("should throw error for unknown provider", async () => {
@@ -648,6 +806,7 @@ model_provider = "swixter-test"
         name: "ollama-test",
         providerId: "ollama",
         apiKey: "test-key",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -658,7 +817,10 @@ model_provider = "swixter-test"
       const config = parseToml(await file.text());
 
       expect(config.model_providers["swixter-ollama-test"].wire_api).toBe("responses");
-      expect(config.model_providers["swixter-ollama-test"].requires_openai_auth).toBe(true);
+      // requires_openai_auth must NOT be set: it's reserved for OpenAI-managed auth
+      // and is mutually exclusive with env_key. swixter uses env_key only.
+      expect(config.model_providers["swixter-ollama-test"].requires_openai_auth).toBeUndefined();
+      expect(config.model_providers["swixter-ollama-test"].env_key).toBe("OLLAMA_API_KEY");
     });
 
     test("should set wire_api to 'responses' for Custom provider", async () => {
@@ -667,6 +829,7 @@ model_provider = "swixter-test"
         providerId: "custom",
         apiKey: "test-key",
         baseURL: "https://api.example.com",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -677,7 +840,8 @@ model_provider = "swixter-test"
       const config = parseToml(await file.text());
 
       expect(config.model_providers["swixter-custom-test"].wire_api).toBe("responses");
-      expect(config.model_providers["swixter-custom-test"].requires_openai_auth).toBe(true);
+      expect(config.model_providers["swixter-custom-test"].requires_openai_auth).toBeUndefined();
+      expect(config.model_providers["swixter-custom-test"].env_key).toBe("OPENAI_API_KEY");
     });
   });
 
@@ -693,16 +857,16 @@ model_provider = "swixter-test"
 
       await adapter.apply(profile);
 
-      const file = Bun.file(TEST_CONFIG_PATH);
-      const config = parseToml(await file.text());
+      // Default model now lives in the standalone profile file (Codex 0.134.0+)
+      const profileFile = parseToml(await Bun.file(`${TEST_CONFIG_DIR}/swixter-ollama-test.config.toml`).text());
 
       // Should have model from Ollama preset's defaultModels[0]
-      expect(config.profiles["swixter-ollama-test"].model).toBe("qwen2.5-coder:7b");
+      expect(profileFile.model).toBe("qwen2.5-coder:7b");
     });
   });
 
-  describe("auth.json", () => {
-    test("should write API key to auth.json on apply", async () => {
+  describe("env_key authentication (no auth.json)", () => {
+    test("should NOT write API key to auth.json on apply (env_key model only)", async () => {
       const profile: ClaudeCodeProfile = {
         name: "test",
         providerId: "custom",
@@ -713,45 +877,46 @@ model_provider = "swixter-test"
 
       await adapter.apply(profile);
 
-      expect(existsSync(TEST_AUTH_PATH)).toBe(true);
-      const auth = JSON.parse(await Bun.file(TEST_AUTH_PATH).text());
-      expect(auth.OPENAI_API_KEY).toBe("sk-test-key");
+      // auth.json must not be created by swixter — keys are provided via env var
+      expect(existsSync(TEST_AUTH_PATH)).toBe(false);
     });
 
-    test("should use custom envKey in auth.json", async () => {
+    test("provider table uses env_key and never requires_openai_auth", async () => {
       const profile: ClaudeCodeProfile = {
         name: "test",
         providerId: "custom",
         apiKey: "sk-test-key",
         envKey: "MY_CUSTOM_KEY",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await adapter.apply(profile);
 
-      const auth = JSON.parse(await Bun.file(TEST_AUTH_PATH).text());
-      expect(auth.MY_CUSTOM_KEY).toBe("sk-test-key");
-      expect(auth.OPENAI_API_KEY).toBeUndefined();
+      const config = parseToml(await Bun.file(TEST_CONFIG_PATH).text());
+      const provider = config.model_providers["swixter-test"];
+      expect(provider.env_key).toBe("MY_CUSTOM_KEY");
+      expect(provider.requires_openai_auth).toBeUndefined();
     });
 
-    test("should not write auth.json when apiKey is empty", async () => {
+    test("verify should pass based on config structure regardless of apiKey", async () => {
       const profile: ClaudeCodeProfile = {
         name: "test",
-        providerId: "ollama",
-        apiKey: "",
+        providerId: "custom",
+        apiKey: "sk-some-key",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await adapter.apply(profile);
-
-      expect(existsSync(TEST_AUTH_PATH)).toBe(false);
+      // No auth.json needed; verification is structural
+      expect(await adapter.verify(profile)).toBe(true);
     });
 
-    test("should preserve existing keys in auth.json", async () => {
-      // Pre-populate auth.json with another key
-      writeFileSync(TEST_AUTH_PATH, JSON.stringify({ OTHER_KEY: "other-value" }, null, 2));
+    test("apply must not touch an existing auth.json owned by Codex login", async () => {
+      // Codex itself may write auth.json for ChatGPT login. swixter must leave it alone.
+      writeFileSync(TEST_AUTH_PATH, JSON.stringify({ tokens: "codex-owned" }, null, 2));
 
       const profile: ClaudeCodeProfile = {
         name: "test",
@@ -764,50 +929,8 @@ model_provider = "swixter-test"
       await adapter.apply(profile);
 
       const auth = JSON.parse(await Bun.file(TEST_AUTH_PATH).text());
-      expect(auth.OPENAI_API_KEY).toBe("sk-test-key");
-      expect(auth.OTHER_KEY).toBe("other-value");
-    });
-
-    test("verify should fail when auth.json has wrong key", async () => {
-      const profile: ClaudeCodeProfile = {
-        name: "test",
-        providerId: "custom",
-        apiKey: "sk-correct-key",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      await adapter.apply(profile);
-
-      // Tamper with auth.json
-      writeFileSync(TEST_AUTH_PATH, JSON.stringify({ OPENAI_API_KEY: "sk-wrong-key" }, null, 2));
-
-      const result = await adapter.verify(profile);
-      expect(result).toBe(false);
-    });
-
-    test("remove should delete key from auth.json while preserving others", async () => {
-      const profile: ClaudeCodeProfile = {
-        name: "test",
-        providerId: "custom",
-        apiKey: "sk-test-key",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      await adapter.apply(profile);
-
-      // Add another key
-      writeFileSync(TEST_AUTH_PATH, JSON.stringify({
-        OPENAI_API_KEY: "sk-test-key",
-        OTHER_KEY: "other-value",
-      }, null, 2));
-
-      await adapter.remove("test");
-
-      const auth = JSON.parse(await Bun.file(TEST_AUTH_PATH).text());
+      expect(auth.tokens).toBe("codex-owned");
       expect(auth.OPENAI_API_KEY).toBeUndefined();
-      expect(auth.OTHER_KEY).toBe("other-value");
     });
   });
 
@@ -824,22 +947,19 @@ model_provider = "swixter-test"
 
       await adapter.apply(profile);
 
-      // Verify it was created
-      let file = Bun.file(TEST_CONFIG_PATH);
-      let config = parseToml(await file.text());
-      expect(config.profiles["swixter-test"]).toBeDefined();
+      // Verify it was created (standalone file + provider table, no [profiles])
+      let config = parseToml(await Bun.file(TEST_CONFIG_PATH).text());
+      expect(existsSync(`${TEST_CONFIG_DIR}/swixter-test.config.toml`)).toBe(true);
       expect(config.model_providers["swixter-test"]).toBeDefined();
-      expect(config.profile).toBe("swixter-test");
+      expect(config.model_provider).toBe("swixter-test");
 
       // Remove it
       await adapter.remove("test");
 
       // Verify it was removed
-      file = Bun.file(TEST_CONFIG_PATH);
-      config = parseToml(await file.text());
-      expect(config.profiles["swixter-test"]).toBeUndefined();
+      config = parseToml(await Bun.file(TEST_CONFIG_PATH).text());
+      expect(existsSync(`${TEST_CONFIG_DIR}/swixter-test.config.toml`)).toBe(false);
       expect(config.model_providers["swixter-test"]).toBeUndefined();
-      expect(config.profile).toBeUndefined();
       expect(config.model_provider).toBeUndefined();
     });
 
@@ -894,18 +1014,15 @@ model = "gpt-4"
 
       await adapter.apply(profile);
 
-      // Verify it's active
-      let file = Bun.file(TEST_CONFIG_PATH);
-      let config = parseToml(await file.text());
-      expect(config.profile).toBe("swixter-test");
+      // Verify it's active (model_provider points at our provider)
+      let config = parseToml(await Bun.file(TEST_CONFIG_PATH).text());
+      expect(config.model_provider).toBe("swixter-test");
 
       // Remove it
       await adapter.remove("test");
 
-      // Verify active profile was cleared
-      file = Bun.file(TEST_CONFIG_PATH);
-      config = parseToml(await file.text());
-      expect(config.profile).toBeUndefined();
+      // Verify active provider was cleared
+      config = parseToml(await Bun.file(TEST_CONFIG_PATH).text());
       expect(config.model_provider).toBeUndefined();
     });
 
@@ -998,9 +1115,9 @@ model_provider = "swixter-test"
       const file = Bun.file(TEST_CONFIG_PATH);
       const config = parseToml(await file.text());
 
-      // Profile should be removed
-      expect(config.profiles["swixter-test"]).toBeUndefined();
-      expect(config.model_providers["swixter-test"]).toBeUndefined();
+      // Profile/provider should be removed
+      expect(config.profiles?.["swixter-test"]).toBeUndefined();
+      expect(config.model_providers?.["swixter-test"]).toBeUndefined();
 
       // Other config should be preserved
       expect(config.mcp_servers).toBeDefined();
@@ -1023,6 +1140,7 @@ model_provider = "swixter-test"
         providerId: "custom",
         apiKey: "test-key",
         envKey: "MY_CUSTOM_API_KEY",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1040,6 +1158,7 @@ model_provider = "swixter-test"
         name: "test",
         providerId: "ollama",
         apiKey: "test-key",
+        apiFormat: "openai_responses",
         // No envKey field
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1059,6 +1178,7 @@ model_provider = "swixter-test"
         providerId: "custom",
         apiKey: "test-key",
         envKey: "",  // Empty string should use default
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1108,6 +1228,7 @@ model_provider = "swixter-test"
         providerId: "custom",
         apiKey: "test-key",
         envKey: "MY_API_KEY_2024",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1199,6 +1320,7 @@ model_provider = "swixter-test"
         apiKey: "original-key",
         envKey: "MY_CUSTOM_KEY",
         baseURL: "https://api.example.com",
+        apiFormat: "openai_responses",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1221,6 +1343,147 @@ model_provider = "swixter-test"
       // env_key should be preserved
       expect(config.model_providers["swixter-test"].env_key).toBe("MY_CUSTOM_KEY");
       expect(config.model_providers["swixter-test"].base_url).toBe("https://api2.example.com");
+    });
+  });
+
+  describe("chat-only provider bridging (proxy bridge)", () => {
+    // Fixture presets for resolveProviderEndpoints decision tests.
+    const moonshotPreset: ProviderPreset = {
+      id: "moonshot",
+      name: "Moonshot",
+      displayName: "Moonshot (Kimi)",
+      baseURL: "https://api.moonshot.cn/v1",
+      defaultModels: [],
+      authType: "api-key",
+      defaultApiFormat: "openai_chat",
+      wire_api: "chat",
+      env_key: "MOONSHOT_API_KEY",
+    };
+
+    // A responses-native provider (e.g. MiniMax-CN style): not bridged.
+    const responsesPreset: ProviderPreset = {
+      id: "minimax-cn",
+      name: "MiniMax",
+      displayName: "MiniMax (CN)",
+      baseURL: "https://api.minimax.chat/v1",
+      defaultModels: [],
+      authType: "api-key",
+      defaultApiFormat: "anthropic_messages",
+      wire_api: "responses",
+      env_key: "ANTHROPIC_API_KEY",
+    };
+
+    describe("resolveProviderEndpoints (pure decision logic)", () => {
+      test("chat-only provider → bridged through local proxy", () => {
+        const profile: ClaudeCodeProfile = {
+          name: "kimi",
+          providerId: "moonshot",
+          apiKey: "sk-real-kimi-key",
+          baseURL: "https://api.moonshot.cn/v1",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const result = resolveProviderEndpoints(profile, moonshotPreset);
+
+        expect(result.bridged).toBe(true);
+        expect(result.base_url).toBe(
+          `http://${DEFAULT_PROXY_HOST}:${DEFAULT_PROXY_PORT}/v1`,
+        );
+        expect(result.env_key).toBe(SWIXTER_PROXY_ENV_KEY);
+      });
+
+      test("non-chat (responses-native) provider → NOT bridged, real base_url + real env_key", () => {
+        const profile: ClaudeCodeProfile = {
+          name: "minimax",
+          providerId: "minimax-cn",
+          apiKey: "sk-real",
+          baseURL: "https://api.minimax.chat/v1",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const result = resolveProviderEndpoints(profile, responsesPreset);
+
+        expect(result.bridged).toBe(false);
+        expect(result.base_url).toBe("https://api.minimax.chat/v1");
+        expect(result.env_key).toBe("ANTHROPIC_API_KEY");
+      });
+
+      test("profile.apiFormat override to openai_chat forces bridge even if preset says responses", () => {
+        const profile: ClaudeCodeProfile = {
+          name: "force-chat",
+          providerId: "minimax-cn",
+          apiKey: "sk-real",
+          baseURL: "https://api.minimax.chat/v1",
+          apiFormat: "openai_chat",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const result = resolveProviderEndpoints(profile, responsesPreset);
+
+        expect(result.bridged).toBe(true);
+        expect(result.env_key).toBe(SWIXTER_PROXY_ENV_KEY);
+      });
+
+      test("profile.apiFormat override to non-chat disables bridge even if preset says chat", () => {
+        const profile: ClaudeCodeProfile = {
+          name: "force-resp",
+          providerId: "moonshot",
+          apiKey: "sk-real",
+          baseURL: "https://api.moonshot.cn/v1",
+          apiFormat: "anthropic_messages",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const result = resolveProviderEndpoints(profile, moonshotPreset);
+
+        expect(result.bridged).toBe(false);
+        expect(result.base_url).toBe("https://api.moonshot.cn/v1");
+        expect(result.env_key).toBe("MOONSHOT_API_KEY");
+      });
+
+      test("profile-level envKey is honored on the non-bridged path", () => {
+        const profile: ClaudeCodeProfile = {
+          name: "custom",
+          providerId: "minimax-cn",
+          apiKey: "sk",
+          baseURL: "https://api.minimax.chat/v1",
+          envKey: "MY_CUSTOM_ENV",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const result = resolveProviderEndpoints(profile, responsesPreset);
+        expect(result.bridged).toBe(false);
+        expect(result.env_key).toBe("MY_CUSTOM_ENV");
+      });
+    });
+
+    describe("side-effect helpers are non-throwing best-effort", () => {
+      test("setProxyAuthEnvForGUI does not throw (any platform)", () => {
+        // Should be safe to call on any test platform; on non-darwin it just
+        // prints an instruction, on darwin it spawns a fire-and-forget launchctl.
+        expect(() => setProxyAuthEnvForGUI()).not.toThrow();
+      });
+
+      test("ensureProxyRunning does not throw even if it can't start the daemon", async () => {
+        // No real proxy is running in CI/sandbox; this should either start a
+        // throwaway daemon or return false with a warning — never throw.
+        const result = await ensureProxyRunning("definitely-nonexistent-profile-xyz");
+        expect(typeof result).toBe("boolean");
+      });
+    });
+
+    describe("constants are wired", () => {
+      test("SWIXTER_PROXY_ENV_KEY is the documented env var name", () => {
+        expect(SWIXTER_PROXY_ENV_KEY).toBe("SWIXTER_PROXY_KEY");
+      });
+      test("SWIXTER_PROXY_AUTH_TOKEN is the fixed bearer the proxy authenticates", () => {
+        expect(SWIXTER_PROXY_AUTH_TOKEN).toBe("swixter-local-proxy");
+      });
     });
   });
 });

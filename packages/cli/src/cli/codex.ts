@@ -954,9 +954,10 @@ async function cmdApply(): Promise<void> {
       console.log();
 
       // Show usage instructions
-      console.log(pc.bold("Run Codex now: ") + pc.cyan("codex"));
+      console.log(pc.bold("Run Codex now: ") + pc.cyan("swixter codex run"));
       console.log();
-      console.log(pc.dim("Environment variables are automatically managed via auth.json."));
+      const envKey = profile.envKey || preset?.env_key || "OPENAI_API_KEY";
+      console.log(pc.dim(`Or export your key first:  export ${envKey}=<your-key>  then run  codex`));
       console.log();
     } else {
       console.log(pc.yellow("⚠  Profile written, but verification failed"));
