@@ -3,6 +3,14 @@ use std::collections::HashMap;
 
 pub const CONFIG_VERSION: &str = "2.0.0";
 
+/// TS 用 new Date().toISOString()（毫秒精度）；统一的时间戳来源，
+/// groups.rs 与后续 CLI create/edit 都调用它。
+pub fn now_iso() -> String {
+    time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Iso8601::DEFAULT)
+        .unwrap()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ConfigFile {

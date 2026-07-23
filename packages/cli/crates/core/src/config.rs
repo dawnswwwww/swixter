@@ -243,16 +243,17 @@ mod tests {
     fn delete_clears_active_and_refuses_group_members() {
         let (_d, mut m) = mgr();
         m.upsert_profile(profile("p1"), Some("claude")).unwrap();
-        m.config_mut_for_test()
-            .groups
-            .insert("g1".into(), crate::types::Group {
+        m.config_mut_for_test().groups.insert(
+            "g1".into(),
+            crate::types::Group {
                 id: "g1".into(),
                 name: "g".into(),
                 profiles: vec!["p1".into()],
                 is_default: true,
                 created_at: "t".into(),
                 updated_at: "t".into(),
-            });
+            },
+        );
         assert!(matches!(m.delete_profile("p1"), Err(CoreError::InUse(_))));
         m.config_mut_for_test().groups.clear();
         m.delete_profile("p1").unwrap();

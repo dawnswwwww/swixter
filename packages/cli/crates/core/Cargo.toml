@@ -12,6 +12,8 @@ serde_yaml_ng.workspace = true
 url.workspace = true
 thiserror.workspace = true
 dirs.workspace = true
+time.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

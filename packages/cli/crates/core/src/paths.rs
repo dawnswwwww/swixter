@@ -25,7 +25,10 @@ pub fn providers_path() -> PathBuf {
 }
 
 pub fn claude_settings_path() -> PathBuf {
-    dirs::home_dir().unwrap().join(".claude").join("settings.json")
+    dirs::home_dir()
+        .unwrap()
+        .join(".claude")
+        .join("settings.json")
 }
 
 pub fn codex_config_path() -> PathBuf {
