@@ -110,3 +110,72 @@ pub fn transform_response(body: &Value, ctx: &TransformCtx) -> Result<Value, Pro
         _ => Ok(body.clone()),
     }
 }
+
+/// TS: transformStream —— SSE 字节流经 SseChunker 切事件后逐事件转换，再序列化回字节流。
+/// 上游流结束时 chunker.flush() 的残余事件追加在尾部。
+pub fn transform_stream<S>(
+    stream: S,
+    ctx: &TransformCtx,
+) -> std::pin::Pin<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>>
+where
+    S: futures::Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Send + 'static,
+{
+    use futures::StreamExt;
+
+    type Converter = Box<dyn FnMut(&crate::sse::SseEvent) -> Vec<streaming::SseOut> + Send>;
+    let converter: Converter = match (ctx.client_format, ctx.target_format) {
+        (ApiFormat::AnthropicMessages, ApiFormat::OpenaiChat) => {
+            let mut c = streaming::ChatToAnthropicStream::new();
+            Box::new(move |ev| c.convert_event(ev))
+        }
+        (ApiFormat::OpenaiResponses, ApiFormat::OpenaiChat) => {
+            let mut c = streaming::ChatToResponsesStream::new();
+            Box::new(move |ev| c.convert_event(ev))
+        }
+        _ => unreachable!("transform_stream 只在 has_transformer 为真时调用"),
+    };
+
+    let render = |events: Vec<crate::sse::SseEvent>, converter: &mut Converter| -> String {
+        events
+            .iter()
+            .flat_map(&mut *converter)
+            .map(|o| crate::sse::serialize_sse_event(&o.event, &o.data_json))
+            .collect()
+    };
+
+    let state = std::sync::Arc::new(std::sync::Mutex::new((
+        crate::sse::SseChunker::new(),
+        converter,
+    )));
+    let st = state.clone();
+    let main = stream.filter_map(move |item| {
+        let text = match item {
+            Ok(bytes) => {
+                let mut guard = st.lock().unwrap();
+                let (chunker, converter) = &mut *guard;
+                let events = chunker.feed(&bytes);
+                render(events, converter)
+            }
+            Err(e) => return futures::future::ready(Some(Err(std::io::Error::other(e)))),
+        };
+        futures::future::ready(if text.is_empty() {
+            None
+        } else {
+            Some(Ok(bytes::Bytes::from(text)))
+        })
+    });
+    let tail = futures::stream::once(async move {
+        let mut guard = state.lock().unwrap();
+        let (chunker, converter) = &mut *guard;
+        let events = chunker.flush();
+        render(events, converter)
+    })
+    .filter_map(|text| {
+        futures::future::ready(if text.is_empty() {
+            None
+        } else {
+            Some(Ok(bytes::Bytes::from(text)))
+        })
+    });
+    Box::pin(main.chain(tail))
+}
