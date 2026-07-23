@@ -542,7 +542,7 @@ pub struct ModelFamily {
 }
 ```
 
-注意 `base_url_chat` 必须显式 `#[serde(rename = "baseURLChat")]`（`rename_all = "camelCase"` 会生成 `baseUrlChat`，与 TS 的 `baseURLChat` 不符）；`wire_api` / `env_key` 同理必须显式保留下划线命名。`auth_type` 上 TS 字段名是 `authType`（camelCase 规则覆盖正确），`AuthType` 已 derive `Default`（`ApiKey` 为默认变体），容器级 `#[serde(default)]` 缺失时可用。
+注意 `base_url_chat` 必须显式 `#[serde(rename = "baseURLChat")]`（`rename_all = "camelCase"` 会生成 `baseUrlChat`，与 TS 的 `baseURLChat` 不符）；`wire_api` / `env_key` 同理必须显式保留下划线命名。**`base_url` 也必须显式 `#[serde(rename = "baseURL")]`**（camelCase 会生成 `baseUrl`，与 TS 的 `baseURL` 不符，Profile 与 ProviderPreset 两处都要——实施时已修正）。`auth_type` 上 TS 字段名是 `authType`（camelCase 规则覆盖正确），`AuthType` 已 derive `Default`（`ApiKey` 为默认变体），容器级 `#[serde(default)]` 缺失时可用。
 
 - [ ] **Step 4: 实现 validate.rs 和 lib.rs**
 
