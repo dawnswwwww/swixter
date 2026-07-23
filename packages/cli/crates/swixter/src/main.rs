@@ -33,6 +33,9 @@ fn run() -> i32 {
             clap_complete::generate(clap_shell, &mut cmd, "swixter", &mut std::io::stdout());
             EXIT_SUCCESS
         }
+        Commands::Claude(a) => commands::coder::dispatch("claude", a),
+        Commands::Codex(a) => commands::coder::dispatch("codex", a),
+        Commands::Qwen(a) => commands::coder::dispatch("qwen", a),
         // 以下分支在后续任务中接入真实 handler；先报"未实现"保持编译
         _ => {
             eprintln!("not implemented yet");
