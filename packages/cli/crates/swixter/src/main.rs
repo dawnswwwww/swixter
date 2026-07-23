@@ -37,10 +37,9 @@ fn run() -> i32 {
         Commands::Claude(a) => commands::coder::dispatch("claude", a),
         Commands::Codex(a) => commands::coder::dispatch("codex", a),
         Commands::Qwen(a) => commands::coder::dispatch("qwen", a),
-        // 以下分支在后续任务中接入真实 handler；先报"未实现"保持编译
-        _ => {
-            eprintln!("not implemented yet");
-            EXIT_GENERAL
-        }
+        Commands::Providers(a) => commands::providers::dispatch(a),
+        Commands::Group(a) => commands::group::dispatch(a),
+        Commands::Export { file } => commands::transfer::export_cmd(&file),
+        Commands::Import { file } => commands::transfer::import_cmd(&file),
     }
 }
