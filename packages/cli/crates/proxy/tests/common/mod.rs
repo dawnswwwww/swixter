@@ -4,8 +4,12 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct RecordedRequest {
+    // 各测试二进制按需读取不同字段；单二进制内未读字段属正常
+    #[allow(dead_code)]
     pub method: String,
+    #[allow(dead_code)]
     pub path: String,
+    #[allow(dead_code)]
     pub headers: Vec<(String, String)>,
     #[allow(dead_code)] // Task 9 handler/server 测试断言 body 时使用
     pub body: Vec<u8>,

@@ -16,7 +16,7 @@ fn run_converter(
 ) -> Vec<(String, serde_json::Value)> {
     events
         .iter()
-        .flat_map(|e| conv(e))
+        .flat_map(&mut conv)
         .map(|o| (o.event, serde_json::from_str(&o.data_json).unwrap()))
         .collect()
 }

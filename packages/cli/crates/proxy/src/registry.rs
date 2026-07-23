@@ -61,10 +61,7 @@ pub fn registry_path() -> PathBuf {
 }
 
 fn legacy_runtime_path() -> PathBuf {
-    registry_path()
-        .parent()
-        .unwrap()
-        .join("proxy-runtime.json")
+    registry_path().parent().unwrap().join("proxy-runtime.json")
 }
 
 pub fn load_registry() -> InstanceRegistry {
@@ -84,7 +81,8 @@ pub fn save_registry(registry: &InstanceRegistry) -> std::io::Result<()> {
 
 pub fn update_instance(status: &ProxyStatus) {
     let mut r = load_registry();
-    r.instances.insert(status.instance_id.clone(), status.clone());
+    r.instances
+        .insert(status.instance_id.clone(), status.clone());
     let _ = save_registry(&r);
 }
 
@@ -100,7 +98,7 @@ pub fn clean_stale_instances() {
     let mut r = load_registry();
     let before = r.instances.len();
     r.instances
-        .retain(|_, s| !(s.running && !is_process_alive(s.pid.unwrap_or(0))));
+        .retain(|_, s| !s.running || is_process_alive(s.pid.unwrap_or(0)));
     if r.instances.len() != before {
         let _ = save_registry(&r);
     }
@@ -159,9 +157,7 @@ pub fn is_process_alive(pid: u32) -> bool {
 
 #[cfg(windows)]
 pub fn is_process_alive(pid: u32) -> bool {
-    use windows_sys::Win32::System::Threading::{
-        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    };
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
     if pid == 0 {
         return false;
     }
@@ -196,9 +192,7 @@ pub fn terminate_process(pid: u32) {
 
 #[cfg(windows)]
 pub fn terminate_process(pid: u32) {
-    use windows_sys::Win32::System::Threading::{
-        OpenProcess, TerminateProcess, PROCESS_TERMINATE,
-    };
+    use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
     let h = unsafe { OpenProcess(PROCESS_TERMINATE, 0, pid) };
     if !h.is_null() {
         unsafe {

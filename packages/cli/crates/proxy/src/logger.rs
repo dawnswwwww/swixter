@@ -60,8 +60,7 @@ fn rotate_if_needed(path: &std::path::Path, max_size: u64) {
     if meta.len() < max_size {
         return;
     }
-    let rotated =
-        path.with_file_name(format!("{}.1", path.file_name().unwrap().to_string_lossy()));
+    let rotated = path.with_file_name(format!("{}.1", path.file_name().unwrap().to_string_lossy()));
     let _ = std::fs::remove_file(&rotated);
     let _ = std::fs::rename(path, rotated);
 }
@@ -144,12 +143,11 @@ mod tests {
         let log = ProxyLogger::new("default");
         log.info("hello", Some(serde_json::json!({"k": 1})));
         log.request("POST", "/v1/messages", 200, 42);
-        let lines: Vec<serde_json::Value> =
-            std::fs::read_to_string(proxy_log_path("default"))
-                .unwrap()
-                .lines()
-                .map(|l| serde_json::from_str(l).unwrap())
-                .collect();
+        let lines: Vec<serde_json::Value> = std::fs::read_to_string(proxy_log_path("default"))
+            .unwrap()
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
         assert_eq!(lines[0]["level"], "info");
         assert_eq!(lines[0]["msg"], "hello");
         assert_eq!(lines[0]["instanceId"], "default");
