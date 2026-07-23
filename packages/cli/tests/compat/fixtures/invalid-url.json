@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "coders": {},
+  "groups": {},
+  "profiles": {
+    "bad": {
+      "name": "bad",
+      "providerId": "custom",
+      "apiKey": "k",
+      "baseURL": "not a url",
+      "createdAt": "t",
+      "updatedAt": "t"
+    }
+  }
+}
