@@ -5,6 +5,8 @@ package-lock.json
 # output
 out
 dist
+# exception: prebuilt UI assets are committed for release builds
+!packages/cli/ui/dist/
 *.tgz
 
 # code coverage

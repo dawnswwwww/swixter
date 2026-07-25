@@ -2,7 +2,7 @@
 node_modules/
 
 # Build output
-dist/
+# dist/ is intentionally NOT ignored: prebuilt UI assets are committed for release builds (see M4 plan)
 dist-ssr/
 
 # Local env files

@@ -43,3 +43,11 @@ npm run build
 ```
 
 Output will be in `ui/dist/` directory.
+
+## Committed prebuilt assets
+
+`ui/dist/` is committed to git as the UI asset source for release builds
+(cargo-dist jobs run `cargo build` directly, with no chance to build the UI
+first). After changing anything under `ui/src/`, you MUST run
+`bun install && bun run build` and commit the updated `dist/` together with
+your source changes.
