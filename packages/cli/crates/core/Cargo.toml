@@ -1,8 +1,11 @@
 [package]
 name = "swixter-core"
+description = "Core config/profile/group management for swixter, the AI coding assistant profile switcher"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }

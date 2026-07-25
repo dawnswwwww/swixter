@@ -1,8 +1,13 @@
 [package]
 name = "swixter"
+description = "CLI tool for managing AI coding assistant configurations - switch between providers (Claude Code, Codex, Continue) with Anthropic, Ollama, or custom APIs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["claude", "codex", "llm", "config", "cli"]
+categories = ["command-line-utilities"]
 
 [[bin]]
 name = "swixter"

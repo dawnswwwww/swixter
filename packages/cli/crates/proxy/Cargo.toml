@@ -1,8 +1,11 @@
 [package]
 name = "swixter-proxy"
+description = "Anthropic/OpenAI protocol-transforming failover proxy for swixter"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [dependencies]
 swixter-core = { path = "../core" }

@@ -1,8 +1,11 @@
 [package]
 name = "swixter-server"
+description = "Web UI backend, auth and cloud sync client for swixter"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 build = "build.rs"
 
 [dependencies]

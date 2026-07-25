@@ -6,6 +6,8 @@ members = ["crates/core", "crates/swixter", "crates/proxy", "crates/server"]
 version = "0.2.0"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/dawnswwwww/swixter"
+homepage = "https://github.com/dawnswwwww/swixter"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
