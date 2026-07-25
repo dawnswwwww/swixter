@@ -85,6 +85,50 @@ fn create_list_switch_current_delete() {
 }
 
 #[test]
+fn create_with_apply_switches_to_new_profile_before_applying() {
+    let dir = tempfile::tempdir().unwrap();
+    // 已有激活 profile A
+    swixter(&dir)
+        .args([
+            "claude",
+            "create",
+            "--quiet",
+            "--name",
+            "prof-a",
+            "--provider",
+            "anthropic",
+            "--api-key",
+            "sk-ant-AAA",
+        ])
+        .assert()
+        .success();
+    // create B --apply：必须先切换到 B 再 apply（TS 语义）
+    swixter(&dir)
+        .args([
+            "claude",
+            "create",
+            "--quiet",
+            "--name",
+            "prof-b",
+            "--provider",
+            "anthropic",
+            "--api-key",
+            "sk-ant-BBB",
+            "--apply",
+        ])
+        .assert()
+        .success();
+    swixter(&dir)
+        .args(["claude", "current"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("prof-b"));
+    let settings = std::fs::read_to_string(dir.path().join(".claude/settings.json")).unwrap();
+    assert!(settings.contains("sk-ant-BBB"));
+    assert!(!settings.contains("sk-ant-AAA"));
+}
+
+#[test]
 fn create_quiet_validates_name_and_provider() {
     let dir = tempfile::tempdir().unwrap();
     swixter(&dir)

@@ -162,6 +162,12 @@ fn cmd_create(coder: &CoderSpec, a: CreateArgs) -> i32 {
             }
             println!("✓ Profile \"{}\" created", profile.name);
             if a.apply {
+                // TS: create --apply 先切换到新 profile 再 apply；
+                // upsert 仅在首 profile 或无激活时自动切换，已有激活 profile 需显式 set
+                if let Err(e) = mgr.set_active_profile(coder.id, &profile.name) {
+                    eprintln!("✗ {e}");
+                    return EXIT_GENERAL;
+                }
                 match apply_active(coder) {
                     Ok(()) => println!("✓ Applied to {}", coder.display_name),
                     Err(e) => {

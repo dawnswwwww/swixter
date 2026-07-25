@@ -23,16 +23,46 @@ pub fn generate_id() -> String {
     format!("grp_{millis}_{s}")
 }
 
+/// TS: cli/group.ts validateGroupNameOrExit —— trim 后为空复用 profile name 校验文案
+fn validate_group_name(name: &str) -> Result<(), CoreError> {
+    if name.trim().is_empty() {
+        return Err(CoreError::Validation(
+            "Profile name cannot be empty".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// TS: cli/group.ts normalizeAndValidateProfiles —— 组内重复 profile 拒绝
+fn validate_no_duplicate_profiles(profiles: &[String]) -> Result<(), CoreError> {
+    let mut seen = std::collections::HashSet::new();
+    let mut duplicates: Vec<&str> = Vec::new();
+    for p in profiles {
+        if !seen.insert(p.as_str()) && !duplicates.contains(&p.as_str()) {
+            duplicates.push(p.as_str());
+        }
+    }
+    if !duplicates.is_empty() {
+        return Err(CoreError::Validation(format!(
+            "Duplicate profiles are not allowed: {}",
+            duplicates.join(", ")
+        )));
+    }
+    Ok(())
+}
+
 pub fn create(
     mgr: &mut ConfigManager,
     name: &str,
     profiles: Vec<String>,
 ) -> Result<Group, CoreError> {
+    validate_group_name(name)?;
     if profiles.is_empty() {
         return Err(CoreError::Validation(
             "group must contain at least one profile".into(),
         ));
     }
+    validate_no_duplicate_profiles(&profiles)?;
     // TS cli/group.ts:76 —— 重名拒绝（exit 2 由 CLI 层映射）
     if mgr.config().groups.values().any(|g| g.name == name) {
         return Err(CoreError::Validation(format!(
@@ -77,12 +107,16 @@ pub fn update(
     if !mgr.config().groups.contains_key(id) {
         return Err(CoreError::NotFound(format!("Group \"{id}\" not found")));
     }
+    if let Some(n) = name {
+        validate_group_name(n)?;
+    }
     if let Some(ps) = &profiles {
         if ps.is_empty() {
             return Err(CoreError::Validation(
                 "group must contain at least one profile".into(),
             ));
         }
+        validate_no_duplicate_profiles(ps)?;
         for p in ps {
             if !mgr.config().profiles.contains_key(p) {
                 return Err(CoreError::NotFound(format!(
@@ -217,6 +251,60 @@ mod tests {
             }
             other => panic!("expected Validation, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn create_and_update_reject_duplicate_profiles() {
+        let (_d, mut m) = mgr_with_profiles();
+        // create
+        let err = crate::groups::create(&mut m, "dup", vec!["p1".into(), "p1".into()]).unwrap_err();
+        match err {
+            crate::CoreError::Validation(msg) => {
+                assert_eq!(msg, "Duplicate profiles are not allowed: p1");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        // update
+        let g = crate::groups::create(&mut m, "ok", vec!["p1".into()]).unwrap();
+        let err = crate::groups::update(
+            &mut m,
+            &g.id,
+            None,
+            Some(vec!["p2".into(), "p3".into(), "p2".into()]),
+        )
+        .unwrap_err();
+        match err {
+            crate::CoreError::Validation(msg) => {
+                assert_eq!(msg, "Duplicate profiles are not allowed: p2");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        // 校验失败不得落盘
+        assert_eq!(m.config().groups[&g.id].profiles, vec!["p1"]);
+    }
+
+    #[test]
+    fn create_and_update_reject_blank_name() {
+        let (_d, mut m) = mgr_with_profiles();
+        // create
+        let err = crate::groups::create(&mut m, "   ", vec!["p1".into()]).unwrap_err();
+        match err {
+            crate::CoreError::Validation(msg) => {
+                assert_eq!(msg, "Profile name cannot be empty");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        assert!(m.config().groups.is_empty());
+        // update
+        let g = crate::groups::create(&mut m, "keep", vec!["p1".into()]).unwrap();
+        let err = crate::groups::update(&mut m, &g.id, Some("  "), None).unwrap_err();
+        match err {
+            crate::CoreError::Validation(msg) => {
+                assert_eq!(msg, "Profile name cannot be empty");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        assert_eq!(m.config().groups[&g.id].name, "keep");
     }
 
     #[test]

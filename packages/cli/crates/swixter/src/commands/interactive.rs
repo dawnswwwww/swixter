@@ -315,6 +315,11 @@ fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
         .interact()
         .map_err(|_| EXIT_CANCELLED)?;
     if do_apply {
+        // 同 cmd_create --apply：先显式切换到新 profile 再 apply
+        if let Err(e) = mgr.set_active_profile(coder.id, &profile.name) {
+            eprintln!("✗ {e}");
+            return Err(EXIT_GENERAL);
+        }
         match apply_active(coder) {
             Ok(()) => println!("✓ Applied to {}", coder.display_name),
             Err(e) => {

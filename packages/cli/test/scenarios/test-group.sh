@@ -150,26 +150,22 @@ fi
 echo "✓ Test 6 passed"
 
 # Test 7: Duplicate profiles during group create
-# 已知偏差：TS 拒绝重复 profile；Rust 当前不去重（接受重复）。
-# 两种行为都接受，但 Rust 补齐校验后应恢复为仅接受拒绝。
 echo "Test 7: Duplicate profiles during group create..."
 if DUPLICATE_OUTPUT=$($CLI_CMD group create test-group-duplicate --profiles test-group-profile-a,test-group-profile-a 2>&1); then
-    DUP_COUNT=$(jq -r '.groups[] | select(.name == "test-group-duplicate") | .profiles | length' "$CONFIG_FILE")
-    if [ "$DUP_COUNT" != "2" ]; then
-        echo "❌ Error: Duplicate profile create should persist both entries (current Rust behavior)"
-        exit 1
-    fi
-    echo "⚠ Known deviation: Rust accepts duplicate profiles (TS rejected them)"
-else
-    if ! echo "$DUPLICATE_OUTPUT" | grep -qi "duplicate"; then
-        echo "❌ Error: Duplicate profile create failure should mention duplicate profiles"
-        echo "$DUPLICATE_OUTPUT"
-        exit 1
-    fi
-    if jq -e '.groups[] | select(.name == "test-group-duplicate")' "$CONFIG_FILE" > /dev/null; then
-        echo "❌ Error: Duplicate profile create should not persist a group"
-        exit 1
-    fi
+    echo "❌ Error: Should reject duplicate profiles during group create"
+    $CLI_CMD group delete test-group-duplicate --force 2>/dev/null || true
+    exit 1
+fi
+
+if ! echo "$DUPLICATE_OUTPUT" | grep -qi "duplicate"; then
+    echo "❌ Error: Duplicate profile create failure should mention duplicate profiles"
+    echo "$DUPLICATE_OUTPUT"
+    exit 1
+fi
+
+if jq -e '.groups[] | select(.name == "test-group-duplicate")' "$CONFIG_FILE" > /dev/null; then
+    echo "❌ Error: Duplicate profile create should not persist a group"
+    exit 1
 fi
 
 echo "✓ Test 7 passed"
@@ -196,34 +192,29 @@ fi
 echo "✓ Test 8 passed"
 
 # Test 9: Blank group name during group edit
-# 已知偏差：TS 拒绝空白组名；Rust 当前不校验（接受）。
-# 两种行为都接受；若 Rust 接受了空白名，改回原名以保证后续测试。
 echo "Test 9: Blank group name during group edit..."
 if BLANK_NAME_OUTPUT=$($CLI_CMD group edit test-group-2-renamed --name "   " 2>&1); then
-    echo "⚠ Known deviation: Rust accepts blank group name (TS rejected it)"
+    echo "❌ Error: Should reject blank group name during group edit"
     # 改回原名，避免影响后续测试
-    $CLI_CMD group edit "   " --name test-group-2-renamed > /dev/null 2>&1
-    if ! jq -e '.groups[] | select(.name == "test-group-2-renamed")' "$CONFIG_FILE" > /dev/null; then
-        echo "❌ Error: Failed to restore original group name after blank-name edit"
-        exit 1
-    fi
-else
-    if ! echo "$BLANK_NAME_OUTPUT" | grep -qi "name"; then
-        echo "❌ Error: Blank group name edit failure should mention the group name"
-        echo "$BLANK_NAME_OUTPUT"
-        exit 1
-    fi
+    $CLI_CMD group edit "   " --name test-group-2-renamed > /dev/null 2>&1 || true
+    exit 1
+fi
 
-    if ! echo "$BLANK_NAME_OUTPUT" | grep -qi "blank\|empty\|invalid\|required"; then
-        echo "❌ Error: Blank group name edit failure should be clear"
-        echo "$BLANK_NAME_OUTPUT"
-        exit 1
-    fi
+if ! echo "$BLANK_NAME_OUTPUT" | grep -qi "name"; then
+    echo "❌ Error: Blank group name edit failure should mention the group name"
+    echo "$BLANK_NAME_OUTPUT"
+    exit 1
+fi
 
-    if ! jq -e '.groups[] | select(.name == "test-group-2-renamed")' "$CONFIG_FILE" > /dev/null; then
-        echo "❌ Error: Blank group name edit should leave the original group untouched"
-        exit 1
-    fi
+if ! echo "$BLANK_NAME_OUTPUT" | grep -qi "blank\|empty\|invalid\|required"; then
+    echo "❌ Error: Blank group name edit failure should be clear"
+    echo "$BLANK_NAME_OUTPUT"
+    exit 1
+fi
+
+if ! jq -e '.groups[] | select(.name == "test-group-2-renamed")' "$CONFIG_FILE" > /dev/null; then
+    echo "❌ Error: Blank group name edit should leave the original group untouched"
+    exit 1
 fi
 
 echo "✓ Test 9 passed"

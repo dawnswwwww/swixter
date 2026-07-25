@@ -97,6 +97,10 @@ fn edit(name: Option<String>, new_name: Option<String>, profiles: Option<String>
             eprintln!("✗ {e}");
             EXIT_NOT_FOUND
         }
+        Err(swixter_core::CoreError::Validation(e)) => {
+            eprintln!("✗ {e}");
+            EXIT_INVALID_ARG
+        }
         Err(e) => {
             eprintln!("✗ {e}");
             EXIT_GENERAL
