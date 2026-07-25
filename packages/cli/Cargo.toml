@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/swixter", "crates/proxy"]
+members = ["crates/core", "crates/swixter", "crates/proxy", "crates/server"]
 
 [workspace.package]
 version = "0.2.0"
@@ -15,7 +15,7 @@ serde_yaml_ng = "0.10"
 url = "2"
 thiserror = "1"
 dirs = "5"
-time = { version = "0.3", features = ["formatting", "std", "macros"] }
+time = { version = "0.3", features = ["formatting", "parsing", "std", "macros"] }
 rand = "0.8"
 clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
@@ -28,11 +28,19 @@ assert_cmd = "2"
 predicates = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "process", "signal"] }
 axum = "0.8"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
 bytes = "1"
 futures = "0.3"
 dashmap = "6"
 libc = "0.2"
+aes-gcm = "0.10"
+pbkdf2 = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+tokio-tungstenite = "0.26"
+rust-embed = "8"
+open = "5"
+mime_guess = "2"
 
 [profile.release]
 lto = true
