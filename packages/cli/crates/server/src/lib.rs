@@ -4,6 +4,8 @@ pub mod daemon;
 pub mod server;
 pub mod sync;
 
+pub use server::{find_available_port, open_browser, start_server, ServerOptions};
+
 use std::time::Duration;
 
 #[derive(thiserror::Error, Debug)]

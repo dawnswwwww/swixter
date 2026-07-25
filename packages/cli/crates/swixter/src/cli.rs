@@ -32,12 +32,31 @@ pub enum Commands {
     Completion { shell: ShellKind },
     /// Local proxy with failover
     Proxy(ProxyArgs),
-    /// [M3] Web UI
-    Ui(StubArgs),
+    /// Web UI (start in foreground by default)
+    Ui(UiArgs),
     /// [M3] Cloud auth
     Auth(StubArgs),
     /// [M3] Cloud sync
     Sync(StubArgs),
+}
+
+#[derive(Args)]
+pub struct UiArgs {
+    /// Port to listen on (default 3141, auto-increment if taken)
+    #[arg(long, short = 'p')]
+    pub port: Option<u16>,
+    /// Start in background (daemon mode)
+    #[arg(long)]
+    pub daemon: bool,
+    /// Stop the background UI daemon
+    #[arg(long)]
+    pub stop: bool,
+    /// Show UI daemon status
+    #[arg(long)]
+    pub status: bool,
+    /// Do not open the browser automatically
+    #[arg(long)]
+    pub no_browser: bool,
 }
 
 #[derive(Args)]
