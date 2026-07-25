@@ -75,7 +75,7 @@ fn cancelled<T>(r: dialoguer::Result<T>) -> Option<T> {
 
 fn prompt_email() -> Option<String> {
     cancelled(
-        Input::new()
+        Input::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Email:")
             .validate_with(|v: &String| {
                 if v.is_empty() {
@@ -140,7 +140,7 @@ fn setup_encryption_after_auth(store: &TokenStore) {
         return;
     }
     let setup = cancelled(
-        Confirm::new()
+        Confirm::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Set up end-to-end encryption for cloud sync?")
             .default(true)
             .interact(),
@@ -149,7 +149,7 @@ fn setup_encryption_after_auth(store: &TokenStore) {
         return;
     }
     let Some(master_password) = cancelled(
-        Password::new()
+        Password::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Create master password for encryption (separate from login password):")
             .validate_with(|v: &String| {
                 if v.is_empty() {
@@ -165,7 +165,7 @@ fn setup_encryption_after_auth(store: &TokenStore) {
         return;
     };
     let remember = cancelled(
-        Confirm::new()
+        Confirm::with_theme(&crate::theme::swixter_theme())
             .with_prompt(
                 "Save encryption key locally for automatic sync? (Less secure but convenient)",
             )
@@ -185,7 +185,7 @@ async fn prompt_set_password(client: &AuthClient, store: &TokenStore, has_passwo
     }
     let Some(state) = store.load() else { return };
     let set_pw = cancelled(
-        Confirm::new()
+        Confirm::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Set a login password for future sign-ins?")
             .default(true)
             .interact(),
@@ -194,7 +194,7 @@ async fn prompt_set_password(client: &AuthClient, store: &TokenStore, has_passwo
         return;
     }
     let Some(password) = cancelled(
-        Password::new()
+        Password::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Create password:")
             .validate_with(|v: &String| {
                 if v.len() < 6 {
@@ -228,7 +228,7 @@ fn prompt_sync_choice(store: &TokenStore) {
         "Skip for now",
     ];
     let Some(choice) = cancelled(
-        Select::new()
+        Select::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Different account detected. How would you like to handle cloud data?")
             .items(&items)
             .default(0)
@@ -280,7 +280,7 @@ async fn register(client: &AuthClient, store: &TokenStore) -> i32 {
     );
 
     let Some(code) = cancelled(
-        Input::new()
+        Input::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Enter the 6-digit verification code sent to your email:")
             .validate_with(|v: &String| {
                 if v.len() == 6 && v.chars().all(|c| c.is_ascii_digit()) {
@@ -295,7 +295,7 @@ async fn register(client: &AuthClient, store: &TokenStore) -> i32 {
     };
 
     let Some(password) = cancelled(
-        Password::new()
+        Password::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Create password:")
             .validate_with(|v: &String| {
                 if v.is_empty() {
@@ -312,7 +312,7 @@ async fn register(client: &AuthClient, store: &TokenStore) -> i32 {
     };
 
     let display_name = cancelled(
-        Input::new()
+        Input::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Display name (optional):")
             .allow_empty(true)
             .interact_text(),
@@ -355,7 +355,7 @@ async fn register(client: &AuthClient, store: &TokenStore) -> i32 {
 /// TS: completeMagicLinkManual —— 无 sessionId 时手动输 token 验证
 async fn magic_link_manual(client: &AuthClient, email: &str) -> Result<LoginResult, String> {
     let token = cancelled(
-        Input::new()
+        Input::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Enter the magic link token:")
             .validate_with(|v: &String| {
                 if v.is_empty() {
@@ -474,7 +474,7 @@ async fn login(client: &AuthClient, store: &TokenStore, magic_link: bool) -> i32
         }
     } else {
         let Some(password) = cancelled(
-            Password::new()
+            Password::with_theme(&crate::theme::swixter_theme())
                 .with_prompt("Password:")
                 .validate_with(|v: &String| {
                     if v.is_empty() {
@@ -573,7 +573,7 @@ async fn delete_account(client: &AuthClient, store: &TokenStore) -> i32 {
         return EXIT_SUCCESS;
     }
     let confirmed = cancelled(
-        Confirm::new()
+        Confirm::with_theme(&crate::theme::swixter_theme())
             .with_prompt(
                 "This will permanently delete your cloud account and all synced data. Continue?",
             )

@@ -100,9 +100,10 @@ fn remove(id: Option<String>, quiet: bool) -> i32 {
                 return EXIT_SUCCESS;
             }
             let items: Vec<&str> = user.iter().map(|p| p.id.as_str()).collect();
-            match dialoguer::Select::new()
+            match dialoguer::Select::with_theme(&crate::theme::swixter_theme())
                 .with_prompt("Remove which provider?")
                 .items(&items)
+                .default(0)
                 .interact()
             {
                 Ok(i) => user[i].id.clone(),
@@ -112,7 +113,7 @@ fn remove(id: Option<String>, quiet: bool) -> i32 {
         }
     };
     if !quiet {
-        let ok = dialoguer::Confirm::new()
+        let ok = dialoguer::Confirm::with_theme(&crate::theme::swixter_theme())
             .with_prompt(format!("Remove provider \"{id}\"?"))
             .default(false)
             .interact()

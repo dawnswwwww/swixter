@@ -23,13 +23,15 @@ const MENU: &[(&str, &str)] = &[
 
 pub fn main_menu(coder: &CoderSpec) -> i32 {
     // TS cli/claude.ts:1018-1052 —— 执行一个子命令后即返回（exit 子命令的码），不循环
+    crate::theme::print_header(&format!("Swixter — {}", coder.display_name));
     let items: Vec<&str> = MENU.iter().map(|(_, label)| *label).collect();
-    let sel = match Select::new()
+    let sel = match Select::with_theme(&crate::theme::swixter_theme())
         .with_prompt(format!(
             "{} — what would you like to do?",
             coder.display_name
         ))
         .items(&items)
+        .default(0)
         .interact()
     {
         Ok(i) => i,
@@ -102,7 +104,7 @@ pub fn main_menu(coder: &CoderSpec) -> i32 {
         ),
         "delete" => match pick_profile(&ConfigManager::load(), "Delete which profile?") {
             Some(name) => {
-                let ok = Confirm::new()
+                let ok = Confirm::with_theme(&crate::theme::swixter_theme())
                     .with_prompt(format!("Delete profile \"{name}\"?"))
                     .default(false)
                     .interact()
@@ -135,9 +137,10 @@ pub fn pick_profile(mgr: &ConfigManager, prompt: &str) -> Option<String> {
         println!("No profiles yet. Create one first.");
         return None;
     }
-    Select::new()
+    Select::with_theme(&crate::theme::swixter_theme())
         .with_prompt(prompt)
         .items(&names.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+        .default(0)
         .interact()
         .ok()
         .map(|i| names[i].clone())
@@ -153,7 +156,11 @@ pub fn create_wizard(coder: &CoderSpec, _prefill: CreateArgs) -> i32 {
 
 fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
     // 各步 cancel → 返回 EXIT_CANCELLED（TS: p.cancel + exit 130）
-    let name: String = match Input::new()
+    crate::theme::print_header(&format!(
+        "Create {} Configuration Profile",
+        coder.display_name
+    ));
+    let name: String = match Input::with_theme(&crate::theme::swixter_theme())
         .with_prompt("Profile name")
         .validate_with(|s: &String| {
             if s.len() >= 2
@@ -170,6 +177,7 @@ fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
         Ok(v) => v,
         Err(_) => return Err(EXIT_CANCELLED),
     };
+    crate::theme::print_rail();
 
     let providers = presets::builtin_presets()
         .iter()
@@ -186,9 +194,10 @@ fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
         )
         .collect::<Vec<_>>();
     let labels: Vec<String> = providers.iter().map(|(_, d)| d.clone()).collect();
-    let pi = match Select::new()
+    let pi = match Select::with_theme(&crate::theme::swixter_theme())
         .with_prompt("Provider")
         .items(&labels)
+        .default(0)
         .interact()
     {
         Ok(i) => i,
@@ -196,20 +205,24 @@ fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
     };
     let provider_id = providers[pi].0.clone();
     let preset = presets::find_provider(&provider_id);
+    crate::theme::print_rail();
 
     let input_opt = |prompt: &str| -> Result<Option<String>, i32> {
-        let v: String = Input::new()
+        let v: String = Input::with_theme(&crate::theme::swixter_theme())
             .with_prompt(prompt)
             .allow_empty(true)
             .interact_text()
             .map_err(|_| EXIT_CANCELLED)?;
+        crate::theme::print_rail();
         Ok(if v.is_empty() { None } else { Some(v) })
     };
     let input_req = |prompt: &str| -> Result<String, i32> {
-        Input::new()
+        let v = Input::with_theme(&crate::theme::swixter_theme())
             .with_prompt(prompt)
             .interact_text()
-            .map_err(|_| EXIT_CANCELLED)
+            .map_err(|_| EXIT_CANCELLED)?;
+        crate::theme::print_rail();
+        Ok(v)
     };
 
     // apiKey 必填只对 codex/qwen 且 provider != ollama 生效；claude 一律可选
@@ -249,18 +262,21 @@ fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
                     "anthropic_responses",
                     "gemini_native",
                 ];
-                let fi = Select::new()
+                let fi = Select::with_theme(&crate::theme::swixter_theme())
                     .with_prompt("API format")
                     .items(&formats)
+                    .default(0)
                     .interact()
                     .map_err(|_| EXIT_CANCELLED)?;
                 args.api_format = Some(formats[fi].into());
+                crate::theme::print_rail();
             }
-            let configure_models = Confirm::new()
+            let configure_models = Confirm::with_theme(&crate::theme::swixter_theme())
                 .with_prompt("Configure models?")
                 .default(false)
                 .interact()
                 .map_err(|_| EXIT_CANCELLED)?;
+            crate::theme::print_rail();
             if configure_models {
                 args.anthropic_model = input_opt("ANTHROPIC_MODEL (optional)")?;
                 args.default_haiku_model = input_opt("Default Haiku model (optional)")?;
@@ -276,14 +292,16 @@ fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
                 .unwrap_or_default();
             model_choices.push("Custom...".into());
             if !model_choices.is_empty() {
-                let mi = Select::new()
+                let mi = Select::with_theme(&crate::theme::swixter_theme())
                     .with_prompt("Model")
                     .items(&model_choices)
+                    .default(0)
                     .interact()
                     .map_err(|_| EXIT_CANCELLED)?;
                 args.model = if model_choices[mi] == "Custom..." {
                     Some(input_req("Model name")?)
                 } else {
+                    crate::theme::print_rail();
                     Some(model_choices[mi].clone())
                 };
             }
@@ -308,8 +326,9 @@ fn create_wizard_impl(coder: &CoderSpec) -> Result<i32, i32> {
         eprintln!("✗ {e}");
         return Err(EXIT_GENERAL);
     }
-    println!("✓ Profile \"{}\" created", profile.name);
-    let do_apply = Confirm::new()
+    crate::theme::print_step_done(&format!("Profile \"{}\" created", profile.name));
+    crate::theme::print_rail();
+    let do_apply = Confirm::with_theme(&crate::theme::swixter_theme())
         .with_prompt(format!("Apply this profile to {} now?", coder.display_name))
         .default(true)
         .interact()
@@ -355,12 +374,13 @@ fn edit_wizard_impl(coder: &CoderSpec, name: Option<String>) -> Result<i32, i32>
         }
     };
     let input_default = |prompt: &str, cur: Option<&str>| -> Result<Option<String>, i32> {
-        let v: String = Input::new()
+        let v: String = Input::with_theme(&crate::theme::swixter_theme())
             .with_prompt(prompt)
             .default(cur.unwrap_or("").to_string())
             .allow_empty(true)
             .interact_text()
             .map_err(|_| EXIT_CANCELLED)?;
+        crate::theme::print_rail();
         Ok(if v.is_empty() { None } else { Some(v) })
     };
     let mut p: Profile = profile;
@@ -377,7 +397,7 @@ fn edit_wizard_impl(coder: &CoderSpec, name: Option<String>) -> Result<i32, i32>
     }
     println!("✓ Profile \"{}\" updated", p.name);
     // TS: edit 后 apply 确认默认 false
-    let do_apply = Confirm::new()
+    let do_apply = Confirm::with_theme(&crate::theme::swixter_theme())
         .with_prompt(format!("Apply to {} now?", coder.display_name))
         .default(false)
         .interact()

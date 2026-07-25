@@ -78,7 +78,7 @@ fn make_key_provider(state: &AuthState) -> impl Fn() -> Result<[u8; 32], ServerE
         if let Some(k) = &encryption_key {
             return key_from_base64(k);
         }
-        let master_password = Password::new()
+        let master_password = Password::with_theme(&crate::theme::swixter_theme())
             .with_prompt("Master password:")
             .validate_with(|v: &String| {
                 if v.is_empty() {

@@ -258,7 +258,7 @@ pub fn handle_apply_prompt(coder: &CoderSpec, apply: bool, no_apply: bool) -> i3
         );
         return EXIT_SUCCESS;
     }
-    match dialoguer::Confirm::new()
+    match dialoguer::Confirm::with_theme(&crate::theme::swixter_theme())
         .with_prompt(format!("Apply this profile to {} now?", coder.display_name))
         .default(true)
         .interact()

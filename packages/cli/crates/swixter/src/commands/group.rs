@@ -118,7 +118,7 @@ fn delete(name: &str, force: bool) -> i32 {
         }
     };
     if !force {
-        let ok = dialoguer::Confirm::new()
+        let ok = dialoguer::Confirm::with_theme(&crate::theme::swixter_theme())
             .with_prompt(format!("Delete group \"{name}\"?"))
             .default(false)
             .interact()

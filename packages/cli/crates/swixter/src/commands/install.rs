@@ -100,9 +100,10 @@ pub fn install(coder: &CoderSpec, method: Option<usize>, _force: bool) -> i32 {
                     }
                 })
                 .collect();
-            match dialoguer::Select::new()
+            match dialoguer::Select::with_theme(&crate::theme::swixter_theme())
                 .with_prompt("Select installation method")
                 .items(&items)
+                .default(0)
                 .interact()
             {
                 Ok(i) => methods[i],

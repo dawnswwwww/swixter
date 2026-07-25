@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod install_data;
+mod theme;
 
 use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
