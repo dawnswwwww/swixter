@@ -14,9 +14,9 @@ name = "swixter"
 path = "src/main.rs"
 
 [dependencies]
-swixter-core = { path = "../core" }
-swixter-proxy = { path = "../proxy" }
-swixter-server = { path = "../server" }
+swixter-core = { version = "0.2.0", path = "../core" }
+swixter-proxy = { version = "0.2.0", path = "../proxy" }
+swixter-server = { version = "0.2.0", path = "../server" }
 clap.workspace = true
 clap_complete.workspace = true
 dialoguer.workspace = true
