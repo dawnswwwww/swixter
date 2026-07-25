@@ -16,6 +16,12 @@ pub enum ServerError {
     Crypto(String),
     #[error("auth error: {0}")]
     Auth(String),
+    #[error("sync error: {0}")]
+    Sync(#[from] crate::sync::client::SyncError),
+    #[error("sync conflict: {0} (use --force-local to overwrite remote, or --force-remote to overwrite local)")]
+    SyncConflict(crate::sync::types::SyncConflict),
+    #[error("core error: {0}")]
+    Core(#[from] swixter_core::CoreError),
 }
 
 // 常量逐字对齐 TS 源码（见计划 Global Constraints）
