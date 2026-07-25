@@ -1,6 +1,6 @@
 {
   "name": "swixter",
-  "version": "0.1.12",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -10,22 +10,16 @@
   ],
   "scripts": {
     "build": "bun run --filter '*' build",
-    "build:cli": "bun run --filter 'swixter' build",
     "dev:website": "bun run --filter 'swixter-website' dev",
     "dev:docs": "bun run --filter 'swixter-docs' dev",
     "build:website": "bun run --filter 'swixter-website' build",
     "build:docs": "bun run --filter 'swixter-docs' build",
-    "test": "bun run --filter 'swixter' test",
-    "test:e2e": "cd packages/cli && bun run test:e2e",
-    "cli": "bun run --filter 'swixter' cli",
-    "cli:dev": "bun run --filter 'swixter' cli:dev",
-    "ui:dev": "bun run --filter 'swixter' ui:dev",
-    "preversion": "bun test",
-    "version": "node scripts/sync-versions.js && git add packages/*/package.json packages/cli/src/constants/meta.ts",
-    "postversion": "git push --follow-tags",
-    "release:patch": "npm version patch",
-    "release:minor": "npm version minor",
-    "release:major": "npm version major"
+    "test": "cd packages/cli && cargo test --workspace",
+    "test:e2e": "cd packages/cli && bash test/e2e-docker.sh",
+    "sync-versions": "node scripts/sync-versions.js",
+    "release:patch": "bash scripts/bump-version.sh patch",
+    "release:minor": "bash scripts/bump-version.sh minor",
+    "release:major": "bash scripts/bump-version.sh major"
   },
   "author": "dawnswwwww",
   "license": "MIT",
