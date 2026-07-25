@@ -36,8 +36,36 @@ pub enum Commands {
     Ui(UiArgs),
     /// Cloud auth (register/login/logout/status/delete-account)
     Auth(AuthArgs),
-    /// [M3] Cloud sync
-    Sync(StubArgs),
+    /// Cloud sync (push/pull/status/enable/disable)
+    Sync(SyncArgs),
+}
+
+#[derive(Args)]
+pub struct SyncArgs {
+    #[command(subcommand)]
+    pub command: SyncCommand,
+}
+
+#[derive(Subcommand)]
+pub enum SyncCommand {
+    /// Push config to cloud
+    Push {
+        /// Overwrite remote even on version conflict
+        #[arg(long)]
+        force_local: bool,
+    },
+    /// Pull config from cloud
+    Pull {
+        /// Overwrite local even on version conflict
+        #[arg(long)]
+        force_remote: bool,
+    },
+    /// Show sync state (local syncMeta + remote status)
+    Status,
+    /// Enable auto sync (current process only, not persisted)
+    Enable,
+    /// Disable auto sync
+    Disable,
 }
 
 #[derive(Args)]
@@ -81,12 +109,6 @@ pub struct UiArgs {
     /// Do not open the browser automatically
     #[arg(long)]
     pub no_browser: bool,
-}
-
-#[derive(Args)]
-pub struct StubArgs {
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-    pub args: Vec<String>,
 }
 
 #[derive(Args)]

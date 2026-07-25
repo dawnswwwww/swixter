@@ -191,7 +191,7 @@ mod tests {
         let stats = import_config(&mut mgr, &out, false, true).unwrap();
         assert_eq!(stats.imported, 1);
         assert_eq!(mgr.get_profile("p1").unwrap().api_key, "sk-1234567890abcd");
-        assert_eq!(validate_export_file(&out).unwrap().sanitized, false);
+        assert!(!validate_export_file(&out).unwrap().sanitized);
     }
 
     #[test]

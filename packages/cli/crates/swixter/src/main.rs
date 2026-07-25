@@ -26,12 +26,7 @@ fn run() -> i32 {
     match command {
         Commands::Ui(a) => commands::ui::dispatch(a),
         Commands::Auth(a) => commands::auth::dispatch(a),
-        Commands::Sync(_) => {
-            eprintln!(
-                "This command is not yet available in the Rust build (coming in milestone M3)."
-            );
-            EXIT_GENERAL
-        }
+        Commands::Sync(a) => commands::sync::dispatch(a),
         Commands::Completion { shell } => {
             let mut cmd = Cli::command();
             let clap_shell = match shell {

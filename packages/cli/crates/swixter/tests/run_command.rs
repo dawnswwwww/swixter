@@ -5,9 +5,7 @@ fn fake_cli(dir: &tempfile::TempDir, name: &str) {
     let bin = dir.path().join("bin");
     std::fs::create_dir_all(&bin).unwrap();
     let script = bin.join(name);
-    std::fs::write(&script, format!(
-        "#!/bin/sh\necho \"$@\" > \"$FAKE_OUT.args\"\nenv | grep -E 'ANTHROPIC|OPENAI|OLLAMA' > \"$FAKE_OUT.env\" 2>/dev/null || true\n"
-    )).unwrap();
+    std::fs::write(&script, "#!/bin/sh\necho \"$@\" > \"$FAKE_OUT.args\"\nenv | grep -E 'ANTHROPIC|OPENAI|OLLAMA' > \"$FAKE_OUT.env\" 2>/dev/null || true\n").unwrap();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

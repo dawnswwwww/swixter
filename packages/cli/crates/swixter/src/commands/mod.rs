@@ -6,5 +6,6 @@ pub mod interactive;
 pub mod providers;
 pub mod proxy;
 pub mod run;
+pub mod sync;
 pub mod transfer;
 pub mod ui;

@@ -166,7 +166,9 @@ fn setup_encryption_after_auth(store: &TokenStore) {
     };
     let remember = cancelled(
         Confirm::new()
-            .with_prompt("Save encryption key locally for automatic sync? (Less secure but convenient)")
+            .with_prompt(
+                "Save encryption key locally for automatic sync? (Less secure but convenient)",
+            )
             .default(false)
             .interact(),
     )
@@ -255,7 +257,9 @@ async fn register(client: &AuthClient, store: &TokenStore) -> i32 {
     println!();
     println!("Register Swixter Account");
 
-    let Some(email) = prompt_email() else { return EXIT_SUCCESS };
+    let Some(email) = prompt_email() else {
+        return EXIT_SUCCESS;
+    };
 
     println!("Sending verification code...");
     let send = match client.send_verification_code(&email).await {
@@ -270,7 +274,10 @@ async fn register(client: &AuthClient, store: &TokenStore) -> i32 {
             return EXIT_GENERAL;
         }
     };
-    println!("✓ Verification code sent! (Expires in {}s)", send.expires_in);
+    println!(
+        "✓ Verification code sent! (Expires in {}s)",
+        send.expires_in
+    );
 
     let Some(code) = cancelled(
         Input::new()
@@ -330,7 +337,11 @@ async fn register(client: &AuthClient, store: &TokenStore) -> i32 {
     };
 
     let result = LoginResult::from(resp);
-    let welcome = result.user.display_name.clone().unwrap_or_else(|| result.user.email.clone());
+    let welcome = result
+        .user
+        .display_name
+        .clone()
+        .unwrap_or_else(|| result.user.email.clone());
     if let Err(e) = persist_auth(store, &result, "password") {
         eprintln!("✗ {e}");
         return EXIT_GENERAL;
@@ -346,7 +357,13 @@ async fn magic_link_manual(client: &AuthClient, email: &str) -> Result<LoginResu
     let token = cancelled(
         Input::new()
             .with_prompt("Enter the magic link token:")
-            .validate_with(|v: &String| if v.is_empty() { Err("Token is required") } else { Ok(()) })
+            .validate_with(|v: &String| {
+                if v.is_empty() {
+                    Err("Token is required")
+                } else {
+                    Ok(())
+                }
+            })
             .interact_text(),
     )
     .ok_or_else(|| "cancelled".to_string())?;
@@ -388,8 +405,19 @@ async fn magic_link_flow(client: &AuthClient, email: &str) -> Result<LoginResult
         tokio::time::sleep(MAGIC_LINK_POLL_INTERVAL).await;
         match client.check_magic_link_session(&session_id).await {
             Ok(s) if s.status == "completed" => {
-                let (Some(access_token), Some(refresh_token), Some(expires_at), Some(user), Some(salt)) =
-                    (s.access_token, s.refresh_token, s.expires_at, s.user, s.encryption_salt)
+                let (
+                    Some(access_token),
+                    Some(refresh_token),
+                    Some(expires_at),
+                    Some(user),
+                    Some(salt),
+                ) = (
+                    s.access_token,
+                    s.refresh_token,
+                    s.expires_at,
+                    s.user,
+                    s.encryption_salt,
+                )
                 else {
                     return Err("Incomplete session data from server".to_string());
                 };
@@ -409,7 +437,10 @@ async fn magic_link_flow(client: &AuthClient, email: &str) -> Result<LoginResult
             Err(_) => continue, // 其他错误继续轮询
         }
     }
-    Err("Timed out waiting for magic link confirmation. The magic link may have expired.".to_string())
+    Err(
+        "Timed out waiting for magic link confirmation. The magic link may have expired."
+            .to_string(),
+    )
 }
 
 /// TS: cmdLogin / cmdMagicLinkLogin 的公共收尾：persist → 加密引导 → 换账号提示
@@ -422,7 +453,9 @@ async fn login(client: &AuthClient, store: &TokenStore, magic_link: bool) -> i32
         println!("Login to Swixter");
     }
 
-    let Some(email) = prompt_email() else { return EXIT_SUCCESS };
+    let Some(email) = prompt_email() else {
+        return EXIT_SUCCESS;
+    };
 
     let auth_method = if magic_link { "magic-link" } else { "password" };
     let result = if magic_link {
@@ -432,14 +465,24 @@ async fn login(client: &AuthClient, store: &TokenStore, magic_link: bool) -> i32
                 if e != "cancelled" {
                     eprintln!("✗ {e}");
                 }
-                return if e == "cancelled" { EXIT_SUCCESS } else { EXIT_GENERAL };
+                return if e == "cancelled" {
+                    EXIT_SUCCESS
+                } else {
+                    EXIT_GENERAL
+                };
             }
         }
     } else {
         let Some(password) = cancelled(
             Password::new()
                 .with_prompt("Password:")
-                .validate_with(|v: &String| if v.is_empty() { Err("Password is required") } else { Ok(()) })
+                .validate_with(|v: &String| {
+                    if v.is_empty() {
+                        Err("Password is required")
+                    } else {
+                        Ok(())
+                    }
+                })
                 .interact(),
         ) else {
             return EXIT_SUCCESS;
@@ -455,7 +498,11 @@ async fn login(client: &AuthClient, store: &TokenStore, magic_link: bool) -> i32
         }
     };
 
-    let welcome = result.user.display_name.clone().unwrap_or_else(|| result.user.email.clone());
+    let welcome = result
+        .user
+        .display_name
+        .clone()
+        .unwrap_or_else(|| result.user.email.clone());
     let has_password = result.has_password;
     let user_changed = match persist_auth(store, &result, auth_method) {
         Ok(c) => c,
@@ -508,7 +555,11 @@ fn status(store: &TokenStore) -> i32 {
             println!("  Expires: {}", state.expires_at);
             println!(
                 "  Encryption: {}",
-                if state.encryption_key.is_some() { "enabled" } else { "not configured" }
+                if state.encryption_key.is_some() {
+                    "enabled"
+                } else {
+                    "not configured"
+                }
             );
         }
     }
@@ -523,7 +574,9 @@ async fn delete_account(client: &AuthClient, store: &TokenStore) -> i32 {
     }
     let confirmed = cancelled(
         Confirm::new()
-            .with_prompt("This will permanently delete your cloud account and all synced data. Continue?")
+            .with_prompt(
+                "This will permanently delete your cloud account and all synced data. Continue?",
+            )
             .default(false)
             .interact(),
     );

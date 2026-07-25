@@ -54,9 +54,7 @@ pub fn pid_alive(pid: u32) -> bool {
 
 #[cfg(windows)]
 pub fn pid_alive(pid: u32) -> bool {
-    use windows_sys::Win32::System::Threading::{
-        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    };
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
     unsafe {
         let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
         if h.is_null() {
@@ -72,7 +70,14 @@ pub fn pid_alive(pid: u32) -> bool {
 #[cfg(unix)]
 pub fn terminate(pid: u32, graceful: bool) {
     unsafe {
-        libc::kill(pid as i32, if graceful { libc::SIGTERM } else { libc::SIGKILL });
+        libc::kill(
+            pid as i32,
+            if graceful {
+                libc::SIGTERM
+            } else {
+                libc::SIGKILL
+            },
+        );
     }
 }
 
