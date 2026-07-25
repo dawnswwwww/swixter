@@ -96,6 +96,36 @@ async fn ws_sends_snapshot_then_broadcasts_events() {
 }
 
 #[tokio::test]
+async fn server_releases_connection_when_client_closes() {
+    let dir = tempfile::tempdir().unwrap();
+    write_config(
+        dir.path(),
+        serde_json::json!({}),
+        serde_json::json!({}),
+        None,
+    );
+    let _guard = RegistryPathOverride::set(dir.path().join("proxy-instances.json"));
+    let base = spawn_server(dir.path()).await;
+
+    let (mut socket, _) =
+        tokio_tungstenite::connect_async(format!("{}/ws", base.replacen("http", "ws", 1)))
+            .await
+            .unwrap();
+    let snap = next_json(&mut socket).await;
+    assert_eq!(snap["type"], "snapshot");
+
+    // 客户端立即 close：server 端 select 读到 Close/断线后必须退出任务并断开底层连接。
+    // 修复前 server 不读 socket，连接永不回收，客户端流不会结束（此断言会超时失败）。
+    socket.close(None).await.ok();
+    match tokio::time::timeout(std::time::Duration::from_secs(5), socket.next()).await {
+        Ok(None) => {} // 流正常结束（server 侧断开）
+        Ok(Some(Ok(m))) => assert!(m.is_close(), "expected close frame, got {m:?}"),
+        Ok(Some(Err(_))) => {} // 连接已被 server 侧断开
+        Err(_) => panic!("server did not release the connection after client close"),
+    }
+}
+
+#[tokio::test]
 async fn group_active_broadcasts_change() {
     let dir = tempfile::tempdir().unwrap();
     write_config(

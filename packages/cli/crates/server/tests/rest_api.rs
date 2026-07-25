@@ -428,6 +428,38 @@ async fn cors_only_allows_localhost_origins() {
         .unwrap();
     assert_eq!(resp.status(), 200);
     assert!(resp.headers().get("access-control-allow-origin").is_none());
+
+    // 前缀绕过 origin：host 精确匹配，必须无 CORS 头
+    for evil in [
+        "http://127.0.0.1.evil.com",
+        "http://localhost.evil.com",
+        "https://127.0.0.1:3141",
+    ] {
+        let resp = http
+            .get(format!("{base}/api/version"))
+            .header("origin", evil)
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            resp.headers().get("access-control-allow-origin").is_none(),
+            "origin {evil} 不应被放行"
+        );
+    }
+
+    // 任意端口的本机 origin 放行
+    for good in ["http://127.0.0.1:3141", "http://localhost:8080"] {
+        let resp = http
+            .get(format!("{base}/api/version"))
+            .header("origin", good)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.headers().get("access-control-allow-origin").unwrap(),
+            good
+        );
+    }
 }
 
 #[tokio::test]

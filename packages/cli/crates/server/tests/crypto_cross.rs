@@ -3,7 +3,7 @@ use swixter_server::crypto::{derive::*, encrypt::*};
 #[test]
 fn pbkdf2_matches_fixed_vector() {
     // 与 WebCrypto PBKDF2-HMAC-SHA256(100k) 对齐的固定向量
-    let key = derive_key("correct horse battery staple", "AAECAwQFBgcICQoLDA0ODw==");
+    let key = derive_key("correct horse battery staple", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
     assert_eq!(key_to_base64(&key).len(), 44); // 32 字节 → base64 44 字符
                                                // hex 断言值由 gen-crypto-fixtures.ts 首次运行时打印后填入（双向锚定）
     assert_eq!(
@@ -21,7 +21,8 @@ fn decrypts_ts_generated_vectors() {
     let derived = derive_key(
         v["password"].as_str().unwrap(),
         v["saltBase64"].as_str().unwrap(),
-    );
+    )
+    .unwrap();
     assert_eq!(derived, key);
     for case in v["cases"].as_array().unwrap() {
         let pt = case["plaintext"].as_str().unwrap();

@@ -17,12 +17,14 @@ pub struct ServerOptions {
     pub config_path: Option<PathBuf>,
 }
 
-/// TS: server/index.ts findAvailablePort —— 从 start 起递增 bind 探测
-pub async fn find_available_port(start: u16) -> u16 {
+/// TS: server/index.ts findAvailablePort —— 从 start 起递增 bind 探测；
+/// 递增到 65535 仍被占用则返回错误（debug 下 `port += 1` 会溢出 panic）
+pub async fn find_available_port(start: u16) -> Result<u16, crate::ServerError> {
     let mut port = start;
     loop {
         match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
-            Ok(_) => return port,
+            Ok(_) => return Ok(port),
+            Err(e) if port == u16::MAX => return Err(e.into()),
             Err(_) => port += 1,
         }
     }
@@ -37,7 +39,13 @@ pub fn open_browser(url: &str) {
 
 /// 启动 Web UI server（阻塞 serve，调用方负责生命周期/信号）
 pub async fn start_server(port: Option<u16>, opts: ServerOptions) {
-    let port = find_available_port(port.unwrap_or(DEFAULT_UI_PORT)).await;
+    let port = match find_available_port(port.unwrap_or(DEFAULT_UI_PORT)).await {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("✗ No available port: {e}");
+            return;
+        }
+    };
     let state = state::AppState::new(opts.config_path);
     let app = routes::router(state);
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
@@ -45,4 +53,24 @@ pub async fn start_server(port: Option<u16>, opts: ServerOptions) {
         .expect("bind ui server");
     println!("Swixter Web UI: http://127.0.0.1:{port}");
     axum::serve(listener, app).await.ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_available_port;
+
+    #[tokio::test]
+    async fn returns_free_port() {
+        let port = find_available_port(0).await.unwrap();
+        assert_eq!(port, 0); // 0 = 由内核分配，bind 必成功
+    }
+
+    #[tokio::test]
+    async fn errors_instead_of_overflow_at_upper_bound() {
+        // 占住 65535 后从 65535 起探测：必须返回 Err 而非 debug 溢出 panic
+        let _held = tokio::net::TcpListener::bind(("127.0.0.1", u16::MAX))
+            .await
+            .unwrap();
+        assert!(find_available_port(u16::MAX).await.is_err());
+    }
 }

@@ -40,6 +40,12 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(_) => None,
             },
+            // 必须读 socket：客户端 Close/断线时退出循环回收连接
+            // （ping/pong 由 axum/tungstenite 层自动处理，无需关心）
+            msg = socket.recv() => match msg {
+                None | Some(Ok(Message::Close(_))) | Some(Err(_)) => break,
+                Some(Ok(_)) => continue, // 客户端不应发业务消息，忽略
+            },
         };
         let Some(text) = text else { break };
         if socket.send(Message::Text(text.into())).await.is_err() {

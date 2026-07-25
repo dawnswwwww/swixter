@@ -89,7 +89,7 @@ fn make_key_provider(state: &AuthState) -> impl Fn() -> Result<[u8; 32], ServerE
             })
             .interact()
             .map_err(|_| ServerError::Auth("cancelled".into()))?;
-        Ok(derive_key(&master_password, &salt))
+        derive_key(&master_password, &salt)
     }
 }
 

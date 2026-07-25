@@ -41,7 +41,7 @@ mod tests {
 
     #[test]
     fn encrypt_decrypt_round_trip() {
-        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==");
+        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
         for pt in ["", "hello", "中文-🔐"] {
             let ct = encrypt(&key, pt).unwrap();
             assert_eq!(decrypt(&key, &ct).unwrap(), pt);
@@ -50,7 +50,7 @@ mod tests {
 
     #[test]
     fn ciphertext_layout_is_iv_ct_tag() {
-        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==");
+        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
         let pt = "hello";
         let ct = encrypt(&key, pt).unwrap();
         let raw = B64.decode(&ct).unwrap();
@@ -60,9 +60,9 @@ mod tests {
 
     #[test]
     fn decrypt_rejects_short_or_wrong_key() {
-        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==");
+        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
         let ct = encrypt(&key, "hello").unwrap();
-        let other = derive_key("other", "AAECAwQFBgcICQoLDA0ODw==");
+        let other = derive_key("other", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
         assert!(decrypt(&other, &ct).is_err());
         assert!(decrypt(&key, &B64.encode([0u8; 10])).is_err());
         assert!(decrypt(&key, "not-base64!!!").is_err());

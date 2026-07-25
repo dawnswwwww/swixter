@@ -54,7 +54,13 @@ async fn run_foreground(port: Option<u16>, no_browser: bool) -> i32 {
         return EXIT_SUCCESS;
     }
 
-    let port = swixter_server::find_available_port(port.unwrap_or(DEFAULT_UI_PORT)).await;
+    let port = match swixter_server::find_available_port(port.unwrap_or(DEFAULT_UI_PORT)).await {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("✗ No available port: {e}");
+            return EXIT_GENERAL;
+        }
+    };
     let url = format!("http://127.0.0.1:{port}");
     // daemon 子进程（SWIXTER_UI_DAEMON=1）不开浏览器
     if !no_browser && std::env::var("SWIXTER_UI_DAEMON").is_err() {
@@ -114,7 +120,13 @@ async fn start_daemon(port: Option<u16>) -> i32 {
 
     let port = match port {
         Some(p) => p,
-        None => swixter_server::find_available_port(DEFAULT_UI_PORT).await,
+        None => match swixter_server::find_available_port(DEFAULT_UI_PORT).await {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("✗ No available port: {e}");
+                return EXIT_GENERAL;
+            }
+        },
     };
 
     // 子进程参数：原样透传，仅去掉 --daemon（TS 同款过滤）

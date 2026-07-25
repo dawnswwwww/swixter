@@ -13,11 +13,14 @@ pub fn generate_salt() -> String {
 }
 
 /// TS: deriveKey —— PBKDF2-HMAC-SHA256(password UTF-8, salt, 100_000) → 32 字节 AES key
-pub fn derive_key(password: &str, salt_b64: &str) -> [u8; 32] {
-    let salt = B64.decode(salt_b64).expect("invalid salt base64");
+/// salt 非法 base64（如 auth.json 损坏）返回 Err，不 panic
+pub fn derive_key(password: &str, salt_b64: &str) -> Result<[u8; 32], ServerError> {
+    let salt = B64
+        .decode(salt_b64)
+        .map_err(|e| ServerError::Crypto(format!("invalid salt base64: {e}")))?;
     let mut key = [0u8; 32];
     pbkdf2_hmac::<Sha256>(password.as_bytes(), &salt, PBKDF2_ITERATIONS, &mut key);
-    key
+    Ok(key)
 }
 
 /// TS: exportKeyToBase64
@@ -48,10 +51,20 @@ mod tests {
 
     #[test]
     fn key_base64_round_trip() {
-        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==");
+        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
         let b64 = key_to_base64(&key);
         assert_eq!(b64.len(), 44);
         assert_eq!(key_from_base64(&b64).unwrap(), key);
+    }
+
+    #[test]
+    fn derive_key_rejects_invalid_salt_base64() {
+        // auth.json 损坏（salt 非 base64）→ Err 而非 panic
+        assert!(matches!(
+            derive_key("pw", "not-base64!!!"),
+            Err(ServerError::Crypto(_))
+        ));
+        assert!(derive_key("pw", "").is_ok()); // 空 salt 合法 base64，可派生
     }
 
     #[test]

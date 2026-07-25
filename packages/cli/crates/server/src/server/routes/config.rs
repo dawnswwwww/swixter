@@ -110,9 +110,17 @@ async fn export_config_file(
     let tmp = state
         .config_path()
         .with_file_name(format!(".export-{millis}.json"));
+    // 同名残留先删，避免沿用旧文件权限；导出内容含明文 key，落盘即收紧 0600
+    let _ = std::fs::remove_file(&tmp);
     let result = export_config(mgr.config(), &tmp, sanitize, None)
         .map_err(|e| ApiError::internal("EXPORT_FAILED", e.to_string()))
         .and_then(|()| {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))
+                    .map_err(|e| ApiError::internal("EXPORT_FAILED", e.to_string()))?;
+            }
             std::fs::read_to_string(&tmp)
                 .map_err(|e| ApiError::internal("EXPORT_FAILED", e.to_string()))
         });

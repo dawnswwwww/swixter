@@ -105,3 +105,9 @@ Auto-sync：进程内开关（默认 false，enable/disable 无持久化）；�
 3. 密文布局需逐字节兼容：aes-gcm crate `Aes256Gcm` + 96-bit nonce 直接对应。
 4. auto-sync enable/disable 仅进程内语义。
 5. Rust 技术选型：axum + tokio-tungstenite（WS）+ reqwest + rust-embed（静态）。
+
+## 已知继承缺陷（TS 同款，暂未修）
+
+1. **providers 明文上云**：sync push 时 profiles 的敏感字段（apiKey/authToken）有字段级加密，而 providers 的 headers/敏感字段是明文上传云端——TS 端继承下来的不一致，两侧需同修（本轮 Rust 重写保持行为对齐，未动）。
+2. **master password 变更后旧数据解不开**：加密 key 由 password+salt PBKDF2 派生，改 master password 后云端已加密数据无法用新 key 解密（无重加密/密钥包裹机制）。
+3. **export 默认明文导出**：`GET /api/config/export` 默认（不带 `?sanitize=true`）返回含明文 API key 的导出文件；本地 UI server 无鉴权，安全边界完全依赖 CORS 只放行 `http://127.0.0.1:*` / `http://localhost:*`（host 精确匹配）这道防线。

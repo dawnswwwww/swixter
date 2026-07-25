@@ -125,7 +125,7 @@ fn apply_encryption_setup(
     let mut state = store
         .load()
         .ok_or_else(|| ServerError::Auth("not logged in".into()))?;
-    let key = derive_key(master_password, &state.encryption_salt);
+    let key = derive_key(master_password, &state.encryption_salt)?;
     if remember {
         state.encryption_key = Some(key_to_base64(&key));
         store.save(&state)?;

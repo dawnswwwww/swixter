@@ -78,7 +78,17 @@ async fn start_proxy(
         .as_ref()
         .and_then(|b| b.get("port"))
         .and_then(|v| v.as_u64())
-        .map(|p| p as u16);
+        .map(|p| {
+            if (1..=65535).contains(&p) {
+                Ok(p as u16)
+            } else {
+                Err(ApiError::bad_request(
+                    "INVALID_PORT",
+                    "port must be between 1 and 65535",
+                ))
+            }
+        })
+        .transpose()?;
 
     let port = match requested_port {
         Some(p) => p,

@@ -42,7 +42,7 @@ mod tests {
 
     #[test]
     fn only_api_key_and_auth_token_strings_are_encrypted() {
-        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==");
+        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
         let obj = json!({
             "apiKey": "sk-123",
             "authToken": "tok-456",
@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn missing_sensitive_fields_is_noop() {
-        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==");
+        let key = derive_key("pw", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
         let obj = json!({"baseURL": "https://x"});
         assert_eq!(encrypt_sensitive_fields(&key, &obj).unwrap(), obj);
     }
