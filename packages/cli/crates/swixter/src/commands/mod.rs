@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod coder;
 pub mod group;
 pub mod install;

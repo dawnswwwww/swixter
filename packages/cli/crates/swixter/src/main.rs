@@ -25,7 +25,8 @@ fn run() -> i32 {
     };
     match command {
         Commands::Ui(a) => commands::ui::dispatch(a),
-        Commands::Auth(_) | Commands::Sync(_) => {
+        Commands::Auth(a) => commands::auth::dispatch(a),
+        Commands::Sync(_) => {
             eprintln!(
                 "This command is not yet available in the Rust build (coming in milestone M3)."
             );

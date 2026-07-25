@@ -34,10 +34,34 @@ pub enum Commands {
     Proxy(ProxyArgs),
     /// Web UI (start in foreground by default)
     Ui(UiArgs),
-    /// [M3] Cloud auth
-    Auth(StubArgs),
+    /// Cloud auth (register/login/logout/status/delete-account)
+    Auth(AuthArgs),
     /// [M3] Cloud sync
     Sync(StubArgs),
+}
+
+#[derive(Args)]
+pub struct AuthArgs {
+    #[command(subcommand)]
+    pub command: AuthCommand,
+}
+
+#[derive(Subcommand)]
+pub enum AuthCommand {
+    /// Create a new cloud account (email verification)
+    Register,
+    /// Sign in to your account
+    Login {
+        /// Sign in with a magic link instead of a password
+        #[arg(long)]
+        magic_link: bool,
+    },
+    /// Sign out
+    Logout,
+    /// Check login status
+    Status,
+    /// Permanently delete your cloud account and synced data
+    DeleteAccount,
 }
 
 #[derive(Args)]
