@@ -137,7 +137,10 @@ async fn import_config_file(
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
     let Some(config) = body.get("config") else {
-        return Err(ApiError::bad_request("INVALID_PARAMS", "config is required"));
+        return Err(ApiError::bad_request(
+            "INVALID_PARAMS",
+            "config is required",
+        ));
     };
     let overwrite = body
         .get("overwrite")

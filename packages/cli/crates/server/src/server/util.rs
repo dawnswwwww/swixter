@@ -48,10 +48,13 @@ mod tests {
     fn mask_rules_match_ts() {
         assert_eq!(mask_api_key(""), "****");
         assert_eq!(mask_api_key("short123"), "****"); // ≤8
-        // 15 字符 → min(15-8, 20) = 7 星号（计划示例 "sk-a****1234" 为笔误，以对齐 TS 的实现为准）
+                                                      // 15 字符 → min(15-8, 20) = 7 星号（计划示例 "sk-a****1234" 为笔误，以对齐 TS 的实现为准）
         assert_eq!(mask_api_key("sk-abcdefgh1234"), "sk-a*******1234");
         // 星号数量 min(len-8, 20)
-        assert_eq!(mask_api_key(&"x".repeat(40)), format!("xxxx{}xxxx", "*".repeat(20)));
+        assert_eq!(
+            mask_api_key(&"x".repeat(40)),
+            format!("xxxx{}xxxx", "*".repeat(20))
+        );
         assert_eq!(mask_auth_token(None), None);
         assert_eq!(mask_auth_token(Some("t")), Some("****".into()));
     }

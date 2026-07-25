@@ -15,14 +15,16 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/providers", get(list_providers).post(create_provider))
         // TS 无 GET /api/providers/:id 端点，仅 PUT/DELETE
-        .route("/providers/{id}", put(update_provider).delete(delete_provider))
-    }
+        .route(
+            "/providers/{id}",
+            put(update_provider).delete(delete_provider),
+        )
+}
 
 /// 合并 presets+user（用户覆盖同 id 内置），附 isUser 标志
 fn merged_providers(state: &AppState) -> Vec<serde_json::Value> {
     let user = swixter_core::user_providers::load_from(&state.providers_path());
-    let user_ids: std::collections::HashSet<String> =
-        user.iter().map(|p| p.id.clone()).collect();
+    let user_ids: std::collections::HashSet<String> = user.iter().map(|p| p.id.clone()).collect();
     let mut all: Vec<ProviderPreset> = swixter_core::presets::builtin_presets()
         .iter()
         .filter(|p| !user_ids.contains(&p.id))
@@ -78,8 +80,15 @@ async fn create_provider(
         "authType": body.get("authType").and_then(|x| x.as_str()).unwrap_or("api-key"),
     });
     for k in [
-        "baseURLChat", "headers", "rateLimit", "docs", "isChinese", "defaultApiFormat",
-        "wire_api", "env_key", "modelFamilies",
+        "baseURLChat",
+        "headers",
+        "rateLimit",
+        "docs",
+        "isChinese",
+        "defaultApiFormat",
+        "wire_api",
+        "env_key",
+        "modelFamilies",
     ] {
         if let Some(x) = body.get(k) {
             v[k] = x.clone();
@@ -101,12 +110,15 @@ async fn update_provider(
     Path(id): Path<String>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let existing = load_user(&state).into_iter().find(|p| p.id == id).ok_or_else(|| {
-        ApiError::bad_request(
-            "NOT_USER_PROVIDER",
-            format!("Provider \"{id}\" is not a user-defined provider"),
-        )
-    })?;
+    let existing = load_user(&state)
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| {
+            ApiError::bad_request(
+                "NOT_USER_PROVIDER",
+                format!("Provider \"{id}\" is not a user-defined provider"),
+            )
+        })?;
 
     // TS: {...existing, ...body, id} —— id 取 URL 参数
     let mut v = serde_json::to_value(&existing).unwrap();

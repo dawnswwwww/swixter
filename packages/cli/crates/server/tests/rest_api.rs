@@ -61,7 +61,11 @@ async fn profiles_crud_with_masking_and_error_codes() {
     let http = reqwest::Client::new();
 
     // GET 列表：apiKey/authToken 掩码（首4 + 星号(min(len-8,20)) + 尾4）
-    let resp = http.get(format!("{base}/api/profiles")).send().await.unwrap();
+    let resp = http
+        .get(format!("{base}/api/profiles"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
     let list: serde_json::Value = resp.json().await.unwrap();
     let p = &list.as_array().unwrap()[0];
@@ -206,7 +210,11 @@ async fn providers_user_only_mutation() {
     let http = reqwest::Client::new();
 
     // GET：内置 preset 带 isUser=false
-    let resp = http.get(format!("{base}/api/providers")).send().await.unwrap();
+    let resp = http
+        .get(format!("{base}/api/providers"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
     let list: serde_json::Value = resp.json().await.unwrap();
     let ollama = list
@@ -363,7 +371,11 @@ async fn version_endpoint_for_daemon_healthcheck() {
     let base = spawn_server(dir.path()).await;
     let http = reqwest::Client::new();
 
-    let resp = http.get(format!("{base}/api/version")).send().await.unwrap();
+    let resp = http
+        .get(format!("{base}/api/version"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
     let v: serde_json::Value = resp.json().await.unwrap();
     assert!(v["appVersion"].as_str().unwrap().contains('.'));
@@ -495,5 +507,192 @@ async fn groups_crud_and_set_active() {
         .send()
         .await
         .unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+// ---- Task 6 追加：proxy 端点 + 静态 SPA ----
+
+#[tokio::test]
+async fn proxy_logs_parsed_ndjson_latest_first() {
+    let dir = tempfile::tempdir().unwrap();
+    write_config(dir.path(), serde_json::json!({}), serde_json::json!({}));
+    let _guard = swixter_proxy::logger::LogPathOverride::set(dir.path().to_path_buf());
+    // 3 条合法 + 1 条坏行（坏行应被跳过但计入 total）
+    std::fs::write(
+        dir.path().join("proxy-default.log"),
+        concat!(
+            r#"{"ts":"t1","level":"info","msg":"first"}"#,
+            "\n",
+            r#"{"ts":"t2","level":"info","msg":"second"}"#,
+            "\n",
+            "not-json\n",
+            r#"{"ts":"t3","level":"info","msg":"third"}"#,
+            "\n",
+        ),
+    )
+    .unwrap();
+    let base = spawn_server(dir.path()).await;
+    let http = reqwest::Client::new();
+
+    // lines=3 → tail 覆盖坏行（跳过）+ 2 条合法行，最新在前
+    // （TS 同款语义：先 tail 后解析，坏行占 tail 名额）
+    let resp = http
+        .get(format!("{base}/api/proxy/logs?lines=3"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let v: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(v["instanceId"], "default");
+    assert_eq!(v["total"], 4); // 非空行总数（含坏行）
+    let lines = v["lines"].as_array().unwrap();
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0]["msg"], "third");
+    assert_eq!(lines[1]["msg"], "second");
+
+    // 默认 200 行 → 全部 3 条合法行，最新在前
+    let resp = http
+        .get(format!("{base}/api/proxy/logs"))
+        .send()
+        .await
+        .unwrap();
+    let v: serde_json::Value = resp.json().await.unwrap();
+    let lines = v["lines"].as_array().unwrap();
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[0]["msg"], "third");
+    assert_eq!(lines[2]["msg"], "first");
+
+    // 日志文件不存在 → 空结果
+    let resp = http
+        .get(format!("{base}/api/proxy/logs?instanceId=ghost"))
+        .send()
+        .await
+        .unwrap();
+    let v: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(v["lines"].as_array().unwrap().len(), 0);
+    assert_eq!(v["total"], 0);
+}
+
+#[tokio::test]
+async fn proxy_status_and_instances_enriched() {
+    let dir = tempfile::tempdir().unwrap();
+    write_config(
+        dir.path(),
+        serde_json::json!({
+            "p1": {
+                "name": "p1", "providerId": "ollama", "apiKey": "k-123456789",
+                "createdAt": "2025-01-01T00:00:00.000Z", "updatedAt": "2025-01-01T00:00:00.000Z",
+            }
+        }),
+        serde_json::json!({
+            "g1": {
+                "id": "g1", "name": "main", "profiles": ["p1"], "isDefault": false,
+                "createdAt": "2025-01-01T00:00:00.000Z", "updatedAt": "2025-01-01T00:00:00.000Z",
+            }
+        }),
+    );
+    // activeGroup 写盘
+    let mut cfg: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("config.json")).unwrap())
+            .unwrap();
+    cfg["activeGroup"] = "g1".into();
+    std::fs::write(dir.path().join("config.json"), cfg.to_string()).unwrap();
+
+    let _guard =
+        swixter_proxy::registry::RegistryPathOverride::set(dir.path().join("proxy-instances.json"));
+    swixter_proxy::registry::update_instance(&swixter_proxy::types::ProxyStatus {
+        instance_id: "default".into(),
+        kind: swixter_proxy::types::InstanceKind::Service,
+        running: true,
+        host: "127.0.0.1".into(),
+        port: 15721,
+        pid: Some(std::process::id()),
+        ..Default::default()
+    });
+    let base = spawn_server(dir.path()).await;
+    let http = reqwest::Client::new();
+
+    let resp = http
+        .get(format!("{base}/api/proxy/status"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let v: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(v["instanceId"], "default");
+    assert_eq!(v["running"], true);
+    assert_eq!(v["activeGroupName"], "main");
+
+    let resp = http
+        .get(format!("{base}/api/proxy/instances"))
+        .send()
+        .await
+        .unwrap();
+    let list: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(list.as_array().unwrap().len(), 1);
+    assert_eq!(list[0]["activeGroupName"], "main");
+}
+
+#[tokio::test]
+async fn static_spa_fallback_and_mime() {
+    let dir = tempfile::tempdir().unwrap();
+    write_config(dir.path(), serde_json::json!({}), serde_json::json!({}));
+    let base = spawn_server(dir.path()).await;
+    let http = reqwest::Client::new();
+
+    // GET / → 200 text/html
+    let resp = http.get(format!("{base}/")).send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(ct.starts_with("text/html"), "content-type: {ct}");
+    let index_html = resp.text().await.unwrap();
+    assert!(index_html.to_lowercase().contains("<html"));
+
+    // SPA 回退：未命中路径 → index.html
+    let resp = http
+        .get(format!("{base}/no/such/route"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.text().await.unwrap(), index_html);
+
+    // 已知静态资源 MIME（vite.svg 恒存在于 ui/dist）
+    let resp = http.get(format!("{base}/vite.svg")).send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(resp.headers().get("content-type").unwrap(), "image/svg+xml");
+
+    // dist 里若有 js 资产，断言 javascript MIME
+    let assets_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/dist/assets");
+    if let Some(js) = std::fs::read_dir(assets_dir).ok().and_then(|mut it| {
+        it.find_map(|e| {
+            let name = e.ok()?.file_name().to_string_lossy().into_owned();
+            name.ends_with(".js").then_some(name)
+        })
+    }) {
+        let resp = http
+            .get(format!("{base}/assets/{js}"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        let ct = resp
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert!(ct.contains("javascript"), "content-type: {ct}");
+    }
+
+    // /api/ 前缀不落入静态：未匹配的 api 路径 → 404（非 index.html）
+    let resp = http.get(format!("{base}/api/nope")).send().await.unwrap();
     assert_eq!(resp.status(), 404);
 }

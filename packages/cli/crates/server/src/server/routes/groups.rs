@@ -105,10 +105,8 @@ async fn update_group(
         ));
     }
     let name = body.get("name").and_then(|v| v.as_str());
-    let profiles: Option<Vec<String>> = body
-        .get("profiles")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
+    let profiles: Option<Vec<String>> =
+        body.get("profiles").and_then(|v| v.as_array()).map(|arr| {
             arr.iter()
                 .filter_map(|x| x.as_str().map(String::from))
                 .collect()

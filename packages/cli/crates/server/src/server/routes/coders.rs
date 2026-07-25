@@ -26,9 +26,8 @@ pub fn routes() -> Router<AppState> {
 }
 
 fn require_coder(coder: &str) -> Result<&'static swixter_core::coder::CoderSpec, ApiError> {
-    get_coder(coder).ok_or_else(|| {
-        ApiError::not_found("UNKNOWN_CODER", format!("Coder \"{coder}\" not found"))
-    })
+    get_coder(coder)
+        .ok_or_else(|| ApiError::not_found("UNKNOWN_CODER", format!("Coder \"{coder}\" not found")))
 }
 
 async fn list_coders(State(state): State<AppState>) -> impl IntoResponse {
@@ -72,9 +71,10 @@ async fn set_active_profile(
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, ApiError> {
     let spec = require_coder(&coder)?;
-    let profile_name = body.get("profileName").and_then(|v| v.as_str()).ok_or_else(|| {
-        ApiError::bad_request("INVALID_PARAMS", "profileName is required")
-    })?;
+    let profile_name = body
+        .get("profileName")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| ApiError::bad_request("INVALID_PARAMS", "profileName is required"))?;
     let mut mgr = state.config_manager();
     mgr.set_active_profile(spec.id, profile_name)
         .map_err(|e| ApiError::internal("SWITCH_FAILED", e.to_string()))?;

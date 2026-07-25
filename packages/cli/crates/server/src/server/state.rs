@@ -27,10 +27,7 @@ impl AppState {
     }
 
     pub fn providers_path(&self) -> PathBuf {
-        self.config_path()
-            .parent()
-            .unwrap()
-            .join("providers.json")
+        self.config_path().parent().unwrap().join("providers.json")
     }
 
     /// 每请求重新加载（TS 同语义）
