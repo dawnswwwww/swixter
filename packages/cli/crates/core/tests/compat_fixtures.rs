@@ -3,7 +3,7 @@ use swixter_core::types::{ApiFormat, ConfigFile};
 
 fn fixture(name: &str) -> String {
     let p = format!(
-        "{}/../../tests/compat/fixtures/{}",
+        "{}/tests/fixtures/compat/{}",
         env!("CARGO_MANIFEST_DIR"),
         name
     );
