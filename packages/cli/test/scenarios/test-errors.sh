@@ -3,7 +3,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 
 echo "=== Test: Error Handling ==="
 
@@ -61,7 +61,8 @@ echo "✓ Test 6 passed: Correctly rejected unknown command"
 echo "Test 7: Apply without any configuration..."
 # Clear all profiles first
 rm -f ~/.config/swixter/config.json
-if $CLI_CMD claude apply 2>&1 | grep -q "No active configuration"; then
+# Rust 文案为 "No active profile for <coder>"（TS 为 "No active configuration"）
+if $CLI_CMD claude apply 2>&1 | grep -q "No active profile"; then
     echo "✓ Test 7 passed: Correctly prompted no configuration"
 else
     echo "⚠ Test 7 skipped: May already have configuration"

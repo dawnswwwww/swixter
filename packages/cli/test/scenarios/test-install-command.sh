@@ -9,7 +9,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 MOCK_BIN_DIR="$HOME/bin"
 
 echo "=== Test: Install Command ==="
@@ -34,8 +34,11 @@ echo "Test 2: Install command shows methods when CLI not installed..."
 OUTPUT=$($CLI_CMD claude install 2>&1) || EXIT_CODE=$?
 
 # In non-TTY Docker environment, should show installation methods
+# (Rust: prints "Please install <name> manually:" + numbered method list)
 if echo "$OUTPUT" | grep -q "Available installation methods"; then
     echo "✓ Test 2 passed: Install command shows available methods"
+elif echo "$OUTPUT" | grep -q "manually:"; then
+    echo "✓ Test 2 passed: Install command shows manual method list"
 elif echo "$OUTPUT" | grep -q "is not installed"; then
     # Should at least detect CLI is not installed
     echo "✓ Test 2 passed: Install command detects CLI not installed"
@@ -50,6 +53,10 @@ echo "Test 3: Install command detects when CLI is already installed..."
 mkdir -p "$MOCK_BIN_DIR"
 printf '#!/bin/bash\necho "claude 1.0.0"\nexit 0\n' > "$MOCK_BIN_DIR/claude"
 chmod +x "$MOCK_BIN_DIR/claude"
+# Mock npm that fails fast：codex 只有 npm 单一安装方法会被直接执行，
+# mock 掉以避免真实全局安装/网络依赖（后续 Test 4 会用到）
+printf '#!/bin/bash\nexit 1\n' > "$MOCK_BIN_DIR/npm"
+chmod +x "$MOCK_BIN_DIR/npm"
 export PATH="$MOCK_BIN_DIR:$PATH"
 
 OUTPUT=$($CLI_CMD claude install 2>&1) || true
@@ -88,17 +95,18 @@ if $CLI_CMD qwen install 2>&1 | grep -q "Unknown command"; then
 fi
 echo "✓ Test 5 passed: Install command exists for qwen"
 
-# ─────────────────────────────────────────────
-# Test 6: Install command with --method parameter (non-interactive)
-# ─────────────────────────────────────────────
-echo "Test 6: Install command accepts --method parameter..."
-OUTPUT=$($CLI_CMD claude install --method 1 2>&1) || EXIT_CODE=$?
+# Test 6: Install command validates --method parameter (non-interactive)
+# 注意：使用越界索引，避免在容器内真实执行安装命令（Rust 会原样执行
+# 所选方法的 shell 命令，如 curl 安装脚本，依赖外网且会污染后续场景）。
+echo "Test 6: Install command validates --method parameter..."
+EXIT_CODE=0
+OUTPUT=$($CLI_CMD claude install --method 99 2>&1) || EXIT_CODE=$?
 
-# Should either show error for invalid method or attempt installation
-if echo "$OUTPUT" | grep -qi "Invalid method\|Error\|Available"; then
-    echo "✓ Test 6 passed: Install command handles --method parameter"
+if echo "$OUTPUT" | grep -qi "Invalid method"; then
+    echo "✓ Test 6 passed: Install command rejects out-of-range --method"
 else
-    echo "⚠ Test 6: Install command --method behavior needs verification"
+    echo "❌ Error: Expected 'Invalid method index' error, got: $OUTPUT"
+    exit 1
 fi
 
 # ─────────────────────────────────────────────

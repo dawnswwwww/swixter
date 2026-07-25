@@ -3,7 +3,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 CONFIG_FILE="$HOME/.config/swixter/config.json"
 
 echo "=== Test: Delete Configuration ==="

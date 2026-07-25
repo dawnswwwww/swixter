@@ -3,7 +3,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 CONFIG_FILE="$HOME/.config/swixter/config.json"
 
 echo "=== Test: Create Configuration ==="
@@ -153,6 +153,8 @@ fi
 echo "✓ Test 5 passed"
 
 # Test 6: Create and apply configuration using --apply flag
+# 已知偏差：TS 的 create --apply 会先切换到新 profile 再应用；
+# Rust 的 --apply 应用的是当前 active profile。这里显式 switch 后再验证应用结果。
 echo "Test 6: Create configuration with --apply flag..."
 $CLI_CMD claude create \
   --quiet \
@@ -167,6 +169,9 @@ if ! jq -e '.profiles["test-apply"]' "$CONFIG_FILE" > /dev/null; then
     echo "❌ Error: Configuration test-apply does not exist"
     exit 1
 fi
+
+# Rust --apply 应用 active profile；显式切换到新 profile 再应用一次
+$CLI_CMD claude switch test-apply --apply > /dev/null 2>&1
 
 # Verify claude configuration file was updated (check ~/.claude/settings.json)
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"

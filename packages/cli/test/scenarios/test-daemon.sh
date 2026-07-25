@@ -3,7 +3,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 PID_FILE="$HOME/.config/swixter/ui.pid"
 LOG_FILE="$HOME/.config/swixter/ui.log"
 

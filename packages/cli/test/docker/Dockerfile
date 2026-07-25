@@ -1,10 +1,11 @@
 # Swixter E2E 测试环境
-FROM oven/bun:latest
+FROM debian:bookworm-slim
 
 # 安装基础工具
 RUN apt-get update && apt-get install -y \
     jq \
     curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建测试用户

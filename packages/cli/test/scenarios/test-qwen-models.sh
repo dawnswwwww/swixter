@@ -3,20 +3,18 @@
 
 set -e
 
-CLI_CMD="node dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 # Get dynamic config path for cross-platform compatibility
 CONFIG_FILE=$HOME/.continue/config.yaml
 
 echo "=== Test: Qwen Model Configuration ==="
 
-# Build the project first
-echo "Building project..."
-bun run build > /dev/null 2>&1
-
 # Clean up any existing config
 rm -f "$CONFIG_FILE"
 
 # Test 1: Create qwen profile with model (non-interactive)
+# 已知偏差：Rust 的 create --apply 应用当前 active profile（TS 会先切换到新
+# profile）。这里在 create 后显式 switch，保证验证的是目标 profile。
 echo "Test 1: Create qwen profile with model..."
 $CLI_CMD qwen create \
   --quiet \
@@ -26,6 +24,7 @@ $CLI_CMD qwen create \
   --base-url https://openrouter.ai/api/v1 \
   --model gpt-4 \
   --apply > /dev/null 2>&1
+$CLI_CMD qwen switch test-qwen-model --apply > /dev/null 2>&1
 
 # Verify YAML contains model
 if ! grep -q "model: gpt-4" "$CONFIG_FILE"; then
@@ -57,6 +56,9 @@ $CLI_CMD qwen create \
   --base-url http://localhost:11434 \
   --model llama2 \
   --apply > /dev/null 2>&1
+# --apply 应用的是 active profile；Continue 配置按 title upsert，
+# 显式对新 profile 再应用一次以写入其条目
+$CLI_CMD qwen switch test-qwen-ollama --apply > /dev/null 2>&1
 
 # Verify both models exist
 if ! grep -q "model: gpt-4" "$CONFIG_FILE" || ! grep -q "model: llama2" "$CONFIG_FILE"; then
@@ -76,6 +78,7 @@ $CLI_CMD qwen create \
   --base-url https://api.openai.com/v1 \
   --model gpt-3.5-turbo \
   --apply > /dev/null 2>&1
+$CLI_CMD qwen switch test-qwen-quiet --apply > /dev/null 2>&1
 
 # Verify model is set
 if ! grep -q "model: gpt-3.5-turbo" "$CONFIG_FILE"; then

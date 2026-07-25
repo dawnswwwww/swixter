@@ -9,7 +9,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 MOCK_BIN_DIR="$HOME/bin"
 
 echo "=== Test: Update Command ==="
@@ -38,13 +38,19 @@ fi
 
 # ─────────────────────────────────────────────
 # Test 3: Update-cli command works when CLI is installed
+# （mock claude 放在含 "npm" 的路径下并提供失败的 mock npm，
+#   使安装方式检测命中 npm 方法且快速失败，
+#   避免回退到 curl 安装脚本真实下载/安装 coder CLI）
 # ─────────────────────────────────────────────
 echo "Test 3: Update-cli command works when CLI is installed..."
-mkdir -p "$MOCK_BIN_DIR"
+mkdir -p "$MOCK_BIN_DIR/npm-global"
 # Create mock CLI that returns version
-printf '#!/bin/bash\nif [ "$1" = "--version" ]; then echo "claude 1.0.0"; else exit 0; fi\n' > "$MOCK_BIN_DIR/claude"
-chmod +x "$MOCK_BIN_DIR/claude"
-export PATH="$MOCK_BIN_DIR:$PATH"
+printf '#!/bin/bash\nif [ "$1" = "--version" ]; then echo "claude 1.0.0"; else exit 0; fi\n' > "$MOCK_BIN_DIR/npm-global/claude"
+chmod +x "$MOCK_BIN_DIR/npm-global/claude"
+# Mock npm that fails fast (no network, no real installs)
+printf '#!/bin/bash\nexit 1\n' > "$MOCK_BIN_DIR/npm"
+chmod +x "$MOCK_BIN_DIR/npm"
+export PATH="$MOCK_BIN_DIR/npm-global:$MOCK_BIN_DIR:$PATH"
 
 OUTPUT=$($CLI_CMD claude update-cli 2>&1) || true
 
@@ -58,8 +64,8 @@ else
     echo "⚠ Test 3: Update-cli command behavior with installed CLI needs verification"
 fi
 
-# Clean up mock
-rm -f "$MOCK_BIN_DIR/claude"
+# Clean up mocks
+rm -f "$MOCK_BIN_DIR/npm-global/claude" "$MOCK_BIN_DIR/npm"
 
 # ─────────────────────────────────────────────
 # Test 4: Upgrade alias works for claude
