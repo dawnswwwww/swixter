@@ -1,5 +1,7 @@
 # Windows Compatibility Guide
 
+> **Note (v0.2.0):** Swixter has been rewritten in Rust. The "Code Architecture" and "Developer Notes" sections below still describe the former TypeScript implementation and are kept for historical reference. Installation and build instructions in this document have been updated for the Rust codebase.
+
 This document provides comprehensive information about Swixter's Windows support, including current status, configuration paths, testing strategies, and future enhancements.
 
 ## Current Status
@@ -34,9 +36,9 @@ This document provides comprehensive information about Swixter's Windows support
    - ✅ Docker-based tests work on Windows (requires Docker Desktop + WSL2)
    - ❌ Native Windows test suite not yet available
 
-3. **Build Script**
-   - ✅ Main build works (`bun build`)
-   - ⚠️ `chmod +x` in package.json is harmless on Windows but unnecessary
+3. **Build**
+   - ✅ Rust build works (`cargo build --release`)
+   - ✅ Prebuilt Windows binaries ship with every GitHub Release
 
 ## Configuration File Paths
 
@@ -135,15 +137,16 @@ No adapter-specific changes needed for Windows support!
 
 **How to run:**
 ```powershell
-# From PowerShell or Command Prompt
-bun run test:e2e
+# From PowerShell or Command Prompt (requires a Rust toolchain)
+cd packages\cli
+bash test/e2e-docker.sh
 ```
 
 **How it works:**
-1. Builds project with `bun build`
-2. Creates Linux container with Bun runtime
-3. Copies build artifacts into container
-4. Runs 8 bash test scenarios inside container
+1. Builds the Rust binary with `cargo build --release`
+2. Creates a Linux container
+3. Copies the binary and test scripts into the container
+4. Runs 18 bash test scenarios inside the container
 5. Reports results
 
 ### Option 2: Native Windows Testing (Future)
@@ -179,27 +182,32 @@ test("create profile on Windows", () => {
 
 ### Prerequisites
 
-- **Node.js 18+** (or Bun runtime)
+- **Rust toolchain** (for building from source only)
 - Windows 10/11
 
 ### Installation Methods
 
-#### Method 1: npm (Global)
+#### Method 1: PowerShell installer
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.ps1 | iex"
+```
+
+#### Method 2: npm (Global)
 ```powershell
 npm install -g swixter
 ```
 
-#### Method 2: npx (No install)
+#### Method 3: Cargo
 ```powershell
-npx swixter --help
+cargo install swixter
 ```
 
-#### Method 3: From source
+#### Method 4: From source
 ```powershell
 git clone https://github.com/dawnswwwww/swixter.git
-cd swixter
-bun install
-bun run build
+cd swixter\packages\cli
+cargo build --release
+# Binary: target\release\swixter.exe
 ```
 
 ### Verify Installation
@@ -211,18 +219,7 @@ swixter claude --help
 
 ## Common Windows Issues & Solutions
 
-### Issue 1: `chmod: command not found` during build
-
-**Cause:** `package.json` build script includes `chmod +x` which doesn't exist on Windows.
-
-**Solution:** This is harmless - the build will succeed anyway. The executable bit is a Unix concept.
-
-**Fix (future):** Make chmod conditional:
-```json
-"build": "bun build src/cli/index.ts --outdir dist/cli --target node --format esm && (chmod +x dist/cli/index.js || true)"
-```
-
-### Issue 2: Shell completions not working in PowerShell
+### Issue 1: Shell completions not working in PowerShell
 
 **Status:** PowerShell completions not yet implemented.
 
@@ -233,7 +230,7 @@ swixter claude --help
 swixter completion powershell > $PROFILE\..\Completions\swixter.ps1
 ```
 
-### Issue 3: Path not found errors
+### Issue 2: Path not found errors
 
 **Cause:** Mixing forward slashes `/` and backslashes `\` in paths.
 
@@ -276,7 +273,8 @@ const configPath = join(homedir(), ".config", "swixter", "config.json");
 
 1. **Local testing**
    ```powershell
-   bun run cli claude create
+   cd packages\cli
+   cargo run -p swixter -- claude create
    ```
 
 2. **Check generated paths**
@@ -291,7 +289,8 @@ const configPath = join(homedir(), ".config", "swixter", "config.json");
 3. **Run Docker-based E2E tests**
    ```powershell
    # Requires Docker Desktop + WSL2
-   bun run test:e2e
+   cd packages\cli
+   bash test/e2e-docker.sh
    ```
 
 ### Adding New Features (Windows Checklist)
