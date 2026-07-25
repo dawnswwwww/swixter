@@ -76,7 +76,15 @@ pub fn save_registry(registry: &InstanceRegistry) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    std::fs::write(path, serde_json::to_string_pretty(registry)?)
+    // 原子写（与 core config 同款模式）：先写临时文件再 rename，避免半截 JSON
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    let tmp = path.with_file_name(format!(".proxy-instances.tmp-{millis}"));
+    std::fs::write(&tmp, serde_json::to_string_pretty(registry)?)?;
+    std::fs::rename(&tmp, &path)?;
+    Ok(())
 }
 
 pub fn update_instance(status: &ProxyStatus) {
@@ -168,6 +176,35 @@ pub fn is_process_alive(pid: u32) -> bool {
     unsafe {
         windows_sys::Win32::Foundation::CloseHandle(h);
     }
+    true
+}
+
+/// stop 前 pid 身份校验：命令行需包含 "swixter"，防止 pid 被复用后误杀无关进程。
+#[cfg(unix)]
+pub fn is_swixter_process(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    // Linux 优先读 /proc（不依赖 ps）
+    #[cfg(target_os = "linux")]
+    if let Ok(cmdline) = std::fs::read_to_string(format!("/proc/{pid}/cmdline")) {
+        return cmdline.contains("swixter");
+    }
+    // macOS / 其他 unix fallback：ps
+    match std::process::Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "command="])
+        .output()
+    {
+        Ok(out) => String::from_utf8_lossy(&out.stdout).contains("swixter"),
+        Err(_) => false,
+    }
+}
+
+/// Windows：windows-sys 无低成本读取进程命令行的 API（需 WMI），无法校验。
+/// 保守返回 true 维持 TerminateProcess 现状（误杀风险与原实现一致，见 M2 review I3）。
+#[cfg(windows)]
+pub fn is_swixter_process(pid: u32) -> bool {
+    let _ = pid;
     true
 }
 
@@ -280,5 +317,34 @@ mod tests {
     fn current_process_is_alive() {
         assert!(is_process_alive(std::process::id()));
         assert!(!is_process_alive(4_000_000));
+    }
+
+    /// M4：原子写——保存后无 .tmp- 残留文件
+    #[test]
+    fn save_registry_is_atomic() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("proxy-instances.json");
+        let _guard = RegistryPathOverride::set(path.clone());
+        update_instance(&status("default", Some(std::process::id())));
+        assert!(path.exists());
+        let has_tmp = std::fs::read_dir(dir.path())
+            .unwrap()
+            .any(|e| e.unwrap().file_name().to_string_lossy().contains(".tmp-"));
+        assert!(!has_tmp, "atomic write must not leave tmp files");
+    }
+
+    /// I3：身份校验——当前测试进程命令行含 swixter；sleep 进程不含
+    #[cfg(unix)]
+    #[test]
+    fn swixter_process_identity_check() {
+        assert!(is_swixter_process(std::process::id()));
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        assert!(!is_swixter_process(child.id()));
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(!is_swixter_process(0));
     }
 }

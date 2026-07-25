@@ -25,6 +25,14 @@ fn now_millis() -> u128 {
         .as_millis()
 }
 
+/// 流式转换器：逐事件转换 + 流结束时冲刷挂起事件。
+/// drain 解决上游 finish chunk 后不发 [DONE] 直接断流导致尾部事件丢失的问题。
+pub trait StreamTransformer: Send {
+    fn convert_event(&mut self, ev: &SseEvent) -> Vec<SseOut>;
+    /// 上游流结束（含无 [DONE] 断流）时调用一次，返回剩余挂起事件
+    fn drain(&mut self) -> Vec<SseOut>;
+}
+
 // ---------------------------------------------------------------------------
 // 流式 OpenAI Chat SSE → Anthropic SSE（事实表 6 步状态机）
 // ---------------------------------------------------------------------------
@@ -61,9 +69,11 @@ impl ChatToAnthropicStream {
     pub fn new() -> Self {
         Self::default()
     }
+}
 
+impl StreamTransformer for ChatToAnthropicStream {
     /// 返回空 vec = 丢弃事件（含 [DONE]）
-    pub fn convert_event(&mut self, ev: &SseEvent) -> Vec<SseOut> {
+    fn convert_event(&mut self, ev: &SseEvent) -> Vec<SseOut> {
         let SseData::Json(chunk) = &ev.data else {
             return Vec::new(); // [DONE] 丢弃
         };
@@ -184,6 +194,13 @@ impl ChatToAnthropicStream {
         outs
     }
 
+    /// 无挂起事件（message_stop 在 finish_reason 时即发）
+    fn drain(&mut self) -> Vec<SseOut> {
+        Vec::new()
+    }
+}
+
+impl ChatToAnthropicStream {
     /// 首次出现时先 content_block_start（text/thinking），返回 block index
     fn ensure_block(&mut self, kind: BlockKind, outs: &mut Vec<SseOut>) -> u32 {
         let existing = match kind {
@@ -199,8 +216,8 @@ impl ChatToAnthropicStream {
             BlockKind::Thinking => self.current_thinking_block = Some(index),
         }
         let content_block = match kind {
-            BlockKind::Text => json!({ "type": "text", "text": "" }),
-            BlockKind::Thinking => json!({ "type": "thinking", "thinking": "" }),
+            BlockKind::Text => json!({ "type": "text" }),
+            BlockKind::Thinking => json!({ "type": "thinking" }),
         };
         outs.push(out(
             "content_block_start",
@@ -323,8 +340,10 @@ impl ChatToResponsesStream {
     pub fn new() -> Self {
         Self::default()
     }
+}
 
-    pub fn convert_event(&mut self, ev: &SseEvent) -> Vec<SseOut> {
+impl StreamTransformer for ChatToResponsesStream {
+    fn convert_event(&mut self, ev: &SseEvent) -> Vec<SseOut> {
         // [DONE]：flush 挂起的 response.completed（若有），本身不产生其他事件
         if matches!(ev.data, SseData::Done) {
             return self.take_pending_completed();
@@ -386,6 +405,13 @@ impl ChatToResponsesStream {
         outs
     }
 
+    /// 上游断流（无 [DONE]/usage chunk）时仍发出挂起的 response.completed（带最新捕获的 usage）
+    fn drain(&mut self) -> Vec<SseOut> {
+        self.take_pending_completed()
+    }
+}
+
+impl ChatToResponsesStream {
     fn response_shell(&self, status: &str) -> Value {
         json!({
             "id": self.response_id,

@@ -147,3 +147,95 @@ fn openai_to_responses_tool_lifecycle() {
         "{\"cmd\":\"ls\"}"
     );
 }
+
+/// C1：finish chunk 后无 [DONE] 直接断流，drain 仍发出挂起的 response.completed
+#[test]
+fn responses_drain_emits_pending_completed_after_abrupt_eof() {
+    let mut c = ChatToResponsesStream::new();
+    let events = parse_sse_events(concat!(
+        "data: {\"id\":\"c8\",\"model\":\"kimi-k2\",\"choices\":[{\"delta\":{\"content\":\"hi\"},\"index\":0}]}\n\n",
+        "data: {\"id\":\"c8\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\",\"index\":0}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":2,\"total_tokens\":7}}\n\n",
+    ));
+    let out = run_converter(|e| c.convert_event(e), &events);
+    // finish 时只发 done 系列，completed 挂起
+    assert!(out.iter().all(|(_, d)| d["type"] != "response.completed"));
+    let drained = c.drain();
+    assert_eq!(drained.len(), 1);
+    let data: serde_json::Value = serde_json::from_str(&drained[0].data_json).unwrap();
+    assert_eq!(drained[0].event, "response.completed");
+    assert_eq!(data["type"], "response.completed");
+    // 带最新捕获的 usage
+    assert_eq!(data["response"]["usage"]["input_tokens"], 5);
+    assert_eq!(data["response"]["usage"]["output_tokens"], 2);
+    assert_eq!(data["response"]["usage"]["total_tokens"], 7);
+    assert_eq!(data["response"]["status"], "completed");
+    // drain 幂等：再次调用无事件
+    assert!(c.drain().is_empty());
+}
+
+#[test]
+fn anthropic_drain_is_empty() {
+    let mut c = ChatToAnthropicStream::new();
+    let events = parse_sse_events(concat!(
+        "data: {\"id\":\"c9\",\"model\":\"m\",\"choices\":[{\"delta\":{\"content\":\"hi\"},\"index\":0}]}\n\n",
+        "data: {\"id\":\"c9\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\",\"index\":0}]}\n\n",
+    ));
+    let _ = run_converter(|e| c.convert_event(e), &events);
+    assert!(c.drain().is_empty());
+}
+
+/// C1：transform_stream 端到端 —— 上游 finish 后直接 EOF（无 [DONE]），completed 不丢失
+#[tokio::test]
+async fn transform_stream_drains_completed_when_upstream_ends_without_done() {
+    use futures::StreamExt;
+    use swixter_core::types::ApiFormat;
+    use swixter_proxy::transform::{transform_stream, TransformCtx};
+
+    let sse = concat!(
+        "data: {\"id\":\"c10\",\"model\":\"kimi-k2\",\"choices\":[{\"delta\":{\"content\":\"hi\"},\"index\":0}]}\n\n",
+        "data: {\"id\":\"c10\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\",\"index\":0}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":2,\"total_tokens\":7}}\n\n",
+    );
+    let chunks: Vec<Result<bytes::Bytes, reqwest::Error>> = vec![Ok(bytes::Bytes::from(sse))];
+    let upstream = futures::stream::iter(chunks);
+    let ctx = TransformCtx {
+        endpoint: "/v1/responses".into(),
+        client_format: ApiFormat::OpenaiResponses,
+        target_format: ApiFormat::OpenaiChat,
+        stream: true,
+    };
+    let mut out = transform_stream(upstream, &ctx);
+    let mut text = String::new();
+    while let Some(item) = out.next().await {
+        text.push_str(std::str::from_utf8(&item.unwrap()).unwrap());
+    }
+    assert!(
+        text.contains("\"type\":\"response.completed\""),
+        "missing response.completed: {text}"
+    );
+    assert!(text.contains("\"input_tokens\":5"), "missing usage: {text}");
+    assert!(text.contains("\"total_tokens\":7"), "missing usage: {text}");
+}
+
+/// C2 防御：无转换器的组合透传原始流而非 panic
+#[tokio::test]
+async fn transform_stream_passthrough_for_unregistered_pair() {
+    use futures::StreamExt;
+    use swixter_core::types::ApiFormat;
+    use swixter_proxy::transform::{transform_stream, TransformCtx};
+
+    let sse = "data: {\"id\":\"x\",\"choices\":[]}\n\n";
+    let chunks: Vec<Result<bytes::Bytes, reqwest::Error>> = vec![Ok(bytes::Bytes::from(sse))];
+    let upstream = futures::stream::iter(chunks);
+    let ctx = TransformCtx {
+        endpoint: "/v1/chat/completions".into(),
+        client_format: ApiFormat::OpenaiChat,
+        target_format: ApiFormat::AnthropicMessages,
+        stream: true,
+    };
+    let mut out = transform_stream(upstream, &ctx);
+    let mut text = String::new();
+    while let Some(item) = out.next().await {
+        text.push_str(std::str::from_utf8(&item.unwrap()).unwrap());
+    }
+    assert_eq!(text, sse); // 原样透传
+}

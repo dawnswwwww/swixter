@@ -72,15 +72,13 @@ pub fn infer_target_api_format(profile: &Profile, preset: Option<&ProviderPreset
     }
 }
 
-/// TS: TRANSFORMER_REGISTRY —— 仅 2 对；Rust 用 match 静态分派代替运行时注册
+/// TS: TRANSFORMER_REGISTRY —— 仅 2 对；Rust 用 match 静态分派代替运行时注册。
+/// 反向（openai_chat 客户端 → anthropic 上游等）TS 未注册，group 模式该组合跳过。
 pub fn has_transformer(client: ApiFormat, target: ApiFormat) -> bool {
     use ApiFormat::*;
     matches!(
         (client, target),
-        (AnthropicMessages, OpenaiChat)
-            | (OpenaiChat, AnthropicMessages)
-            | (OpenaiResponses, OpenaiChat)
-            | (OpenaiChat, OpenaiResponses)
+        (AnthropicMessages, OpenaiChat) | (OpenaiResponses, OpenaiChat)
     )
 }
 
@@ -112,7 +110,7 @@ pub fn transform_response(body: &Value, ctx: &TransformCtx) -> Result<Value, Pro
 }
 
 /// TS: transformStream —— SSE 字节流经 SseChunker 切事件后逐事件转换，再序列化回字节流。
-/// 上游流结束时 chunker.flush() 的残余事件追加在尾部。
+/// 上游流结束时 chunker.flush() 的残余事件 + converter.drain() 的挂起事件追加在尾部。
 pub fn transform_stream<S>(
     stream: S,
     ctx: &TransformCtx,
@@ -122,26 +120,35 @@ where
 {
     use futures::StreamExt;
 
-    type Converter = Box<dyn FnMut(&crate::sse::SseEvent) -> Vec<streaming::SseOut> + Send>;
-    let converter: Converter = match (ctx.client_format, ctx.target_format) {
+    let converter: Box<dyn streaming::StreamTransformer> = match (
+        ctx.client_format,
+        ctx.target_format,
+    ) {
         (ApiFormat::AnthropicMessages, ApiFormat::OpenaiChat) => {
-            let mut c = streaming::ChatToAnthropicStream::new();
-            Box::new(move |ev| c.convert_event(ev))
+            Box::new(streaming::ChatToAnthropicStream::new())
         }
         (ApiFormat::OpenaiResponses, ApiFormat::OpenaiChat) => {
-            let mut c = streaming::ChatToResponsesStream::new();
-            Box::new(move |ev| c.convert_event(ev))
+            Box::new(streaming::ChatToResponsesStream::new())
         }
-        _ => unreachable!("transform_stream 只在 has_transformer 为真时调用"),
+        // 防御：正常只在 has_transformer 为真时调用；意外组合透传原始流而非 panic
+        (client, target) => {
+            eprintln!(
+                "[swixter-proxy] warn: no stream transformer for {client:?} -> {target:?}, passing through raw stream"
+            );
+            return Box::pin(stream.map(|r| r.map_err(std::io::Error::other)));
+        }
     };
 
-    let render = |events: Vec<crate::sse::SseEvent>, converter: &mut Converter| -> String {
+    fn render(
+        events: Vec<crate::sse::SseEvent>,
+        converter: &mut dyn streaming::StreamTransformer,
+    ) -> String {
         events
             .iter()
-            .flat_map(&mut *converter)
+            .flat_map(|ev| converter.convert_event(ev))
             .map(|o| crate::sse::serialize_sse_event(&o.event, &o.data_json))
             .collect()
-    };
+    }
 
     let state = std::sync::Arc::new(std::sync::Mutex::new((
         crate::sse::SseChunker::new(),
@@ -154,7 +161,7 @@ where
                 let mut guard = st.lock().unwrap();
                 let (chunker, converter) = &mut *guard;
                 let events = chunker.feed(&bytes);
-                render(events, converter)
+                render(events, converter.as_mut())
             }
             Err(e) => return futures::future::ready(Some(Err(std::io::Error::other(e)))),
         };
@@ -167,8 +174,12 @@ where
     let tail = futures::stream::once(async move {
         let mut guard = state.lock().unwrap();
         let (chunker, converter) = &mut *guard;
-        let events = chunker.flush();
-        render(events, converter)
+        let mut text = render(chunker.flush(), converter.as_mut());
+        // drain 挂起事件（如 finish 后无 [DONE] 直接断流时的 response.completed）
+        for o in converter.drain() {
+            text.push_str(&crate::sse::serialize_sse_event(&o.event, &o.data_json));
+        }
+        text
     })
     .filter_map(|text| {
         futures::future::ready(if text.is_empty() {

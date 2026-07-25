@@ -116,10 +116,11 @@ fn infer_target_format_priority_chain() {
 #[test]
 fn has_transformer_only_two_pairs() {
     use ApiFormat::*;
+    // TS 只注册两个方向；反向对不存在（group 模式该组合跳过 profile）
     assert!(has_transformer(AnthropicMessages, OpenaiChat));
-    assert!(has_transformer(OpenaiChat, AnthropicMessages));
     assert!(has_transformer(OpenaiResponses, OpenaiChat));
-    assert!(has_transformer(OpenaiChat, OpenaiResponses));
+    assert!(!has_transformer(OpenaiChat, AnthropicMessages));
+    assert!(!has_transformer(OpenaiChat, OpenaiResponses));
     assert!(!has_transformer(AnthropicMessages, OpenaiResponses));
     assert!(!has_transformer(GeminiNative, OpenaiChat));
 }

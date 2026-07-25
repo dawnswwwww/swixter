@@ -200,9 +200,16 @@ fn cmd_stop(instance_id: &str) -> i32 {
             println!("✓ Proxy instance \"{instance_id}\" stopped");
             return EXIT_SUCCESS;
         }
-        // 跨进程：按 registry pid 发信号 kill（决策点 3，改进 TS 只删条目的现状）
+        // 跨进程：按 registry pid 发信号 kill（决策点 3，改进 TS 只删条目的现状）。
+        // kill 前校验进程身份：pid 可能已被复用，命令行不含 swixter 则只删条目。
         if let Some(pid) = status.pid {
-            registry::terminate_process(pid);
+            if registry::is_swixter_process(pid) {
+                registry::terminate_process(pid);
+            } else {
+                eprintln!(
+                    "Warning: pid {pid} is not a swixter process (pid may have been reused); removing stale registry entry without killing"
+                );
+            }
         }
         registry::remove_instance(instance_id);
         println!("✓ Proxy instance \"{instance_id}\" stopped");
@@ -302,9 +309,10 @@ pub fn resolve_proxy_runtime_binding(
 pub fn build_coder_proxy_env(
     coder: &str,
     base: &[(String, String)],
+    host: &str,
     port: u16,
 ) -> Vec<(String, String)> {
-    let base_url = format!("http://{DEFAULT_PROXY_HOST}:{port}");
+    let base_url = format!("http://{host}:{port}");
     let mut env: Vec<(String, String)> = base.to_vec();
     let set = |env: &mut Vec<(String, String)>, k: &str, v: &str| {
         env.retain(|(key, _)| key != k);
@@ -411,7 +419,7 @@ fn cmd_run(a: ProxyRunArgs) -> i32 {
     }
 
     let base_env: Vec<(String, String)> = std::env::vars().collect();
-    let env = build_coder_proxy_env(&coder, &base_env, binding.port);
+    let env = build_coder_proxy_env(&coder, &base_env, &binding.host, binding.port);
 
     runtime().block_on(async move {
         if started_by_us {
@@ -482,7 +490,7 @@ mod tests {
             ("ANTHROPIC_API_KEY".to_string(), "old".to_string()),
             ("PATH".to_string(), "/bin".to_string()),
         ];
-        let env = build_coder_proxy_env("claude", &base, 15721);
+        let env = build_coder_proxy_env("claude", &base, "127.0.0.1", 15721);
         assert!(env
             .iter()
             .any(|(k, v)| k == "ANTHROPIC_API_BASE" && v == "http://127.0.0.1:15721"));
@@ -490,17 +498,26 @@ mod tests {
             .iter()
             .any(|(k, v)| k == "ANTHROPIC_AUTH_TOKEN" && v == "swixter-local-proxy"));
         assert!(!env.iter().any(|(k, _)| k == "ANTHROPIC_API_KEY")); // 删除
-        let env = build_coder_proxy_env("qwen", &base, 15721);
+        let env = build_coder_proxy_env("qwen", &base, "127.0.0.1", 15721);
         assert!(env
             .iter()
             .any(|(k, v)| k == "ANTHROPIC_API_KEY" && v == "dummy"));
-        let env = build_coder_proxy_env("codex", &base, 15721);
+        let env = build_coder_proxy_env("codex", &base, "127.0.0.1", 15721);
         assert!(env
             .iter()
             .any(|(k, v)| k == "OPENAI_API_BASE" && v == "http://127.0.0.1:15721"));
         assert!(env
             .iter()
             .any(|(k, v)| k == "OPENAI_API_KEY" && v == "dummy"));
+    }
+
+    #[test]
+    fn coder_env_uses_binding_host() {
+        // binding.host 非默认值（如 --host 0.0.0.0）时 env 必须用 binding.host
+        let env = build_coder_proxy_env("claude", &[], "0.0.0.0", 16000);
+        assert!(env
+            .iter()
+            .any(|(k, v)| k == "ANTHROPIC_API_BASE" && v == "http://0.0.0.0:16000"));
     }
 
     #[test]
@@ -528,5 +545,40 @@ mod tests {
         let b = resolve_proxy_runtime_binding(Some("g2"), None, None, &instances);
         assert_eq!(b.port, 15723);
         assert!(!b.reuse_existing);
+    }
+
+    /// I3：registry 里的 pid 指向非 swixter 进程（pid 复用）时，stop 只删条目不 kill
+    #[cfg(unix)]
+    #[test]
+    fn stop_with_reused_pid_removes_entry_without_killing() {
+        use swixter_proxy::registry::RegistryPathOverride;
+
+        let dir = tempfile::tempdir().unwrap();
+        let _guard = RegistryPathOverride::set(dir.path().join("proxy-instances.json"));
+        // 一个确定非 swixter 的存活进程
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        registry::update_instance(&ProxyStatus {
+            instance_id: "foreign".into(),
+            kind: InstanceKind::Service,
+            running: true,
+            host: "127.0.0.1".into(),
+            port: 19999,
+            pid: Some(pid),
+            start_time: Some("2026-07-24T01:00:00.000Z".into()),
+            ..Default::default()
+        });
+
+        let code = cmd_stop("foreign");
+        assert_eq!(code, EXIT_SUCCESS);
+        // 条目已删除
+        assert!(registry::list_proxy_instances().is_empty());
+        // 进程未被误杀
+        assert!(registry::is_process_alive(pid));
+        let _ = child.kill();
+        let _ = child.wait();
     }
 }

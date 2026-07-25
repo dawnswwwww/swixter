@@ -480,3 +480,93 @@ async fn server_streaming_end_to_end_via_http() {
 
     assert!(swixter_proxy::server::stop_in_process_instance("srv-sse").await);
 }
+
+/// C2：openai_chat 客户端 + anthropic 上游（反向对未注册）→ group 跳过该 profile，不转发
+#[tokio::test]
+async fn group_skips_profile_without_registered_transformer() {
+    let dir = tempfile::tempdir().unwrap();
+    let _log = LogPathOverride::set(dir.path().to_path_buf());
+    // baseURL 路径含 /anthropic → target = anthropic_messages
+    let anthropic_upstream = MockUpstream::start(|| {
+        (
+            axum::http::StatusCode::OK,
+            "application/json".into(),
+            axum::body::Body::from(r#"{"should":"not reach"}"#),
+        )
+    })
+    .await;
+    let good = MockUpstream::start(|| {
+        (
+            axum::http::StatusCode::OK,
+            "application/json".into(),
+            axum::body::Body::from(r#"{"from":"good"}"#),
+        )
+    })
+    .await;
+    let cfg = write_config(
+        dir.path(),
+        serde_json::json!({
+            "version":"2.0.0","coders":{},
+            "profiles":{
+                "a":profile_json("a", &format!("{}/anthropic", anthropic_upstream.base_url)),
+                "b":profile_json("b", &good.base_url)
+            },
+            "groups":{"g1":{"id":"g1","name":"g","profiles":["a","b"],"isDefault":true,"createdAt":"t","updatedAt":"t"}},
+            "activeGroup":"g1"
+        }),
+    );
+    let h = ProxyHandler::new(&handler_config(cfg, Some("g"), None));
+    // /v1/chat/completions → client = openai_chat；a 为 anthropic 上游，无转换器 → 跳过；落到 b
+    let resp = h
+        .handle(
+            "POST",
+            "/v1/chat/completions",
+            &bearer(),
+            &Bytes::from(r#"{"model":"m"}"#),
+        )
+        .await;
+    assert_eq!(resp.status, 200);
+    assert_eq!(body_bytes(resp.body).await.as_ref(), br#"{"from":"good"}"#);
+    assert_eq!(anthropic_upstream.recorded.lock().unwrap().len(), 0);
+    assert_eq!(good.recorded.lock().unwrap().len(), 1);
+}
+
+/// C2：group 里只有反向对 profile → 全部跳过 → 503
+#[tokio::test]
+async fn group_all_skipped_returns_503() {
+    let dir = tempfile::tempdir().unwrap();
+    let _log = LogPathOverride::set(dir.path().to_path_buf());
+    let anthropic_upstream = MockUpstream::start(|| {
+        (
+            axum::http::StatusCode::OK,
+            "application/json".into(),
+            axum::body::Body::from(r#"{}"#),
+        )
+    })
+    .await;
+    let cfg = write_config(
+        dir.path(),
+        serde_json::json!({
+            "version":"2.0.0","coders":{},
+            "profiles":{
+                "a":profile_json("a", &format!("{}/anthropic", anthropic_upstream.base_url))
+            },
+            "groups":{"g1":{"id":"g1","name":"g","profiles":["a"],"isDefault":true,"createdAt":"t","updatedAt":"t"}},
+            "activeGroup":"g1"
+        }),
+    );
+    let h = ProxyHandler::new(&handler_config(cfg, Some("g"), None));
+    let resp = h
+        .handle(
+            "POST",
+            "/v1/chat/completions",
+            &bearer(),
+            &Bytes::from(r#"{"model":"m"}"#),
+        )
+        .await;
+    assert_eq!(resp.status, 503);
+    let body = body_bytes(resp.body).await;
+    let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(v["error"], "All providers failed");
+    assert_eq!(anthropic_upstream.recorded.lock().unwrap().len(), 0);
+}

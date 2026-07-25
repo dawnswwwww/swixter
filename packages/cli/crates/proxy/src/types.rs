@@ -2,9 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum InstanceKind {
+    #[default]
     Service,
     Run,
 }
@@ -52,12 +53,6 @@ impl Default for ProxyStatus {
     }
 }
 
-impl InstanceKind {
-    fn default() -> Self {
-        Self::Service
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct ProxyServerConfig {
     pub instance_id: String,
@@ -85,5 +80,10 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         let orig: serde_json::Value = serde_json::from_str(raw).unwrap();
         assert_eq!(back, orig);
+    }
+
+    #[test]
+    fn instance_kind_default_is_service() {
+        assert_eq!(InstanceKind::default(), InstanceKind::Service);
     }
 }

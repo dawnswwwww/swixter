@@ -39,7 +39,7 @@ fn headers_stripped_and_credential_injected() {
     h.insert("host", "localhost".parse().unwrap());
     h.insert("content-length", "10".parse().unwrap());
     h.insert("x-custom", "keep".parse().unwrap());
-    let out = filtered_headers(&h, ApiFormat::AnthropicMessages, "sk-real");
+    let out = filtered_headers(&h, ApiFormat::AnthropicMessages, "sk-real").unwrap();
     assert!(
         out.get("authorization").is_none()
             || out.get("authorization").unwrap() != "Bearer swixter-local-proxy"
@@ -49,7 +49,7 @@ fn headers_stripped_and_credential_injected() {
     assert!(out.get("content-length").is_none());
     assert_eq!(out.get("x-custom").unwrap(), "keep");
     // openai 目标 → Bearer
-    let out2 = filtered_headers(&h, ApiFormat::OpenaiChat, "sk-real");
+    let out2 = filtered_headers(&h, ApiFormat::OpenaiChat, "sk-real").unwrap();
     assert_eq!(out2.get("authorization").unwrap(), "Bearer sk-real");
 }
 
@@ -119,4 +119,120 @@ async fn forward_detects_sse_stream() {
         .await
         .unwrap();
     assert!(resp.is_stream);
+}
+
+/// I2：凭据含换行等非法 header 字符时返回错误而非 panic
+#[test]
+fn invalid_credential_chars_return_error_not_panic() {
+    let h = reqwest::header::HeaderMap::new();
+    let err = filtered_headers(&h, ApiFormat::OpenaiChat, "sk-bad\nkey").unwrap_err();
+    assert!(matches!(err, swixter_proxy::ProxyError::Transform(_)));
+    let err = filtered_headers(&h, ApiFormat::AnthropicMessages, "sk-bad\rkey").unwrap_err();
+    assert!(matches!(err, swixter_proxy::ProxyError::Transform(_)));
+}
+
+/// I2：handler 层——含 \n 的 apiKey 走 forward 返回 Err（单 profile 502 / group 转移的上游异常路径）
+#[tokio::test]
+async fn forward_with_newline_credential_errors_not_panics() {
+    let mut p = profile("http://127.0.0.1:1"); // 不需要可达上游：header 构造先失败
+    p.api_key = "sk-bad\nkey".into();
+    let err = Forwarder::new()
+        .forward(
+            ForwardRequest {
+                method: "POST".into(),
+                path: "/v1/chat/completions".into(),
+                headers: Default::default(),
+                body: bytes::Bytes::from("{}"),
+            },
+            &p,
+            None,
+            Duration::from_secs(5),
+            ApiFormat::OpenaiChat,
+        )
+        .await;
+    let Err(err) = err else {
+        panic!("expected Transform error, got Ok response")
+    };
+    assert!(matches!(err, swixter_proxy::ProxyError::Transform(_)));
+}
+
+/// I1：timeout 只覆盖到响应头；流式 body 慢于 timeout 也不被掐断
+#[tokio::test]
+async fn slow_streaming_body_not_cut_by_header_timeout() {
+    let mock = MockUpstream::start(|| {
+        // 响应头立即返回，body 分 3 段每段间隔 150ms（总 450ms > timeout 200ms）
+        let stream = futures::stream::unfold(0u8, |i| async move {
+            if i >= 3 {
+                return None;
+            }
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            let chunk: Result<bytes::Bytes, std::io::Error> =
+                Ok(bytes::Bytes::from("data: {}\n\n"));
+            Some((chunk, i + 1))
+        });
+        (
+            axum::http::StatusCode::OK,
+            "text/event-stream".into(),
+            axum::body::Body::from_stream(stream),
+        )
+    })
+    .await;
+    let p = profile(&mock.base_url);
+    let resp = Forwarder::new()
+        .forward(
+            ForwardRequest {
+                method: "POST".into(),
+                path: "/v1/chat/completions".into(),
+                headers: Default::default(),
+                body: bytes::Bytes::from("{}"),
+            },
+            &p,
+            None,
+            Duration::from_millis(200),
+            ApiFormat::OpenaiChat,
+        )
+        .await
+        .unwrap();
+    assert!(resp.is_stream);
+    let ForwardBody::Stream(s) = resp.body else {
+        panic!("expected stream body")
+    };
+    use futures::StreamExt;
+    let chunks: Vec<_> = s.collect().await;
+    assert_eq!(chunks.len(), 3, "stream must not be cut by timeout");
+    assert!(chunks.iter().all(|c| c.is_ok()));
+}
+
+/// I1 反向佐证：响应头本身超时仍报错
+#[tokio::test]
+async fn header_timeout_still_applies() {
+    // 裸 TCP listener：接受连接但永不回字节（响应头超时场景）
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        let mut held = Vec::new();
+        loop {
+            let (sock, _) = listener.accept().await.unwrap();
+            held.push(sock); // 持有连接，永不响应
+        }
+    });
+    let p = profile(&format!("http://{addr}"));
+    let err = Forwarder::new()
+        .forward(
+            ForwardRequest {
+                method: "POST".into(),
+                path: "/v1/chat/completions".into(),
+                headers: Default::default(),
+                body: bytes::Bytes::from("{}"),
+            },
+            &p,
+            None,
+            Duration::from_millis(200),
+            ApiFormat::OpenaiChat,
+        )
+        .await;
+    let Err(err) = err else {
+        panic!("expected header timeout error, got Ok response")
+    };
+    assert!(matches!(err, swixter_proxy::ProxyError::Transform(_)));
 }

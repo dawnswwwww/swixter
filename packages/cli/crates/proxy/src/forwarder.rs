@@ -51,8 +51,12 @@ pub fn build_upstream_url(
 }
 
 /// TS: 剔除 authorization/x-api-key/content-length/host（大小写不敏感，HeaderMap name 已小写）；
-/// credential 非空时按目标格式注入
-pub fn filtered_headers(src: &HeaderMap, target_format: ApiFormat, credential: &str) -> HeaderMap {
+/// credential 非空时按目标格式注入。凭据含换行/非 Latin-1 等非法字符时返回错误而非 panic。
+pub fn filtered_headers(
+    src: &HeaderMap,
+    target_format: ApiFormat,
+    credential: &str,
+) -> Result<HeaderMap, ProxyError> {
     let mut out = HeaderMap::new();
     for (name, value) in src.iter() {
         if STRIP_HEADERS.contains(&name.as_str()) {
@@ -65,19 +69,23 @@ pub fn filtered_headers(src: &HeaderMap, target_format: ApiFormat, credential: &
             target_format,
             ApiFormat::AnthropicMessages | ApiFormat::AnthropicResponses
         );
-        if is_anthropic {
-            out.insert(
-                "x-api-key",
-                HeaderValue::from_str(credential).expect("header value"),
-            );
+        let value = if is_anthropic {
+            credential.to_string()
         } else {
-            out.insert(
-                "authorization",
-                HeaderValue::from_str(&format!("Bearer {credential}")).expect("header value"),
-            );
+            format!("Bearer {credential}")
+        };
+        let value = HeaderValue::from_str(&value).map_err(|e| {
+            ProxyError::Transform(format!(
+                "credential contains invalid header characters: {e}"
+            ))
+        })?;
+        if is_anthropic {
+            out.insert("x-api-key", value);
+        } else {
+            out.insert("authorization", value);
         }
     }
-    out
+    Ok(out)
 }
 
 /// TS: credential = profile.authToken || profile.apiKey || ""（JS || 跳过空字符串）
@@ -110,18 +118,23 @@ impl Forwarder {
         target_format: ApiFormat,
     ) -> Result<ForwardResponse, ProxyError> {
         let url = build_upstream_url(profile, preset, &req.path);
-        let headers = filtered_headers(&req.headers, target_format, credential_of(profile));
+        let headers = filtered_headers(&req.headers, target_format, credential_of(profile))?;
         let method = reqwest::Method::from_bytes(req.method.as_bytes())
             .map_err(|e| ProxyError::Transform(format!("bad method: {e}")))?;
 
-        let resp = self
-            .client
-            .request(method, &url)
-            .headers(headers)
-            .body(req.body)
-            .timeout(timeout)
-            .send()
-            .await?;
+        // TS 语义：timeout 只到拿到响应头为止；流式 body 不设总时限（reqwest .timeout() 会覆盖整个 body 读取）
+        let resp = tokio::time::timeout(
+            timeout,
+            self.client
+                .request(method, &url)
+                .headers(headers)
+                .body(req.body)
+                .send(),
+        )
+        .await
+        .map_err(|_| {
+            ProxyError::Transform(format!("upstream response header timeout ({timeout:?})"))
+        })??;
 
         let status = resp.status().as_u16();
         let headers = resp.headers().clone();
