@@ -297,3 +297,218 @@ async fn pull_flow_config_404_errors_push_first() {
         other => panic!("expected Sync(404), got {other:?}"),
     }
 }
+
+// ---------- Task 4: auto-sync ----------
+
+use swixter_server::crypto::derive::key_to_base64;
+use swixter_server::sync::auto_sync;
+
+/// auto-sync 测试共享进程级 ENABLED 开关，必须串行
+static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+fn write_auth(dir: &std::path::Path, encryption_key: Option<String>) -> std::path::PathBuf {
+    let auth_path = dir.join("auth.json");
+    let mut auth = serde_json::json!({
+        "accessToken": "tok",
+        "refreshToken": "refresh-0",
+        "expiresAt": "2999-01-01T00:00:00Z", // 远未来，不触发 refresh
+        "encryptionSalt": "AAECAwQFBgcICQoLDA0ODw==",
+        "authMethod": "password",
+        "userId": "u1",
+        "email": "e@x.com"
+    });
+    if let Some(k) = encryption_key {
+        auth["encryptionKey"] = k.into();
+    }
+    std::fs::write(&auth_path, serde_json::to_string_pretty(&auth).unwrap()).unwrap();
+    auth_path
+}
+
+fn auto_ctx(base_url: &str, dir: &std::path::Path) -> auto_sync::AutoSyncContext {
+    auto_sync::AutoSyncContext {
+        base_url: base_url.to_string(),
+        auth_path: dir.join("auth.json"),
+        config_path: dir.join("config.json"),
+        providers_path: dir.join("providers.json"),
+    }
+}
+
+#[tokio::test]
+async fn auto_sync_skips_when_disabled_or_no_key() {
+    let _g = SERIAL.lock().await;
+    let mock = MockCloud::start(vec![
+        ("/api/sync/status", vec![(200, status_body(3, 1))]),
+        (
+            "/api/sync/push",
+            vec![(
+                200,
+                serde_json::json!({"success":true,"dataVersion":4,"updatedAt":"t"}),
+            )],
+        ),
+    ])
+    .await;
+    let (dir, _cp, _pp) = setup_dir(Some(SyncMeta {
+        dirty: Some(true),
+        ..meta(3, 1)
+    }));
+    let dir_path = dir.path().to_path_buf();
+
+    // disabled：零请求
+    auto_sync::set_enabled(false);
+    write_auth(&dir_path, Some(key_to_base64(&KEY)));
+    auto_sync::sync_push_if_enabled(&auto_ctx(&mock.base_url, &dir_path)).await;
+    assert_eq!(mock.recorded.lock().unwrap().len(), 0);
+
+    // enabled 但 auth.json 无 encryptionKey：零请求（静默跳过）
+    auto_sync::set_enabled(true);
+    write_auth(&dir_path, None);
+    auto_sync::sync_push_if_enabled(&auto_ctx(&mock.base_url, &dir_path)).await;
+    assert_eq!(mock.recorded.lock().unwrap().len(), 0);
+
+    auto_sync::set_enabled(false);
+}
+
+#[tokio::test]
+async fn auto_sync_pushes_when_dirty_and_clears_dirty() {
+    let _g = SERIAL.lock().await;
+    let mock = MockCloud::start(vec![
+        ("/api/sync/status", vec![(200, status_body(3, 1))]),
+        (
+            "/api/sync/push",
+            vec![
+                (
+                    200,
+                    serde_json::json!({"success":true,"dataVersion":4,"updatedAt":"t"}),
+                ),
+                (
+                    200,
+                    serde_json::json!({"success":true,"dataVersion":2,"updatedAt":"t"}),
+                ),
+            ],
+        ),
+    ])
+    .await;
+    let (dir, config_path, _pp) = setup_dir(Some(SyncMeta {
+        dirty: Some(true),
+        ..meta(3, 1)
+    }));
+    let dir_path = dir.path().to_path_buf();
+    write_auth(&dir_path, Some(key_to_base64(&KEY)));
+
+    auto_sync::set_enabled(true);
+    auto_sync::sync_push_if_enabled(&auto_ctx(&mock.base_url, &dir_path)).await;
+    auto_sync::set_enabled(false);
+
+    let rec = mock.recorded.lock().unwrap();
+    // status + config push + providers push（dirty 同时触发两者）
+    assert_eq!(rec.len(), 3);
+    assert_eq!(rec[1].body["dataKey"], "config");
+    assert_eq!(rec[1].body["dataVersion"], 3);
+    assert_eq!(rec[2].body["dataKey"], "providers");
+    drop(rec);
+
+    // 成功后写回 dirty:false（与手动 push 的「不带 dirty」路径不同）
+    let raw: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&config_path).unwrap()).unwrap();
+    assert_eq!(raw["syncMeta"]["dirty"], false);
+    assert_eq!(raw["syncMeta"]["configVersion"], 4);
+    assert_eq!(raw["syncMeta"]["providersVersion"], 2);
+}
+
+#[tokio::test]
+async fn auto_sync_skips_when_not_dirty_and_versions_match() {
+    let _g = SERIAL.lock().await;
+    let mock = MockCloud::start(vec![("/api/sync/status", vec![(200, status_body(3, 1))])]).await;
+    // 无 dirty、版本一致 → 只发 status，不发 push
+    let (dir, _cp, _pp) = setup_dir(Some(meta(3, 1)));
+    let dir_path = dir.path().to_path_buf();
+    write_auth(&dir_path, Some(key_to_base64(&KEY)));
+
+    auto_sync::set_enabled(true);
+    auto_sync::sync_push_if_enabled(&auto_ctx(&mock.base_url, &dir_path)).await;
+    auto_sync::set_enabled(false);
+
+    let rec = mock.recorded.lock().unwrap();
+    assert_eq!(rec.len(), 1);
+    assert_eq!(rec[0].path, "/api/sync/status");
+}
+
+#[tokio::test]
+async fn auto_sync_is_syncing_mutex() {
+    let _g = SERIAL.lock().await;
+    // 挂起服务器：接受连接但不响应，制造 isSyncing 窗口
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let hang_url = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        let listener = tokio::net::TcpListener::from_std(listener).unwrap();
+        loop {
+            let (stream, _) = listener.accept().await.unwrap();
+            tokio::spawn(async move {
+                let _stream = stream; // 持有连接，永不响应
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            });
+        }
+    });
+
+    let (dir, _cp, _pp) = setup_dir(Some(SyncMeta {
+        dirty: Some(true),
+        ..meta(3, 1)
+    }));
+    let dir_path = dir.path().to_path_buf();
+    write_auth(&dir_path, Some(key_to_base64(&KEY)));
+    auto_sync::set_enabled(true);
+
+    // 第一次调用挂在 status 请求上（持有 isSyncing）
+    let first_ctx = auto_ctx(&hang_url, &dir_path);
+    let first = tokio::spawn(async move {
+        auto_sync::sync_push_if_enabled(&first_ctx).await;
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // 第二次调用 CAS 失败直接返回：mock 零请求
+    let mock = MockCloud::start(
+        vec![(200, status_body(3, 1))]
+            .into_iter()
+            .map(|r| ("/api/sync/status", vec![r]))
+            .collect(),
+    )
+    .await;
+    auto_sync::sync_push_if_enabled(&auto_ctx(&mock.base_url, &dir_path)).await;
+    assert_eq!(mock.recorded.lock().unwrap().len(), 0);
+
+    first.abort();
+    auto_sync::set_enabled(false);
+}
+
+#[tokio::test]
+async fn auto_sync_swallows_errors() {
+    let _g = SERIAL.lock().await;
+    let mock = MockCloud::start(vec![
+        (
+            "/api/sync/status",
+            vec![(500, serde_json::json!({"code":"ERR","message":"boom"}))],
+        ),
+        (
+            "/api/sync/pull",
+            vec![(500, serde_json::json!({"code":"ERR","message":"boom"}))],
+        ),
+    ])
+    .await;
+    let (dir, config_path, _pp) = setup_dir(Some(SyncMeta {
+        dirty: Some(true),
+        ..meta(3, 1)
+    }));
+    let dir_path = dir.path().to_path_buf();
+    write_auth(&dir_path, Some(key_to_base64(&KEY)));
+    auto_sync::set_enabled(true);
+    let ctx = auto_ctx(&mock.base_url, &dir_path);
+
+    // load/saveConfigWithSync 正常返回，不传播 sync 错误
+    let mgr = auto_sync::load_config_with_sync(&ctx).await;
+    assert!(mgr.config().profiles.contains_key("p1"));
+    auto_sync::save_config_with_sync(&ctx, &mgr).await.unwrap();
+    assert!(config_path.exists());
+
+    auto_sync::set_enabled(false);
+}
