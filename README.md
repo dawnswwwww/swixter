@@ -26,6 +26,7 @@ A lightweight CLI tool that makes it easy to switch between AI providers for Cla
 ```bash
 # Shell installer (macOS / Linux)
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh
+# Installs to ~/.cargo/bin (install-path = "CARGO_HOME"); make sure it is on your PATH
 
 # Homebrew
 brew install dawnswwwww/tap/swixter

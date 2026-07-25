@@ -14,7 +14,9 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    // UI 产物规范位置：server crate 内的 ui_dist（rust-embed 嵌入源，
+    // 随 cargo package/publish 一起打包，见 M4 code review C1）
+    outDir: '../crates/server/ui_dist',
     emptyOutDir: true,
   },
 })

@@ -695,13 +695,13 @@ async fn static_spa_fallback_and_mime() {
     assert_eq!(resp.status(), 200);
     assert_eq!(resp.text().await.unwrap(), index_html);
 
-    // 已知静态资源 MIME（vite.svg 恒存在于 ui/dist）
+    // 已知静态资源 MIME（vite.svg 恒存在于 ui_dist）
     let resp = http.get(format!("{base}/vite.svg")).send().await.unwrap();
     assert_eq!(resp.status(), 200);
     assert_eq!(resp.headers().get("content-type").unwrap(), "image/svg+xml");
 
-    // dist 里若有 js 资产，断言 javascript MIME
-    let assets_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/dist/assets");
+    // ui_dist 里若有 js 资产，断言 javascript MIME
+    let assets_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/ui_dist/assets");
     if let Some(js) = std::fs::read_dir(assets_dir).ok().and_then(|mut it| {
         it.find_map(|e| {
             let name = e.ok()?.file_name().to_string_lossy().into_owned();

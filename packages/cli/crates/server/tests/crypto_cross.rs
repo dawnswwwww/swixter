@@ -5,7 +5,7 @@ fn pbkdf2_matches_fixed_vector() {
     // 与 WebCrypto PBKDF2-HMAC-SHA256(100k) 对齐的固定向量
     let key = derive_key("correct horse battery staple", "AAECAwQFBgcICQoLDA0ODw==").unwrap();
     assert_eq!(key_to_base64(&key).len(), 44); // 32 字节 → base64 44 字符
-                                               // hex 断言值由 gen-crypto-fixtures.ts 首次运行时打印后填入（双向锚定）
+                                               // hex 断言值与 TS WebCrypto 实现对齐（双向锚定，详见 fixtures/crypto_ts_vectors.json）
     assert_eq!(
         key.iter().map(|b| format!("{b:02x}")).collect::<String>(),
         "49d49c25f597846209f0d92e7770ab64e1c75e94b4ce6c509265ee67175d2a1e"

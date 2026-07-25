@@ -123,11 +123,15 @@ for scenario in "${SCENARIOS[@]}"; do
     TEST_NAME=$(basename "$scenario" .sh | sed 's/test-//')
     echo -e "${BLUE}▸${NC} Running test: ${YELLOW}${TEST_NAME}${NC}"
 
-    if docker exec -u testuser "$CONTAINER_ID" bash "/home/testuser/scenarios/$scenario" 2>&1 | tee /tmp/test-output.log | grep -q "✅"; then
+    # 通过判据：docker exec 退出码为 0 且输出含 ✅（退出码取自 PIPESTATUS，
+    # 不被 tee/grep 管道吞掉）
+    docker exec -u testuser "$CONTAINER_ID" bash "/home/testuser/scenarios/$scenario" 2>&1 | tee /tmp/test-output.log
+    SCENARIO_RC=${PIPESTATUS[0]}
+    if [ "$SCENARIO_RC" -eq 0 ] && grep -q "✅" /tmp/test-output.log; then
         echo -e "${GREEN}  ✓ Pass${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
-        echo -e "${RED}  ✗ Fail${NC}"
+        echo -e "${RED}  ✗ Fail (exit code: $SCENARIO_RC)${NC}"
         cat /tmp/test-output.log
         TESTS_FAILED=$((TESTS_FAILED + 1))
     fi

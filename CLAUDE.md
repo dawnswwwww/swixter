@@ -60,7 +60,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 # E2E tests (Docker-based, requires Docker running)
 bash test/e2e-docker.sh              # From packages/cli; E2E_CARGO_PROFILE=debug for faster iteration
 
-# Web UI: after changing ui/src, rebuild AND commit ui/dist together
+# Web UI: after changing ui/src, rebuild AND commit crates/server/ui_dist together
 cd ui && bun install && bun run build
 
 # Release (from repo root; see "Release and Publishing")
@@ -70,9 +70,9 @@ bun run release:major                # Breaking changes
 git push --follow-tags               # Triggers the release workflows
 ```
 
-### ui/dist commit convention
+### ui_dist commit convention
 
-`packages/cli/ui/dist/` is **committed to git** and is the ONLY source of UI assets for release builds (cargo-dist jobs run bare `cargo build` with no Bun available). Rule: **whenever you modify `ui/src`, run `bun run build` in `ui/` and commit `ui/dist` in the same commit/PR.** The server's build.rs falls back to a placeholder page with a warning when dist is missing — that fallback exists only for local builds and must never ship in a release.
+`packages/cli/crates/server/ui_dist/` is **committed to git** and is the ONLY source of UI assets for release builds (cargo-dist jobs run bare `cargo build` with no Bun available). It lives inside the server crate so `cargo package`/`cargo publish` ship the real UI — an out-of-crate embed folder falls back to the placeholder page for `cargo install` users. Rule: **whenever you modify `ui/src`, run `bun run build` in `ui/` (vite outputs to `../crates/server/ui_dist`) and commit `ui_dist` in the same commit/PR.** The server's build.rs falls back to a placeholder page with a warning when ui_dist is missing — that fallback exists only for local builds and must never ship in a release.
 
 ## Architecture Overview
 

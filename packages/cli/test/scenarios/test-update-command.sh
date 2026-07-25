@@ -30,10 +30,12 @@ echo "✓ Test 1 passed: Update-cli command exists"
 echo "Test 2: Update-cli command prompts to install when CLI not installed..."
 OUTPUT=$($CLI_CMD claude update-cli 2>&1) || EXIT_CODE=$?
 
-if echo "$OUTPUT" | grep -qi "not installed\|install first\|please install"; then
+# Rust 行为可离线确定：未安装时打印 "⚠ Claude is not installed"（install.rs）
+if echo "$OUTPUT" | grep -qF "is not installed"; then
     echo "✓ Test 2 passed: Update-cli command prompts to install first"
 else
-    echo "⚠ Test 2: Update-cli command behavior needs verification"
+    echo "❌ Error: Expected 'is not installed' output, got: $OUTPUT"
+    exit 1
 fi
 
 # ─────────────────────────────────────────────
@@ -54,14 +56,13 @@ export PATH="$MOCK_BIN_DIR/npm-global:$MOCK_BIN_DIR:$PATH"
 
 OUTPUT=$($CLI_CMD claude update-cli 2>&1) || true
 
-# Should either show update message or execute update
-if echo "$OUTPUT" | grep -qi "update\|updating\|latest\|Current version"; then
-    echo "✓ Test 3 passed: Update-cli command executes update logic"
-elif ! echo "$OUTPUT" | grep -q "not installed"; then
-    # If it doesn't show "not installed", it likely detected the mock
-    echo "✓ Test 3 passed: Update-cli command detected mock CLI"
+# mock claude 支持 --version，Rust 必然先打印 "Current version: claude 1.0.0"
+# （install.rs update()），随后 mock npm 失败退出
+if echo "$OUTPUT" | grep -qF "Current version"; then
+    echo "✓ Test 3 passed: Update-cli command detects installed CLI and runs update logic"
 else
-    echo "⚠ Test 3: Update-cli command behavior with installed CLI needs verification"
+    echo "❌ Error: Expected 'Current version' in update output, got: $OUTPUT"
+    exit 1
 fi
 
 # Clean up mocks

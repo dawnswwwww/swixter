@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-25
+
+### Changed
+- **Full Rust rewrite** — The entire codebase was rewritten from TypeScript/Bun to a Rust workspace of four crates: `swixter-core` (config, profiles, groups, providers, adapters, import/export), `swixter-proxy` (failover proxy with circuit breaker and API-format transforms), `swixter-server` (Web UI server: REST/WebSocket, auth, cloud sync, AES-GCM field encryption with PBKDF2 key derivation), and the `swixter` binary (clap CLI). The TypeScript sources were removed
+- **Web UI assets embedded in the server crate** — Prebuilt UI assets moved from `packages/cli/ui/dist` to `packages/cli/crates/server/ui_dist` (vite `outDir` points there directly) so `cargo package`/`cargo publish` ship the real UI instead of the placeholder page
+- **Version source of truth** — The Cargo workspace version is now the single source of truth; `package.json` files are synced from it by `scripts/sync-versions.js`
+
+### Added
+- **Three-channel release pipeline** — cargo-dist generated workflow builds 7 targets and publishes GitHub Releases with shell/PowerShell installers and Homebrew tap; a separate workflow publishes all four crates to crates.io in dependency order (`swixter-core` → `swixter-proxy` → `swixter-server` → `swixter`), so `cargo install swixter` works
+- **`swixter sync` commands** — Cloud sync push/pull with conflict detection and field-level encryption
+- **`swixter auth` commands** — Magic-link login with polling and encrypted token store (5-minute refresh buffer)
+
+### Fixed
+- **`create --apply` parity with TS** — `create --apply` now switches to the newly created profile before applying, matching the historical TS behavior (and group validation was aligned likewise)
+
 ## [0.1.12] - 2026-07-23
 
 ### Fixed

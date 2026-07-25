@@ -1,13 +1,14 @@
-//! rust-embed SPA 静态服务（决策点 3）：编译期嵌入 ui/dist；未命中回退 index.html。
+//! rust-embed SPA 静态服务（决策点 3）：编译期嵌入 crate 内 ui_dist；未命中回退 index.html。
 use axum::{
     http::{header, StatusCode, Uri},
     response::{IntoResponse, Response},
 };
 use rust_embed::RustEmbed;
 
-/// 决策点 3：编译期嵌入 ui/dist（build.rs 保证目录存在）
+/// 决策点 3：编译期嵌入 crate 内 ui_dist（build.rs 保证目录存在；
+/// crate 相对路径，随 cargo package/publish 打包）
 #[derive(RustEmbed)]
-#[folder = "../../ui/dist"]
+#[folder = "ui_dist"]
 struct UiAssets;
 
 /// SPA fallback handler：命中返回资源（mime_guess Content-Type），未命中回退 index.html

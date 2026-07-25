@@ -4,6 +4,14 @@
 # syncs package.json files, commits, and creates a git tag.
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Changelog gate: [Unreleased] must contain entries for the release being cut
+UNRELEASED=$(awk '/^## \[Unreleased\]/{flag=1; next} /^## \[/{flag=0} flag' "$ROOT/CHANGELOG.md")
+if [ -z "$(echo "$UNRELEASED" | tr -d '[:space:]')" ]; then
+  echo "CHANGELOG.md [Unreleased] section is empty. Document the release changes before bumping." >&2
+  exit 1
+fi
+
 cd "$ROOT/packages/cli"
 
 if ! command -v cargo-set-version >/dev/null 2>&1 && ! cargo set-version --help >/dev/null 2>&1; then

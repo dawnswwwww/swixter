@@ -42,12 +42,15 @@ The UI will be available at http://localhost:5173 with API proxy to :3141.
 npm run build
 ```
 
-Output will be in `ui/dist/` directory.
+Output will be in `../crates/server/ui_dist/` (inside the server crate).
 
 ## Committed prebuilt assets
 
-`ui/dist/` is committed to git as the UI asset source for release builds
-(cargo-dist jobs run `cargo build` directly, with no chance to build the UI
-first). After changing anything under `ui/src/`, you MUST run
-`bun install && bun run build` and commit the updated `dist/` together with
-your source changes.
+`crates/server/ui_dist/` is committed to git as the UI asset source for
+release builds (cargo-dist jobs run `cargo build` directly, with no chance
+to build the UI first). It lives inside the server crate so that
+`cargo package` / `cargo publish` include it — an out-of-crate embed folder
+would silently ship the placeholder page to `cargo install` users. After
+changing anything under `ui/src/`, you MUST run
+`bun install && bun run build` and commit the updated `ui_dist/` together
+with your source changes.

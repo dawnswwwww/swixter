@@ -2,7 +2,7 @@
 node_modules/
 
 # Build output
-# dist/ is intentionally NOT ignored: prebuilt UI assets are committed for release builds (see M4 plan)
+# vite outDir is ../crates/server/ui_dist (committed); a stray local dist/ stays ignored
 dist-ssr/
 
 # Local env files

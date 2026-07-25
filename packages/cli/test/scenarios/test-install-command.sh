@@ -33,17 +33,13 @@ echo "✓ Test 1 passed: Install command exists"
 echo "Test 2: Install command shows methods when CLI not installed..."
 OUTPUT=$($CLI_CMD claude install 2>&1) || EXIT_CODE=$?
 
-# In non-TTY Docker environment, should show installation methods
-# (Rust: prints "Please install <name> manually:" + numbered method list)
-if echo "$OUTPUT" | grep -q "Available installation methods"; then
-    echo "✓ Test 2 passed: Install command shows available methods"
-elif echo "$OUTPUT" | grep -q "manually:"; then
+# Rust 行为可离线确定：非 TTY 且未安装时打印
+# "Please install <name> manually:" + 编号方法列表
+if echo "$OUTPUT" | grep -q "manually:"; then
     echo "✓ Test 2 passed: Install command shows manual method list"
-elif echo "$OUTPUT" | grep -q "is not installed"; then
-    # Should at least detect CLI is not installed
-    echo "✓ Test 2 passed: Install command detects CLI not installed"
 else
-    echo "⚠ Test 2: Install command output: $OUTPUT"
+    echo "❌ Error: Expected manual install method list, got: $OUTPUT"
+    exit 1
 fi
 
 # ─────────────────────────────────────────────
@@ -61,14 +57,12 @@ export PATH="$MOCK_BIN_DIR:$PATH"
 
 OUTPUT=$($CLI_CMD claude install 2>&1) || true
 
-# Should either show "already installed" or proceed without install prompt
-if echo "$OUTPUT" | grep -qi "already installed\|installed"; then
+# Rust 打印 "✓ Claude is already installed"（install.rs）；精确匹配，失败即报错
+if echo "$OUTPUT" | grep -qF "already installed"; then
     echo "✓ Test 3 passed: Install command detects existing installation"
-elif ! echo "$OUTPUT" | grep -q "is not installed"; then
-    # If it doesn't show "not installed", it likely detected the mock
-    echo "✓ Test 3 passed: Install command detected mock CLI"
 else
-    echo "⚠ Test 3: Install command behavior with existing CLI needs verification"
+    echo "❌ Error: Expected 'already installed' output, got: $OUTPUT"
+    exit 1
 fi
 
 # Clean up mock
@@ -78,10 +72,13 @@ rm -f "$MOCK_BIN_DIR/claude"
 # Test 4: Install command for codex
 # ─────────────────────────────────────────────
 echo "Test 4: Install command exists for codex..."
-if ! $CLI_CMD codex install 2>&1 | grep -q "Unknown command"; then
-    echo "✓ Test 4 passed: Install command exists for codex"
+# codex 只有 npm 单一安装方法（install.json），非 TTY 下直接执行；
+# mock npm 立即失败，输出必然是 "✗ Failed to install Codex"
+OUTPUT=$($CLI_CMD codex install 2>&1) || true
+if echo "$OUTPUT" | grep -qF "Failed to install"; then
+    echo "✓ Test 4 passed: Install command exists for codex (mock npm fails fast)"
 else
-    echo "❌ Error: Install command not found for codex"
+    echo "❌ Error: Expected 'Failed to install' from mock npm, got: $OUTPUT"
     exit 1
 fi
 

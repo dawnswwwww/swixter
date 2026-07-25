@@ -12,8 +12,6 @@ echo "=== Test: Codex Model Environment Variable ==="
 rm -f "$CONFIG_FILE"
 
 # Test 1: Create codex profile with model
-# 已知偏差：Rust 的 create --apply 应用当前 active profile（TS 会先切换到新
-# profile）。显式 switch 保证应用的是新 profile。
 echo "Test 1: Create codex profile with model..."
 $CLI_CMD codex create \
   --quiet \
@@ -23,7 +21,6 @@ $CLI_CMD codex create \
   --base-url https://openrouter.ai/api/v1 \
   --model gpt-4 \
   --apply > /dev/null 2>&1
-$CLI_CMD codex switch test-codex-model --apply > /dev/null 2>&1
 
 # Test 2: Verify model is in TOML
 # Rust 偏差：model 写入独立 profile 文件（Codex 0.134.0+ 的

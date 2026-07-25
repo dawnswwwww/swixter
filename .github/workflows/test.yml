@@ -86,6 +86,27 @@ jobs:
         run: bun run build:docs
         continue-on-error: true
 
+  # Fails if ui/src changed without committing the rebuilt ui_dist assets
+  ui-dist-freshness:
+    name: ui_dist is up to date
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Rebuild UI and check for drift
+        working-directory: packages/cli/ui
+        run: |
+          bun install
+          bun run build
+          git diff --exit-code ../crates/server/ui_dist
+
   # E2E tests only run on Linux with Docker
   e2e-test:
     name: E2E Tests (Docker)
