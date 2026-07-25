@@ -24,18 +24,28 @@ A lightweight CLI tool that makes it easy to switch between AI providers for Cla
 ## Installation
 
 ```bash
-# npm (Recommended)
+# Shell installer (macOS / Linux)
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh
+
+# Homebrew
+brew install dawnswwwww/tap/swixter
+
+# npm (downloads the platform binary from GitHub Releases at install time;
+# use the shell installer instead in --ignore-scripts environments)
 npm install -g swixter
 
-# npx (No Install Needed)
-npx swixter --help
+# Cargo
+cargo install swixter
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.ps1 | iex"
 ```
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| **Linux** | Full | |
-| **macOS** | Full | |
-| **Windows 10/11** | Full | Requires Node.js 18+ |
+| **Linux** | Full | x86_64 / aarch64 (gnu & musl) |
+| **macOS** | Full | Apple Silicon / Intel |
+| **Windows 10/11** | Full | x86_64 (MSVC) |
 
 Config stored at:
 - **Linux/macOS**: `~/.config/swixter/`
@@ -413,52 +423,60 @@ swixter codex r
 
 ```
 swixter/
-├── src/
-│   ├── cli/           # CLI command handlers
-│   ├── config/        # Config file management
-│   ├── adapters/      # Coder adapters (Claude, Codex, Continue)
-│   ├── providers/     # Provider presets + user-defined providers
-│   ├── groups/        # Group management (failover profiles)
-│   ├── proxy/         # Local proxy server (failover, circuit breaker)
-│   ├── auth/          # Cloud auth (register, login, token management)
-│   ├── sync/          # Cloud sync (push, pull, merge, auto-sync)
-│   ├── crypto/        # End-to-end encryption (key derivation, field encryption)
-│   ├── server/        # Web UI API server
-│   └── utils/         # Shared utilities
-├── ui/                # Web UI (React + Vite + Tailwind)
-└── tests/             # Unit tests
+├── packages/cli/
+│   ├── crates/
+│   │   ├── core/      # Config, profiles, groups, providers, adapters, crypto
+│   │   ├── proxy/     # Failover proxy (circuit breaker, format conversion)
+│   │   ├── server/    # Web UI API server
+│   │   └── swixter/   # CLI entry point and command handlers
+│   ├── ui/            # Web UI (React + Vite + Tailwind)
+│   └── test/          # Docker-based E2E scenarios
+├── packages/website/  # Marketing site
+└── packages/docs/     # Documentation site
 ```
 
 ## Development
 
+Requires a Rust toolchain (stable) and Bun (only for the Web UI / website / docs).
+
 ```bash
 git clone https://github.com/dawnswwwww/swixter.git
-cd swixter
-bun install
-bun run cli:dev      # Dev mode with hot reload
-bun test             # Run tests
-bun run build        # Build all (UI + CLI)
+cd swixter/packages/cli
+
+cargo build                  # Dev build
+cargo build --release        # Release build
+cargo run -p swixter -- claude list   # Run CLI from source
+cargo test --workspace       # Run all tests
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all
+
+bash test/e2e-docker.sh      # E2E tests (Docker-based, requires Docker)
+
+# Web UI (packages/cli/ui): prebuilt dist/ is committed to git.
+# After changing ui/src, rebuild and commit dist together:
+cd ui && bun install && bun run build
 ```
 
 ### Release
 
 ```bash
 # Update CHANGELOG.md first, then:
-bun run release:patch   # Bug fixes (0.1.0 → 0.1.1)
-bun run release:minor   # Features (0.1.0 → 0.2.0)
-bun run release:major   # Breaking changes (0.1.0 → 1.0.0)
+bun run release:patch   # Bug fixes (0.2.0 → 0.2.1)
+bun run release:minor   # Features (0.2.0 → 0.3.0)
+bun run release:major   # Breaking changes (0.2.0 → 1.0.0)
+git push --follow-tags  # Triggers the release workflows
 ```
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| **Runtime** | Bun |
-| **Language** | TypeScript |
-| **CLI UI** | @clack/prompts |
-| **Validation** | Zod |
+| **Language** | Rust |
+| **CLI** | clap + dialoguer |
+| **Async runtime** | Tokio |
 | **Web UI** | React + Vite + Tailwind CSS |
-| **Testing** | Bun test, Docker E2E |
+| **Testing** | cargo test, Docker E2E |
+| **Release** | cargo-dist (shell/powershell/npm/Homebrew installers) |
 
 ## Changelog
 
