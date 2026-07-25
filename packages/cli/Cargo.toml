@@ -51,7 +51,7 @@ strip = true
 [workspace.metadata.dist]
 # 由 cargo-dist 维护；版本号必须与本机/CI 安装的 cargo-dist 一致（`cargo dist --version`），
 # 0.28.0 为占位——首次运行 `cargo dist init`/`generate` 前按实际版本对齐
-cargo-dist-version = "0.28.0"
+cargo-dist-version = "0.32.0"
 ci = "github"
 installers = ["shell", "powershell", "npm", "homebrew"]
 # Homebrew tap 仓库——占位，需用户先在 GitHub 创建 dawnswwwww/homebrew-tap（见 Task 10 文档步骤）
@@ -66,6 +66,8 @@ targets = [
   "x86_64-pc-windows-msvc",
 ]
 install-path = "CARGO_HOME"
+# 发布 job：npm 包 + homebrew formula（需 NPM_TOKEN secret 与 tap 仓库）
+publish-jobs = ["homebrew", "npm"]
 # PR 上只跑 dist plan，不构建产物
 pr-run-mode = "plan"
 # npm installer 包名与现行 npm 包一致（决策记录：npm 包名不变）
