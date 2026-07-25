@@ -26,9 +26,7 @@ pub fn generate_id() -> String {
 /// TS: cli/group.ts validateGroupNameOrExit —— trim 后为空复用 profile name 校验文案
 fn validate_group_name(name: &str) -> Result<(), CoreError> {
     if name.trim().is_empty() {
-        return Err(CoreError::Validation(
-            "Profile name cannot be empty".into(),
-        ));
+        return Err(CoreError::Validation("Profile name cannot be empty".into()));
     }
     Ok(())
 }
