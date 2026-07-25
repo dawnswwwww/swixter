@@ -137,6 +137,24 @@ pub fn set_default(mgr: &mut ConfigManager, id: &str) -> Result<(), CoreError> {
     mgr.save()
 }
 
+/// TS: groups/manager.ts setActiveGroup —— 设置 activeGroup（Web UI PUT /:id/active 用）
+pub fn set_active(mgr: &mut ConfigManager, id: &str) -> Result<(), CoreError> {
+    if !mgr.config().groups.contains_key(id) {
+        return Err(CoreError::NotFound(format!("Group \"{id}\" not found")));
+    }
+    mgr.config_mut_for_test().active_group = Some(id.to_string());
+    mgr.mark_dirty();
+    mgr.save()
+}
+
+/// TS: groups/manager.ts getGroup —— id 或 name 均可命中
+pub fn find_by_id_or_name(mgr: &ConfigManager, id_or_name: &str) -> Option<Group> {
+    if let Some(g) = mgr.config().groups.get(id_or_name) {
+        return Some(g.clone());
+    }
+    find_by_name(mgr, id_or_name)
+}
+
 pub fn find_by_name(mgr: &ConfigManager, name: &str) -> Option<Group> {
     mgr.config()
         .groups

@@ -11,6 +11,9 @@ pub struct CoderSpec {
     pub executable: &'static str,
     pub adapter: AdapterKind,
     pub supports_auth_token: bool,
+    /// TS constants/coders.ts wireApi（"chat" | "responses" | "both"），
+    /// Web UI apply 的 wire_api 兼容性检查与列表响应使用
+    pub wire_api: &'static str,
 }
 
 pub const CODERS: &[CoderSpec] = &[
@@ -20,6 +23,7 @@ pub const CODERS: &[CoderSpec] = &[
         executable: "claude",
         adapter: AdapterKind::Claude,
         supports_auth_token: true,
+        wire_api: "both",
     },
     CoderSpec {
         id: "codex",
@@ -27,6 +31,7 @@ pub const CODERS: &[CoderSpec] = &[
         executable: "codex",
         adapter: AdapterKind::Codex,
         supports_auth_token: false,
+        wire_api: "chat",
     },
     // qwen 历史命名，实际目标是 Continue.dev（TS: getAdapter("qwen") → ContinueAdapter）
     CoderSpec {
@@ -35,6 +40,7 @@ pub const CODERS: &[CoderSpec] = &[
         executable: "qwen",
         adapter: AdapterKind::Continue,
         supports_auth_token: false,
+        wire_api: "chat",
     },
 ];
 

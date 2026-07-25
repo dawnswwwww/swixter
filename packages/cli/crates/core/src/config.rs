@@ -156,6 +156,13 @@ impl ConfigManager {
         }
         Ok(())
     }
+
+    /// TS: manager.ts resetAllData —— 重置为默认空配置并保存
+    /// （各 coder 的 adapter 清理由调用方在调用本方法前执行）
+    pub fn reset(&mut self) -> Result<(), CoreError> {
+        self.config = ConfigFile::empty();
+        self.save()
+    }
 }
 
 /// 先解析为 Value 以支持 v1 迁移与严格校验；解析/校验失败整体回退默认空配置。
