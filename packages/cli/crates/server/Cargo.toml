@@ -9,8 +9,8 @@ homepage.workspace = true
 build = "build.rs"
 
 [dependencies]
-swixter-core = { version = "0.2.2", path = "../core" }
-swixter-proxy = { version = "0.2.2", path = "../proxy" }
+swixter-core = { version = "0.2.3", path = "../core" }
+swixter-proxy = { version = "0.2.3", path = "../proxy" }
 tokio.workspace = true
 axum.workspace = true
 reqwest.workspace = true
