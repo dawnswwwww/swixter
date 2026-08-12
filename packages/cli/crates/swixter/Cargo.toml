@@ -35,3 +35,8 @@ url.workspace = true
 assert_cmd.workspace = true
 predicates.workspace = true
 tempfile.workspace = true
+
+# dist 的 package-local 配置：musl target 构建需要 musl-gcc（ring 的 C 编译
+# 经 cc-rs 调用 musl-gcc），GH runner 默认不带 musl-tools，按 target 限定安装
+[package.metadata.dist.dependencies.apt]
+musl-tools = { version = "*", targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"] }

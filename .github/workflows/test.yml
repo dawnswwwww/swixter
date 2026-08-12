@@ -37,6 +37,9 @@ jobs:
   test:
     name: cargo test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # 超时兜底：一旦某平台测试挂死，超时会留下归档日志便于定位
+    # （正常 ubuntu/macos ~2 分钟、windows ~5 分钟即完成）
+    timeout-minutes: 15
 
     strategy:
       matrix:
