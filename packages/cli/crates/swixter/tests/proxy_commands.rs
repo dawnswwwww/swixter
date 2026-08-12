@@ -174,7 +174,10 @@ fn proxy_start_missing_profile_exits_3() {
         .stderr(predicate::str::contains("Profile \"nope\" not found"));
 }
 
+// fake claude 是 sh 脚本，Windows 无法执行——与 run_command.rs 的 fake-cli 测试一样
+// 限 unix；Windows 的 cmd /C 启动路径由 run.rs 的 launch_spec 单测覆盖
 #[test]
+#[cfg(unix)]
 fn proxy_run_injects_coder_env() {
     let dir = tempfile::tempdir().unwrap();
     setup(&dir)
