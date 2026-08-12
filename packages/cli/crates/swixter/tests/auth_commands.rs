@@ -5,6 +5,7 @@ fn setup(dir: &tempfile::TempDir) -> Command {
     let mut c = Command::cargo_bin("swixter").unwrap();
     c.env("SWIXTER_CONFIG_PATH", dir.path().join("config.json"))
         .env("HOME", dir.path())
+        .env("SWIXTER_HOME", dir.path())
         // 指向不可达地址，避免测试打到真实云端（logout 忽略 API 错误，快速失败即可）
         .env("SWIXTER_API_BASE", "http://127.0.0.1:1");
     c

@@ -7,7 +7,8 @@ use predicates::prelude::*;
 fn setup(dir: &tempfile::TempDir) -> Command {
     let mut c = Command::cargo_bin("swixter").unwrap();
     c.env("SWIXTER_CONFIG_PATH", dir.path().join("config.json"))
-        .env("HOME", dir.path());
+        .env("HOME", dir.path())
+        .env("SWIXTER_HOME", dir.path());
     c
 }
 
@@ -68,6 +69,7 @@ fn ui_foreground_lifecycle() {
         .args(["ui", "--port", &port.to_string(), "--no-browser"])
         .env("SWIXTER_CONFIG_PATH", dir.path().join("config.json"))
         .env("HOME", dir.path())
+        .env("SWIXTER_HOME", dir.path())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()

@@ -22,25 +22,32 @@ echo ""
 
 # Step 1: Build project (Rust binary; use E2E_CARGO_PROFILE=debug for faster local iteration)
 CARGO_PROFILE="${E2E_CARGO_PROFILE:-release}"
-echo -e "${YELLOW}[1/5]${NC} Building project (cargo build --$CARGO_PROFILE)..."
-if [ "$CARGO_PROFILE" = "release" ]; then
-    cargo build --release > /dev/null 2>&1
-else
-    cargo build > /dev/null 2>&1
+# E2E_BUILD_IN_CONTAINER=1（CI 必走）：强制在 rust:1-bookworm 容器内构建。
+# 测试镜像是 debian:bookworm-slim（glibc 2.36），若直接用 ubuntu-latest 宿主
+# （glibc 2.39+）编译的二进制，容器内会报 "GLIBC_2.xx not found" 全线失败。
+# 本地 macOS 主机产出的二进制不是 Linux ELF，也会自动走容器构建。
+FORCE_CONTAINER_BUILD="${E2E_BUILD_IN_CONTAINER:-0}"
+SWIXTER_BIN=""
+if [ "$FORCE_CONTAINER_BUILD" != "1" ]; then
+    echo -e "${YELLOW}[1/5]${NC} Building project (cargo build --$CARGO_PROFILE)..."
+    if [ "$CARGO_PROFILE" = "release" ]; then
+        cargo build --release > /dev/null 2>&1
+    else
+        cargo build > /dev/null 2>&1
+    fi
+    SWIXTER_BIN="$PROJECT_ROOT/target/$CARGO_PROFILE/swixter"
+    if [ ! -x "$SWIXTER_BIN" ]; then
+        echo -e "${RED}✗${NC} Binary not found: $SWIXTER_BIN"
+        exit 1
+    fi
+    echo -e "${GREEN}✓${NC} Project build successful"
+    echo ""
 fi
-SWIXTER_BIN="$PROJECT_ROOT/target/$CARGO_PROFILE/swixter"
-if [ ! -x "$SWIXTER_BIN" ]; then
-    echo -e "${RED}✗${NC} Binary not found: $SWIXTER_BIN"
-    exit 1
-fi
-echo -e "${GREEN}✓${NC} Project build successful"
-echo ""
 
-# Step 1b: 非 Linux 主机（如 macOS）产出的二进制无法在 Linux 容器内运行，
-# 在 rust 容器内交叉构建 Linux 二进制（registry 用命名卷缓存，产物输出到
-# 独立 target/e2e-linux，避免与主机 target 互相污染；CI 的 Linux 主机不走此分支）
-if ! file -b "$SWIXTER_BIN" | grep -q "ELF"; then
-    echo -e "${YELLOW}[1b]${NC} Host binary is not Linux ELF; building Linux binary in container..."
+# Step 1b: 在 rust:1-bookworm 容器内构建 Linux 二进制（与测试镜像 glibc 对齐；
+# registry 用命名卷缓存，产物输出到独立 target/e2e-linux，避免与主机 target 互相污染）
+if [ "$FORCE_CONTAINER_BUILD" = "1" ] || ! file -b "$SWIXTER_BIN" | grep -q "ELF"; then
+    echo -e "${YELLOW}[1b]${NC} Building Linux binary in container (rust:1-bookworm)..."
     docker run --rm \
         -v "$PROJECT_ROOT:/ws" -w /ws \
         -v swixter-e2e-cargo-registry:/usr/local/cargo/registry \

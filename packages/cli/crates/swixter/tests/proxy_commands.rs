@@ -10,6 +10,7 @@ fn setup(dir: &tempfile::TempDir) -> Command {
     let mut c = Command::cargo_bin("swixter").unwrap();
     c.env("SWIXTER_CONFIG_PATH", dir.path().join("config.json"))
         .env("HOME", dir.path())
+        .env("SWIXTER_HOME", dir.path())
         .env("TMPDIR", dir.path());
     c
 }
@@ -54,6 +55,7 @@ fn spawn_foreground_start(dir: &tempfile::TempDir, port: u16, extra: &[&str]) ->
     let mut c = ProcCommand::new(assert_cmd::cargo::cargo_bin("swixter"));
     c.env("SWIXTER_CONFIG_PATH", dir.path().join("config.json"))
         .env("HOME", dir.path())
+        .env("SWIXTER_HOME", dir.path())
         .env("TMPDIR", dir.path())
         .args(["proxy", "start", "--port", &port.to_string()])
         .args(extra)

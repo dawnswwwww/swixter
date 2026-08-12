@@ -18,6 +18,7 @@ fn setup(dir: &tempfile::TempDir) -> Command {
     let mut c = Command::cargo_bin("swixter").unwrap();
     c.env("SWIXTER_CONFIG_PATH", dir.path().join("config.json"))
         .env("HOME", dir.path())
+        .env("SWIXTER_HOME", dir.path())
         .env("FAKE_OUT", dir.path().join("out"))
         .env(
             "PATH",

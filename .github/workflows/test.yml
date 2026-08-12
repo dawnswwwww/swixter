@@ -147,5 +147,7 @@ jobs:
           workspaces: packages/cli
 
       - name: Run E2E tests
-        run: bash packages/cli/test/e2e-docker.sh
+        # 强制容器内构建：宿主 ubuntu-latest 的 glibc 比测试镜像（debian bookworm）新，
+        # 宿主二进制在容器内跑不起来（GLIBC_2.xx not found）
+        run: E2E_BUILD_IN_CONTAINER=1 bash packages/cli/test/e2e-docker.sh
         timeout-minutes: 15
