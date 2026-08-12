@@ -3,7 +3,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 
 echo "=== Test: List Configurations ==="
 

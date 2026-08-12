@@ -3,16 +3,12 @@
 
 set -e
 
-CLI_CMD="node dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 # Get dynamic config paths for cross-platform compatibility
 CLAUDE_CONFIG_FILE=$HOME/.claude/settings.json
 SWIXTER_CONFIG_FILE=$HOME/.config/swixter/config.json
 
 echo "=== Test: Claude Code Model Configuration ==="
-
-# Build the project first
-echo "Building project..."
-bun run build > /dev/null 2>&1
 
 # Clean up any existing configs
 rm -f "$CLAUDE_CONFIG_FILE"

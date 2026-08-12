@@ -1,0 +1,45 @@
+{
+  "model": "claude-sonnet-4-5",
+  "max_tokens": 2048,
+  "stream": true,
+  "thinking": { "type": "enabled", "budget_tokens": 32000 },
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Get weather for a city",
+      "input_schema": {
+        "type": "object",
+        "properties": { "city": { "type": "string" } }
+      }
+    }
+  ],
+  "tool_choice": { "type": "tool", "name": "get_weather" },
+  "messages": [
+    {
+      "role": "assistant",
+      "content": [
+        { "type": "text", "text": "Let me check." },
+        { "type": "tool_use", "id": "toolu_1", "name": "get_weather", "input": { "city": "Paris" } }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_1",
+          "content": [ { "type": "text", "text": "sunny" } ]
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "image",
+          "source": { "type": "base64", "media_type": "image/png", "data": "aGVsbG8=" }
+        }
+      ]
+    }
+  ]
+}

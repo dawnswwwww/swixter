@@ -1,0 +1,4 @@
+# SSE 测试 fixture 必须保持 LF 行尾：Windows 上 core.autocrlf 会把文本文件签出成
+# CRLF，SSE 分块器按 \n\n 切事件将永远匹配不到（crates/proxy 流式集成测试在
+# windows CI 上因此拿到空流）。同类问题历史先例：v0.1.12 的 kimi fixture 修复。
+*.sse text eol=lf

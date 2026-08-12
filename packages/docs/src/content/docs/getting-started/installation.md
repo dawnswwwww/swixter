@@ -3,16 +3,29 @@ title: Installation
 description: Install Swixter on Linux, macOS, or Windows.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
-
 # Installation
 
-Swixter is distributed as an npm package and requires **Node.js >= 18.0.0**.
+Swixter is a single native binary — no Node.js or other runtime required. Pick whichever channel fits your setup.
 
 ## Quick Install
 
 ```bash
+# Shell installer (macOS / Linux)
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh
+# Installs to ~/.cargo/bin; make sure it is on your PATH
+
+# Homebrew
+brew install dawnswwwww/tap/swixter
+
+# npm (downloads the platform binary from GitHub Releases at install time;
+# use the shell installer instead in --ignore-scripts environments)
 npm install -g swixter
+
+# Cargo
+cargo install swixter
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.ps1 | iex"
 ```
 
 Verify the installation:
@@ -21,32 +34,7 @@ Verify the installation:
 swixter version
 ```
 
-## Prerequisites
-
-| Requirement | Version |
-|-------------|---------|
-| Node.js | >= 18.0.0 |
-| npm | >= 9.0.0 (ships with Node) |
-
-<Tabs>
-<TabItem label="Check Node version">
-
-```bash
-node --version
-# Should output: v18.x.x or higher
-```
-
-</TabItem>
-<TabItem label="Install Node via nvm">
-
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-nvm install 20
-nvm use 20
-```
-
-</TabItem>
-</Tabs>
+Prebuilt binaries are published for Linux (x86_64/aarch64, gnu & musl), macOS (Apple Silicon/Intel), and Windows (x86_64 MSVC).
 
 ## Platform Notes
 

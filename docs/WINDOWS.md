@@ -1,10 +1,12 @@
 # Windows Compatibility Guide
 
+> **Note (v0.2.2):** Swixter has been rewritten in Rust. The "Code Architecture" and "Developer Notes" sections below still describe the former TypeScript implementation and are kept for historical reference. Installation and build instructions in this document have been updated for the Rust codebase.
+
 This document provides comprehensive information about Swixter's Windows support, including current status, configuration paths, testing strategies, and future enhancements.
 
 ## Current Status
 
-**Swixter v0.0.8 is ~90% compatible with Windows out of the box.**
+**Swixter v0.2.2 (the Rust rewrite) works on Windows 10/11 out of the box.** Every GitHub Release ships a prebuilt x86_64 (MSVC) binary, installable via the PowerShell one-liner, npm, or Cargo.
 
 ### ✅ What Works on Windows
 
@@ -16,13 +18,17 @@ This document provides comprehensive information about Swixter's Windows support
 
 2. **Configuration file handling**
    - JSON, YAML, and TOML parsing
-   - Cross-platform path resolution via `os.homedir()`
+   - Cross-platform path resolution (home directory located via the `dirs` crate)
    - All three AI coder adapters (Claude, Codex, Continue)
 
 3. **AI Coder Integration**
    - Claude Code: Full support (uses `~/.claude/settings.json`)
    - Codex: Early support (uses `~/.codex/config.toml`)
    - Continue/Qwen: Full support (uses `~/.continue/config.yaml`)
+
+4. **Launching coder CLIs (`run`, `proxy run`)**
+   - npm-installed global CLIs are `.cmd` shims (not `.exe`); Swixter launches them via `cmd /C` so they resolve correctly on Windows
+   - Install-method detection (`which` lookup) honors `PATHEXT` extensions (`.exe`/`.cmd`/`.bat`)
 
 ### ⚠️ What Has Limitations
 
@@ -31,12 +37,13 @@ This document provides comprehensive information about Swixter's Windows support
    - ❌ PowerShell completion not yet implemented
 
 2. **E2E Testing**
-   - ✅ Docker-based tests work on Windows (requires Docker Desktop + WSL2)
-   - ❌ Native Windows test suite not yet available
+   - ✅ Unit/integration tests (`cargo test --workspace`) run natively on Windows in CI (`windows-latest`)
+   - ✅ Docker-based E2E tests work on Windows (requires Docker Desktop + WSL2)
+   - ❌ Docker E2E scenarios themselves still run inside a Linux container
 
-3. **Build Script**
-   - ✅ Main build works (`bun build`)
-   - ⚠️ `chmod +x` in package.json is harmless on Windows but unnecessary
+3. **Build**
+   - ✅ Rust build works (`cargo build --release`)
+   - ✅ Prebuilt Windows binaries ship with every GitHub Release
 
 ## Configuration File Paths
 
@@ -48,7 +55,7 @@ This document provides comprehensive information about Swixter's Windows support
 | **macOS** | `~/.config/swixter/config.json` | XDG Base Directory spec |
 | **Linux** | `~/.config/swixter/config.json` | XDG Base Directory spec |
 
-**Implementation:** `src/constants/paths.ts:getSwixterConfigDir()`
+**Implementation:** `packages/cli/crates/core/src/paths.rs`
 
 ### AI Coder Tool Paths (Cross-Platform)
 
@@ -135,20 +142,21 @@ No adapter-specific changes needed for Windows support!
 
 **How to run:**
 ```powershell
-# From PowerShell or Command Prompt
-bun run test:e2e
+# From PowerShell or Command Prompt (requires a Rust toolchain)
+cd packages\cli
+bash test/e2e-docker.sh
 ```
 
 **How it works:**
-1. Builds project with `bun build`
-2. Creates Linux container with Bun runtime
-3. Copies build artifacts into container
-4. Runs 8 bash test scenarios inside container
+1. Builds the Rust binary with `cargo build --release`
+2. Creates a Linux container
+3. Copies the binary and test scripts into the container
+4. Runs 18 bash test scenarios inside the container
 5. Reports results
 
 ### Option 2: Native Windows Testing (Future)
 
-**Status:** Not implemented (v0.1.0 roadmap)
+**Status:** Superseded — since the v0.2.2 Rust rewrite, `cargo test --workspace` runs natively on Windows CI. A Docker-free E2E variant exercising real Windows paths remains future work.
 
 **Approach:** Rewrite test scenarios in Node.js/TypeScript for true cross-platform tests.
 
@@ -179,27 +187,32 @@ test("create profile on Windows", () => {
 
 ### Prerequisites
 
-- **Node.js 18+** (or Bun runtime)
+- **Rust toolchain** (for building from source only)
 - Windows 10/11
 
 ### Installation Methods
 
-#### Method 1: npm (Global)
+#### Method 1: PowerShell installer
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.ps1 | iex"
+```
+
+#### Method 2: npm (Global)
 ```powershell
 npm install -g swixter
 ```
 
-#### Method 2: npx (No install)
+#### Method 3: Cargo
 ```powershell
-npx swixter --help
+cargo install swixter
 ```
 
-#### Method 3: From source
+#### Method 4: From source
 ```powershell
 git clone https://github.com/dawnswwwww/swixter.git
-cd swixter
-bun install
-bun run build
+cd swixter\packages\cli
+cargo build --release
+# Binary: target\release\swixter.exe
 ```
 
 ### Verify Installation
@@ -211,29 +224,18 @@ swixter claude --help
 
 ## Common Windows Issues & Solutions
 
-### Issue 1: `chmod: command not found` during build
-
-**Cause:** `package.json` build script includes `chmod +x` which doesn't exist on Windows.
-
-**Solution:** This is harmless - the build will succeed anyway. The executable bit is a Unix concept.
-
-**Fix (future):** Make chmod conditional:
-```json
-"build": "bun build src/cli/index.ts --outdir dist/cli --target node --format esm && (chmod +x dist/cli/index.js || true)"
-```
-
-### Issue 2: Shell completions not working in PowerShell
+### Issue 1: Shell completions not working in PowerShell
 
 **Status:** PowerShell completions not yet implemented.
 
 **Workaround:** Use Git Bash or WSL for completion support.
 
-**Fix (v0.1.0):** Add PowerShell completion generator:
+**Planned fix:** Add a PowerShell completion generator:
 ```powershell
 swixter completion powershell > $PROFILE\..\Completions\swixter.ps1
 ```
 
-### Issue 3: Path not found errors
+### Issue 2: Path not found errors
 
 **Cause:** Mixing forward slashes `/` and backslashes `\` in paths.
 
@@ -258,17 +260,18 @@ const configPath = join(homedir(), ".config", "swixter", "config.json");
 - [x] Model configuration support for all coders
 - [x] Edit profile enhancements
 
-### v0.1.0 (Next)
-- [ ] Add PowerShell completion generator
-- [ ] Cross-platform E2E tests (Node.js/TypeScript)
-- [ ] Windows-specific CI/CD pipeline (GitHub Actions)
-- [ ] Test on Windows 10/11 real machines
+### v0.2.2 (Current) ✅
+- [x] Prebuilt Windows binaries (x86_64 MSVC) on every GitHub Release
+- [x] PowerShell installer (`swixter-installer.ps1`)
+- [x] Windows CI: `cargo test --workspace` runs on `windows-latest`
+- [x] Rust build instructions (`cargo build --release` / `cargo install`)
 
-### v0.2.0 (Future)
+### Future
+- [ ] Add PowerShell completion generator
 - [ ] Windows package manager support (Chocolatey, Scoop, winget)
 - [ ] Windows-specific installer (`.exe` with NSIS)
-- [ ] Native Windows paths documentation
-- [ ] PowerShell-specific examples in README
+- [ ] Docker-free E2E scenarios that exercise native Windows paths
+- [ ] Test on Windows 10/11 real machines
 
 ## Developer Notes
 
@@ -276,7 +279,8 @@ const configPath = join(homedir(), ".config", "swixter", "config.json");
 
 1. **Local testing**
    ```powershell
-   bun run cli claude create
+   cd packages\cli
+   cargo run -p swixter -- claude create
    ```
 
 2. **Check generated paths**
@@ -291,7 +295,8 @@ const configPath = join(homedir(), ".config", "swixter", "config.json");
 3. **Run Docker-based E2E tests**
    ```powershell
    # Requires Docker Desktop + WSL2
-   bun run test:e2e
+   cd packages\cli
+   bash test/e2e-docker.sh
    ```
 
 ### Adding New Features (Windows Checklist)
@@ -345,5 +350,5 @@ If you encounter Windows-specific issues:
 
 ---
 
-**Last Updated:** 2026-02-12 (v0.0.8)
+**Last Updated:** 2026-08-12 (v0.2.2)
 **Status:** Active development - Windows support improving with each release

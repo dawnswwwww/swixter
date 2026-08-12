@@ -8,59 +8,65 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    name: fmt + clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cli
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/cli
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
   test:
-    name: Test on ${{ matrix.os }}
+    name: cargo test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # 超时兜底：一旦某平台测试挂死，超时会留下归档日志便于定位
+    # （正常 ubuntu/macos ~2 分钟、windows ~5 分钟即完成）
+    timeout-minutes: 15
 
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: [18.x, 20.x]
       fail-fast: false
+
+    defaults:
+      run:
+        working-directory: packages/cli
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
         with:
-          bun-version: latest
+          workspaces: packages/cli
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
+      - name: cargo test
+        run: cargo test --workspace
 
-      - name: Install dependencies
-        run: bun install
-
-      - name: Run unit tests
-        run: bun run test
-
-      - name: Build CLI
-        run: bun run build:cli
-
-      - name: Verify CLI build output
-        shell: bash
-        run: |
-          if [ ! -f "packages/cli/dist/cli/index.js" ]; then
-            echo "Build failed: packages/cli/dist/cli/index.js not found"
-            exit 1
-          fi
-          echo "CLI build successful"
-
-      - name: Build website
-        run: bun run build:website
-        continue-on-error: true
-
-      - name: Build docs
-        run: bun run build:docs
-        continue-on-error: true
-
-  # E2E tests only run on Linux with Docker
-  e2e-test:
-    name: E2E Tests (Docker)
+  web-build:
+    name: Build website + docs
     runs-on: ubuntu-latest
 
     steps:
@@ -75,9 +81,76 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build CLI
-        run: bun run build:cli
+      - name: Build website
+        run: bun run build:website
+        continue-on-error: true
+
+      - name: Build docs
+        run: bun run build:docs
+        continue-on-error: true
+
+  # Unit tests for the Web UI (packages/cli/ui/tests/unit)
+  ui-test:
+    name: UI unit tests (bun)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: packages/cli/ui
+        run: bun install --frozen-lockfile
+
+      - name: Run UI unit tests
+        working-directory: packages/cli/ui
+        run: bun run test
+
+  # Fails if ui/src changed without committing the rebuilt ui_dist assets
+  ui-dist-freshness:
+    name: ui_dist is up to date
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Rebuild UI and check for drift
+        working-directory: packages/cli/ui
+        run: |
+          bun install
+          bun run build
+          git diff --exit-code ../crates/server/ui_dist
+
+  # E2E tests only run on Linux with Docker
+  e2e-test:
+    name: E2E Tests (Docker)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/cli
 
       - name: Run E2E tests
-        run: cd packages/cli && bun run test:e2e
-        timeout-minutes: 10
+        # 强制容器内构建：宿主 ubuntu-latest 的 glibc 比测试镜像（debian bookworm）新，
+        # 宿主二进制在容器内跑不起来（GLIBC_2.xx not found）
+        run: E2E_BUILD_IN_CONTAINER=1 bash packages/cli/test/e2e-docker.sh
+        timeout-minutes: 15

@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-- **Current Version**: v0.0.8 (see CHANGELOG.md for details)
-- **Stability**: Early release, actively developed
+- **Current Version**: v0.2.3 (see CHANGELOG.md for details)
+- **Implementation**: Rust (rewritten from TypeScript/Bun in v0.2.2; the TS sources were removed)
 - **Platform Support**: Linux, macOS, Windows 10/11
-- **Package Manager**: npm (published as `swixter`)
-- **CI/CD**: GitHub Actions (automated testing and releases)
+- **Distribution**: cargo-dist installers (shell/powershell), npm, Homebrew tap, crates.io
+- **CI/CD**: GitHub Actions (test.yml: fmt/clippy/test matrix + Docker E2E; release.yml: cargo-dist; publish-crates.yml: crates.io)
 
 ## Project Overview
 
@@ -17,367 +17,166 @@ Swixter is a CLI tool for managing configurations across multiple AI coding assi
 - **Codex** - TOML config at `~/.codex/config.toml` with env var support
 - **Continue.dev** - YAML config at `~/.continue/config.yaml` (note: accessed via `swixter qwen` command for historical reasons, but targets Continue.dev VS Code extension, NOT Qwen Code CLI)
 
+## Repository Layout
+
+```
+packages/cli/                # The Rust workspace (all CLI code lives here)
+├── Cargo.toml               # Workspace root; [workspace.package] version is THE version source of truth
+├── crates/
+│   ├── core/                # Config, profiles, groups, providers, adapters, validation, export
+│   ├── proxy/               # Failover proxy (circuit breaker, API format conversion, SSE)
+│   ├── server/              # Web UI HTTP/WS server, auth, sync, crypto
+│   └── swixter/             # CLI binary: clap definitions + command handlers
+├── ui/                      # Web UI (React + Vite + Tailwind); dist/ is COMMITTED (see below)
+└── test/                    # Docker-based E2E (e2e-docker.sh + scenarios/)
+packages/website/            # Marketing site (Bun)
+packages/docs/               # Docs site (Bun)
+scripts/sync-versions.js     # Cargo version → package.json files (one-way)
+scripts/bump-version.sh      # release: bump + sync + commit + tag
+```
+
 ## Development Commands
 
+All Rust commands run from `packages/cli` (the workspace root):
+
 ```bash
-# Build the CLI
-bun run build
+# Build
+cargo build                          # Dev build
+cargo build --release                # Release build
 
-# Run CLI in development mode (with hot reload)
-bun run cli:dev
+# Run the CLI from source
+cargo run -p swixter -- claude list
+cargo run -p swixter -- providers list
 
-# Run CLI directly (without build)
-bun run cli
+# Tests
+cargo test --workspace               # All unit + integration tests
+cargo test -p swixter-core           # Single crate
+cargo test -p swixter --test coder_commands   # Single integration test file
 
-# Run all unit tests
-bun test
+# Lint / format (CI enforces both)
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
 
-# Run specific test file
-bun test tests/adapters/codex.test.ts
+# E2E tests (Docker-based, requires Docker running)
+bash test/e2e-docker.sh              # From packages/cli; E2E_CARGO_PROFILE=debug for faster iteration
 
-# Run E2E tests (Docker-based, requires Docker running)
-bun run test:e2e
+# Web UI: after changing ui/src, rebuild AND commit crates/server/ui_dist together
+cd ui && bun install && bun run build
 
-# Test package contents before publishing
-npm pack --dry-run
-
-# Test CLI commands manually (after build)
-node dist/cli/index.js claude list
-node dist/cli/index.js providers list
-
-# Check version
-bun run cli version
-
-# Release commands (semi-automated via GitHub Actions)
-bun run release:patch   # For bug fixes (0.0.4 -> 0.0.5)
-bun run release:minor   # For new features (0.0.4 -> 0.1.0)
-bun run release:major   # For breaking changes (0.0.4 -> 1.0.0)
+# Release (from repo root; see "Release and Publishing")
+bun run release:patch                # Bug fixes
+bun run release:minor                # New features
+bun run release:major                # Breaking changes
+git push --follow-tags               # Triggers the release workflows
 ```
+
+### ui_dist commit convention
+
+`packages/cli/crates/server/ui_dist/` is **committed to git** and is the ONLY source of UI assets for release builds (cargo-dist jobs run bare `cargo build` with no Bun available). It lives inside the server crate so `cargo package`/`cargo publish` ship the real UI — an out-of-crate embed folder falls back to the placeholder page for `cargo install` users. Rule: **whenever you modify `ui/src`, run `bun run build` in `ui/` (vite outputs to `../crates/server/ui_dist`) and commit `ui_dist` in the same commit/PR.** The server's build.rs falls back to a placeholder page with a warning when ui_dist is missing — that fallback exists only for local builds and must never ship in a release.
 
 ## Architecture Overview
 
+### Crate Boundaries
+
+- **`swixter-core`** — everything pure/config-side: `ConfigManager` (config.rs), profiles/groups (groups.rs), provider presets (presets.rs + committed `presets.json`, the single source of truth for builtin providers), user providers (user_providers.rs), adapters (adapters/{claude,codex,continue_}.rs), validation (validate.rs), import/export (export.rs), paths (paths.rs). No CLI, no network.
+- **`swixter-proxy`** — the failover proxy: handler, forwarder, circuit breaker (breaker.rs), API format transforms (transform/), SSE (sse.rs).
+- **`swixter-server`** — Web UI server: HTTP routes, WebSocket, auth, cloud sync, crypto (AES-GCM field encryption, PBKDF2 key derivation).
+- **`swixter`** — the binary: clap CLI definitions (src/cli.rs) and command handlers (src/commands/*.rs). Exit codes: 0 success, 1 general, 2 invalid argument, 3 not found, 130 cancelled.
+
 ### Core Data Flow
 
-1. **Configuration Storage** (`~/.config/swixter/config.json`)
-   - Stores all profiles, active profile per coder, and metadata
-   - Schema defined in `src/types.ts` (ConfigFile interface)
-   - Managed through `src/config/manager.ts`
+1. **Configuration Storage** (`~/.config/swixter/config.json`; `~/swixter/config.json` on Windows)
+   - Stores all profiles, active profile per coder, groups, and metadata
+   - Managed through `ConfigManager` (swixter-core); atomic writes via temp file + rename
+   - `SWIXTER_CONFIG_PATH` env var overrides the location (used by tests)
 
 2. **Provider System** (Two-tier)
-   - **Built-in providers**: Hardcoded in `src/providers/presets.ts` (Anthropic, Ollama, Custom)
-   - **User-defined providers**: Stored in `~/.config/swixter/providers.json`, managed via `src/providers/user-providers.ts`
-   - User providers can override built-in ones with same ID
-   - Synchronous access (`getPresetById`) for built-in only, async (`getPresetByIdAsync`) for merged access
+   - **Built-in providers**: `crates/core/src/presets.json` (edit the JSON directly; the TS export scripts are gone)
+   - **User-defined providers**: `~/.config/swixter/providers.json`; can override built-ins with the same ID
 
-3. **Adapter Pattern** (`src/adapters/`)
-   - Each AI coder tool has an adapter (Claude Code, Continue.dev)
-   - Adapters handle reading/writing tool-specific config files
-   - Base interface in `src/adapters/base.ts`
+3. **Adapter Pattern** (`crates/core/src/adapters/`)
+   - Each coder has an adapter with apply/verify/remove
+   - Apply flow: `switch` changes the active profile in swixter config → `apply` writes the active profile to the coder's own config file (e.g. `~/.claude/settings.json`)
 
-### Key Module Responsibilities
+### Important Behaviors (kept identical to the TS implementation)
 
-**CLI Layer** (`src/cli/`):
-- `index.ts` - Main entry point, routes commands to handlers
-- `claude.ts` / `qwen.ts` / `codex.ts` - Per-coder command handlers (create, switch, list, delete, apply, run, edit, install, update-cli)
-- `interactive.ts` - Interactive menu-driven UI (welcome screen, main menu)
-- `providers.ts` - Provider management commands (add, remove, list, show)
-- `help.ts` - Detailed help system with command documentation
-- `completions.ts` - Shell completion generation (bash/zsh/fish)
-- `commands/parsers.ts` - Unified argument parsing supporting long/short options
+1. **Coder-agnostic design**: Command handlers in `crates/swixter/src/commands/coder.rs` are generic over a `CoderSpec`; coder-specifics live in core's adapters and coder registry.
 
-**Configuration Layer** (`src/config/`):
-- `manager.ts` - CRUD operations on profiles, atomic file writes
-- `export.ts` - Import/export with optional API key sanitization
+2. **Adapter specifics**:
+   - **Claude (JSON)**: full replacement of API-related env vars in settings.json; fields absent from the profile are removed to prevent stale config; model env vars (`ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_{HAIKU,OPUS,SONNET}_MODEL`) written when the profile has model config; other sections (MCP servers etc.) preserved.
+   - **Codex (TOML)**: env_key references per official spec; provider tables `[model_providers.swixter-<name>]` and `[profiles.swixter-<name>]`, `swixter-` prefix avoids clobbering user config. API keys must be exported as env vars, or use `swixter codex run`.
+   - **Continue (YAML)**: modifies config.yaml model/apiKey fields.
 
-**Constants** (`src/constants/`):
-- Split into multiple files for organization (messages, formatting, defaults, etc.)
-- All UI text centralized in `src/constants/messages.ts` for i18n
-- `install.ts` - Platform-specific installation method definitions for each coder CLI
+3. **`create --apply` semantics**: creates the profile, switches the coder's active profile to it, THEN applies (not the previously active profile).
 
-**Utilities** (`src/utils/`):
-- `validation.ts` - Input validation (profile names, URLs, API keys)
-- `ui.ts` - Shared UI functions (spinners, formatters, error display)
-- `install-commands.ts` - Shared install/update command handlers for all coders
-- `install.ts` - CLI installation detection and guided installation utilities
-- `cli-version.ts` - CLI version detection and comparison using semver
-- `model-helper.ts` - Model field helper utilities for consistent model handling across adapters
-- `env-key-helper.ts` - Environment variable key priority logic for Codex adapter
+4. **Group validation**: create/update reject duplicate profiles within a group and blank group names (`CoreError::Validation` → exit 2); unknown profiles → `CoreError::NotFound` (exit 3).
 
-### Important Design Patterns
+5. **Provider wire_api**: Codex only supports `wire_api: "chat"` providers; Anthropic (`responses`) is filtered out of Codex flows.
 
-1. **Coder-agnostic design**: Most code works with any "coder" (claude/qwen/codex). Coder-specific logic is in adapters and constants/coders.ts.
+6. **`run` command pattern**: Claude/Qwen spawn the coder CLI directly; Codex is all-in-one (apply profile → set env vars → spawn) because Codex requires env vars at process start.
 
-2. **Profile = Configuration template**: A profile contains provider ID, API key, base URL, etc. Multiple profiles can exist; one is "active" per coder.
+7. **Custom env_key per profile** (Codex only): `profile.env_key` > preset `env_key` > `"OPENAI_API_KEY"`.
 
-3. **Apply flow**: `switch` changes active profile in swixter config → `apply` writes active profile to coder's config file (e.g., `~/.claude/settings.json`)
-
-4. **Validation timing**: Input validation happens at prompt time (immediate feedback) AND at save time (for non-interactive mode)
-
-5. **Adapter-specific behaviors**:
-   - **Claude adapter** (JSON): Full replacement of API-related env vars in settings.json. When applying a profile, only fields present in the profile are written; undefined fields are removed to prevent stale configuration. Also writes model environment variables (`ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`) when the profile has model configuration. Other sections (MCP servers, approval policies, etc.) are preserved.
-   - **Continue adapter** (YAML): Modifies config.yaml with model/apiKey fields
-   - **Codex adapter** (TOML): Uses environment variable references (env_key) per official spec. Creates provider tables `[model_providers.swixter-<name>]` and profile tables `[profiles.swixter-<name>]`. API keys must be set as environment variables before running codex, or use `swixter codex run` for automatic setup.
-
-6. **Provider wire_api field**: Codex only supports `wire_api: "chat"` providers (OpenAI-compatible). Anthropic uses `wire_api: "responses"` and is filtered out in Codex CLI flows.
-
-7. **Special "run" command pattern**: Each coder's `run` command behaves differently based on requirements:
-   - **Claude/Qwen**: Simple wrapper that spawns the coder CLI (e.g., `claude` or `qwen-code`)
-   - **Codex**: All-in-one command that applies profile → sets env vars → spawns codex in single operation, because Codex requires environment variables to be set before execution
-
-8. **Profile naming constraints**: Profile names must be alphanumeric with dashes/underscores only (validated in `src/utils/validation.ts`). No spaces, special chars, or starting with dash.
-
-9. **Custom env_key per profile** (Codex only): Codex profiles can override the provider's default env_key.
-   - **Priority**: `profile.envKey` > `preset.env_key` > `"OPENAI_API_KEY"` (fallback)
-   - Set during profile creation or editing via `--env-key` parameter or interactive prompt
-   - Empty/undefined means use provider preset default (e.g., `OLLAMA_API_KEY` for Ollama)
-   - Used consistently across: `createProviderTable()`, `getEnvExportCommands()`, and `cmdRun()`
-   - Allows flexibility for custom providers or non-standard environment setups
-
-10. **Auth token support** (Claude only): Claude Code profiles support an optional `authToken` field mapped to `ANTHROPIC_AUTH_TOKEN` env var. Set via `--auth-token` / `-t` flag during create/edit. Other coders do not support auth tokens (`supportsAuthToken: false` in CODER_REGISTRY).
-
-11. **Model configuration**: Profiles support per-coder model configuration.
-    - **Claude Code**: Uses a `models` object with four fields (`anthropicModel`, `defaultHaikuModel`, `defaultOpusModel`, `defaultSonnetModel`) mapped to corresponding `ANTHROPIC_*` env vars. Helpers in `src/utils/model-helper.ts`.
-    - **Codex/Qwen**: Use a `model` field (with legacy `openaiModel` fallback) mapped to `OPENAI_MODEL`.
-
-12. **Install/Update commands**: `swixter <coder> install` and `swixter <coder> update-cli` (alias: `upgrade`) manage coder CLI installation. Shared handlers in `src/utils/install-commands.ts` use platform-specific method definitions from `src/constants/install.ts`. Version detection uses `semver` library via `src/utils/cli-version.ts`.
+8. **Version strings** come from `env!("CARGO_PKG_VERSION")` at compile time — there is no runtime version file to sync.
 
 ## Testing
 
-- **Unit tests**: Use Bun's built-in test runner (`bun:test`)
-  - Located in `tests/` directory, structure mirrors `src/`
-  - Run individual tests: `bun test tests/adapters/claude.test.ts`
-  - All constants used in validation must be testable (exported from constants/)
-
-- **E2E tests**: Docker-based for isolated environment
-  - Main script: `test/e2e-docker.sh`
-  - Test scenarios in `test/scenarios/` (create, switch, apply, delete, etc.)
-  - Requires Docker running; works on Linux/macOS/Windows (via Docker Desktop)
-  - Builds project → builds Docker image → runs all scenario tests → cleanup
-
-## Documentation
-
-- **README.md**: User-facing documentation (installation, quick start, examples)
-- **CHANGELOG.md**: Version history and release notes (follow Keep a Changelog format)
-- **CLAUDE.md**: This file - developer guidance for Claude Code
-- **docs/WINDOWS.md**: Comprehensive Windows compatibility guide (created in v0.0.2)
+- **Unit/integration tests**: `cargo test --workspace`
+  - Core unit tests live next to the code (`#[cfg(test)]` modules)
+  - CLI integration tests: `crates/swixter/tests/*.rs` (assert_cmd, isolated `HOME` + `SWIXTER_CONFIG_PATH`)
+  - Compat fixtures (config migration samples from the TS era): `crates/core/tests/fixtures/compat/`
+- **E2E tests**: `packages/cli/test/e2e-docker.sh` — builds the release binary, spins up a container, runs all 18 scenarios in `test/scenarios/`
+- CI (`.github/workflows/test.yml`): `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, cargo test on ubuntu/macos/windows, Docker E2E on ubuntu
 
 ## Code Style Notes
 
-- Use TypeScript with strict mode
-- Prefer `async/await` over promises
-- Use `@clack/prompts` for all interactive inputs (provides cancellation, validation)
-- Error messages use `ERRORS` constants from `src/constants/messages.ts`
-- Exit codes defined in `src/constants/formatting.ts` (EXIT_CODES)
-- Cancellation: Use `p.cancel(ERRORS.cancelled)` + `process.exit(EXIT_CODES.userCancelled)`
+- Match the surrounding module's existing patterns; keep `CoreError` variants mapped to the right exit codes at the CLI layer
+- User-facing CLI output mirrors the TS-era strings (`✓`/`✗` prefixes); E2E scenarios assert on them — don't change output text casually
+- UI text is inline in the Rust handlers (the TS i18n constants layer is gone)
 
 ## Configuration File Paths
-
-**Platform-Specific Paths:**
 
 | Platform | Swixter Config | User Providers | Claude Code | Codex | Continue.dev |
 |----------|---------------|----------------|-------------|-------|--------------|
 | **Linux/macOS** | `~/.config/swixter/config.json` | `~/.config/swixter/providers.json` | `~/.claude/settings.json` | `~/.codex/config.toml` | `~/.continue/config.yaml` |
-| **Windows** | `~/swixter/config.json`<br/>(e.g., `C:\Users\name\swixter\config.json`) | `~/swixter/providers.json` | `~/.claude/settings.json`<br/>(e.g., `C:\Users\name\.claude\settings.json`) | `~/.codex/config.toml` | `~/.continue/config.yaml` |
+| **Windows** | `~/swixter/config.json` | `~/swixter/providers.json` | `~/.claude/settings.json` | `~/.codex/config.toml` | `~/.continue/config.yaml` |
 
-**Platform Detection:** Implemented in `src/constants/paths.ts:getSwixterConfigDir()` using `os.platform()` check.
-
-**Key Insight:** Only Swixter's own config path is platform-specific. All AI coder tools use `~/.tool-name` format which works cross-platform via Node.js `os.homedir()`.
-
-## Windows Compatibility
-
-**Current Status:** ~90% Windows compatible (v0.0.2+)
-
-### Cross-Platform Design Principles
-
-1. **Path Handling:**
-   - ✅ Always use `os.homedir()` instead of `~`, `$HOME`, or `%USERPROFILE%`
-   - ✅ Always use `path.join()` instead of string concatenation with `/` or `\`
-   - ✅ Platform detection via `os.platform() === "win32"`
-   - ✅ All adapters already follow these patterns
-
-2. **File Operations:**
-   - ✅ All adapters use `fs/promises` which works identically on Windows
-   - ✅ TOML parsing (`smol-toml`) and YAML parsing (`js-yaml`) are pure JavaScript
-   - ✅ No native dependencies that could cause Windows issues
-
-3. **Configuration Paths:**
-   - Swixter: Platform-specific (`~/.config/swixter` on Unix vs `~/swixter` on Windows)
-   - AI Coders: Unified `~/.tool-name` works cross-platform via `os.homedir()`
-
-### Windows-Specific Considerations
-
-- **Config Location:** Windows uses `~/swixter/config.json` for simplicity and consistency with AI coder tools
-- **E2E Tests:** Docker-based tests work on Windows via Docker Desktop + WSL2 (no code changes needed)
-- **Shell Completions:** Bash/Zsh/Fish supported; PowerShell completion planned for v0.1.0
-- **Build Script:** `chmod +x` in package.json is harmless on Windows (command not found is expected and safe to ignore)
-
-### When Adding Windows-Sensitive Features
-
-If you're adding features that touch file paths or system-specific behavior:
-
-- [ ] Use `os.homedir()` instead of `~` or environment variables
-- [ ] Use `path.join()` instead of template literals with `/`
-- [ ] Use `path.sep` if you need to detect or use the path separator
-- [ ] Test on Windows if modifying `src/constants/paths.ts` or adapters
-- [ ] Update `docs/WINDOWS.md` if adding Windows-specific behavior
-
-**For comprehensive Windows support details, see [docs/WINDOWS.md](docs/WINDOWS.md)**
-
-## When Adding New Features
-
-- **Adding a new coder**:
-  1. Create adapter in `src/adapters/` implementing CoderAdapter interface (apply, verify, remove methods)
-  2. Add entry to CODER_REGISTRY in `src/constants/coders.ts` with config paths, env var mappings, wire_api type
-  3. Create CLI handler in `src/cli/<coder>.ts` (copy claude.ts or codex.ts as template)
-  4. Export handler function in `src/cli/index.ts` and add routing logic
-  5. Add completion support in `src/cli/completions.ts`
-  6. Write unit tests in `tests/adapters/<coder>.test.ts`
-
-- **Adding a new provider**: Users can add via CLI (`swixter providers add`), no code changes needed. Built-in providers go in `src/providers/presets.ts` with wire_api field.
-
-- **Adding new commands**: Update `src/cli/help.ts` with detailed help, add to completions, add command aliases to `src/constants/commands.ts`
-
-- **All user-facing text** must go into `src/constants/messages.ts` for i18n support
-
-## Key Implementation Notes
-
-1. **TOML handling (Codex)**: Use `smol-toml` for parsing/stringifying. Always backup corrupted configs before overwriting.
-
-2. **Environment variables**: Codex adapter stores env_key references, not direct keys. The `getEnvExportCommands()` method generates shell export commands for users. The `run` command automates this by spawning codex with modified env.
-
-3. **Provider filtering**: When creating Codex profiles, filter providers by `wire_api === "chat"` to exclude incompatible ones (like Anthropic's responses API).
-
-4. **Profile naming**: Codex adapter prefixes all table names with `swixter-` to avoid conflicts with user's existing codex config.
-
-5. **Config merging**: Adapters must preserve existing config (MCP servers, approval policies, etc.) when applying profiles - never overwrite the entire file.
+Implemented in `crates/core/src/paths.rs`. Only Swixter's own config path is platform-specific.
 
 ## Release and Publishing
 
-### Semi-Automated Release Process
+Single source of truth for the version: `packages/cli/Cargo.toml` `[workspace.package] version`. `scripts/sync-versions.js` syncs it one-way into the root and `packages/*/package.json` files.
 
-Swixter uses a **semi-automated release workflow** powered by GitHub Actions. Developers control release timing and version numbers, while CI/CD handles testing, building, npm publishing, and GitHub Release creation.
-
-### Version Management
-
-**Version number locations:**
-- `package.json` - NPM official version (automatically updated by `npm version`)
-- `src/constants/meta.ts` - APP_VERSION constant (automatically synced via version hook)
-- `CHANGELOG.md` - Version history (manually maintained)
-
-**npm lifecycle hooks:**
-1. `preversion` - Runs tests
-2. `version` - Syncs APP_VERSION constant to match package.json version, then stages meta.ts
-3. `postversion` - Pushes commits and tags to GitHub
-
-### How to Release a New Version
-
-**Step 1: Update CHANGELOG.md**
-
-Before releasing, manually update `CHANGELOG.md`:
-
-```markdown
-## [Unreleased]
-
-## [0.0.5] - 2025-12-07
-
-### Added
-- Feature description
-
-### Fixed
-- Bug fix description
-
-[0.0.5]: https://github.com/dawnswwwww/swixter/compare/v0.0.4...v0.0.5
-```
-
-**Step 2: Run release command**
+### How to Release
 
 ```bash
-# For bug fixes (0.0.4 → 0.0.5)
-bun run release:patch
-
-# For new features (0.0.4 → 0.1.0)
-bun run release:minor
-
-# For breaking changes (0.0.4 → 1.0.0)
-bun run release:major
+# 1. Update CHANGELOG.md (add a ## [X.Y.Z] - YYYY-MM-DD section)
+# 2. Bump + sync + commit + tag (requires cargo-edit):
+bun run release:patch   # or release:minor / release:major
+# 3. Push — triggers both release workflows:
+git push --follow-tags
 ```
 
-**Step 3: Automated workflow**
+On a `v*` tag, two workflows run in parallel:
 
-The release command automatically:
-1. ✅ Runs all tests (via preversion hook)
-2. ✅ Updates package.json version number (npm version)
-3. ✅ Syncs APP_VERSION constant (via version hook)
-4. ✅ Stages meta.ts changes (via version hook)
-5. ✅ Creates Git commit and tag (npm version)
-6. ✅ Pushes to GitHub (via postversion hook)
-7. ✅ Triggers GitHub Actions workflow
-
-**Step 4: GitHub Actions takes over**
-
-When GitHub detects a new tag (v*):
-1. ✅ Runs tests on Linux/macOS/Windows
-2. ✅ Builds the project
-3. ✅ Publishes to npm (using NPM_TOKEN secret)
-4. ✅ Extracts changelog for this version
-5. ✅ Creates GitHub Release with changelog content
-
-### Verification
-
-After releasing, check:
-- **GitHub Actions**: https://github.com/dawnswwwww/swixter/actions
-- **npm Package**: https://www.npmjs.com/package/swixter
-- **GitHub Releases**: https://github.com/dawnswwwww/swixter/releases
+- **`.github/workflows/release.yml`** (generated by cargo-dist — DO NOT hand-edit; adjust `[dist]` in `dist-workspace.toml` at the repo root and re-run `dist generate`): builds 7 targets, creates the GitHub Release with changelog + checksums, publishes shell/powershell installers, the npm package, and the Homebrew formula.
+- **`.github/workflows/publish-crates.yml`**: `cargo publish` in dependency order (swixter-core → swixter-proxy → swixter-server → swixter) with index-delay sleeps.
 
 ### Required Secrets
 
 GitHub repository secrets (Settings → Secrets and variables → Actions):
-- `NPM_TOKEN` - npm publish token (get from https://www.npmjs.com/settings/tokens)
+- `NPM_TOKEN` — npm Automation token
+- `CARGO_REGISTRY_TOKEN` — crates.io API token (publish-update scope)
+- `HOMEBREW_TAP_TOKEN` — fine-grained PAT with Contents write on `dawnswwwww/homebrew-tap`
 
-### CI/CD Workflows
-
-**`.github/workflows/test.yml`** - Continuous Integration
-- Triggers: push to main, pull requests
-- Runs unit tests + E2E tests
-- Multi-platform testing (Linux/macOS/Windows)
-- Multiple Node versions (18.x, 20.x)
-
-**`.github/workflows/release.yml`** - Release Automation
-- Triggers: push tags matching `v*`
-- Runs tests before publishing
-- Publishes to npm
-- Creates GitHub Release
+Setup details and troubleshooting: [docs/RELEASE-SETUP.md](docs/RELEASE-SETUP.md).
 
 ### Helper Scripts
 
-**`scripts/sync-version.js`**
-- Reads version from package.json
-- Updates APP_VERSION in src/constants/meta.ts
-- Called during npm version hook
+- **`scripts/bump-version.sh`** — cargo set-version + sync-versions + commit + tag
+- **`scripts/sync-versions.js`** — Cargo workspace version → all package.json files
+- **`packages/cli/scripts/extract-changelog.js`** — local changelog extraction tool (no longer used by CI; cargo-dist extracts release notes itself)
 
-**`scripts/extract-changelog.js`**
-- Parses CHANGELOG.md
-- Extracts content for specified version
-- Used by GitHub Actions to create Release notes
+## Windows Compatibility
 
-### Troubleshooting
-
-**Release failed due to test failures:**
-- Fix the tests locally
-- Commit and push fixes
-- Run release command again
-
-**npm publish failed:**
-- Check NPM_TOKEN is valid and has publish permissions
-- Verify package name is not taken
-- Check npm registry status
-
-**GitHub Release not created:**
-- Verify CHANGELOG.md has entry for this version
-- Check GitHub Actions logs
-- Ensure version format matches: `## [X.Y.Z] - YYYY-MM-DD`
-
-**Version already published:**
-- Cannot republish same version to npm
-- Increment version and release again
-- Use `npm unpublish` within 24 hours if needed (not recommended)
+See [docs/WINDOWS.md](docs/WINDOWS.md). Note its architecture sections still describe the former TypeScript implementation (kept for historical reference); install/build instructions there are current.

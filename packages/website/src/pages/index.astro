@@ -20,7 +20,7 @@ import Layout from '../layouts/Layout.astro';
     <!-- Hero -->
     <section class="hero">
       <div class="container">
-        <p class="hero-line"><span class="comment"># v{import.meta.env.PUBLIC_VERSION ?? '0.1.6'}</span></p>
+        <p class="hero-line"><span class="comment"># v{import.meta.env.PUBLIC_VERSION ?? '0.2.3'}</span></p>
         <h1 class="hero-title">
           <span class="glitch" data-text="swixter">swixter</span>
         </h1>
@@ -29,9 +29,12 @@ import Layout from '../layouts/Layout.astro';
         </p>
         <div class="hero-install">
           <span class="prompt-char">$</span>
-          <code class="install-cmd">npm install -g swixter</code>
-          <button class="copy-btn" data-copy="npm install -g swixter" type="button">[copy]</button>
+          <code class="install-cmd">curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh</code>
+          <button class="copy-btn" data-copy="curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh" type="button">[copy]</button>
         </div>
+        <p class="hero-install-alt">
+          <span class="comment">#</span> also: brew install dawnswwwww/tap/swixter &middot; npm install -g swixter &middot; cargo install swixter
+        </p>
       </div>
     </section>
 
@@ -312,6 +315,14 @@ import Layout from '../layouts/Layout.astro';
     font-family: var(--font-code);
     font-size: 13px;
     color: var(--color-on-bg);
+    word-break: break-all;
+  }
+
+  .hero-install-alt {
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-body);
   }
 
   .copy-btn {

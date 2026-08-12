@@ -3,15 +3,11 @@
 
 set -e
 
-CLI_CMD="node dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 # Get dynamic config path for cross-platform compatibility
 CONFIG_FILE=$HOME/.continue/config.yaml
 
 echo "=== Test: Qwen Model Configuration ==="
-
-# Build the project first
-echo "Building project..."
-bun run build > /dev/null 2>&1
 
 # Clean up any existing config
 rm -f "$CONFIG_FILE"

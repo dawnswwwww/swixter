@@ -9,7 +9,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 MOCK_BIN_DIR="$HOME/bin"
 
 echo "=== Test: Update Command ==="
@@ -30,36 +30,43 @@ echo "✓ Test 1 passed: Update-cli command exists"
 echo "Test 2: Update-cli command prompts to install when CLI not installed..."
 OUTPUT=$($CLI_CMD claude update-cli 2>&1) || EXIT_CODE=$?
 
-if echo "$OUTPUT" | grep -qi "not installed\|install first\|please install"; then
+# Rust 行为可离线确定：未安装时打印 "⚠ Claude is not installed"（install.rs）
+if echo "$OUTPUT" | grep -qF "is not installed"; then
     echo "✓ Test 2 passed: Update-cli command prompts to install first"
 else
-    echo "⚠ Test 2: Update-cli command behavior needs verification"
+    echo "❌ Error: Expected 'is not installed' output, got: $OUTPUT"
+    exit 1
 fi
 
 # ─────────────────────────────────────────────
 # Test 3: Update-cli command works when CLI is installed
+# （mock claude 放在含 "npm" 的路径下并提供失败的 mock npm，
+#   使安装方式检测命中 npm 方法且快速失败，
+#   避免回退到 curl 安装脚本真实下载/安装 coder CLI）
 # ─────────────────────────────────────────────
 echo "Test 3: Update-cli command works when CLI is installed..."
-mkdir -p "$MOCK_BIN_DIR"
+mkdir -p "$MOCK_BIN_DIR/npm-global"
 # Create mock CLI that returns version
-printf '#!/bin/bash\nif [ "$1" = "--version" ]; then echo "claude 1.0.0"; else exit 0; fi\n' > "$MOCK_BIN_DIR/claude"
-chmod +x "$MOCK_BIN_DIR/claude"
-export PATH="$MOCK_BIN_DIR:$PATH"
+printf '#!/bin/bash\nif [ "$1" = "--version" ]; then echo "claude 1.0.0"; else exit 0; fi\n' > "$MOCK_BIN_DIR/npm-global/claude"
+chmod +x "$MOCK_BIN_DIR/npm-global/claude"
+# Mock npm that fails fast (no network, no real installs)
+printf '#!/bin/bash\nexit 1\n' > "$MOCK_BIN_DIR/npm"
+chmod +x "$MOCK_BIN_DIR/npm"
+export PATH="$MOCK_BIN_DIR/npm-global:$MOCK_BIN_DIR:$PATH"
 
 OUTPUT=$($CLI_CMD claude update-cli 2>&1) || true
 
-# Should either show update message or execute update
-if echo "$OUTPUT" | grep -qi "update\|updating\|latest\|Current version"; then
-    echo "✓ Test 3 passed: Update-cli command executes update logic"
-elif ! echo "$OUTPUT" | grep -q "not installed"; then
-    # If it doesn't show "not installed", it likely detected the mock
-    echo "✓ Test 3 passed: Update-cli command detected mock CLI"
+# mock claude 支持 --version，Rust 必然先打印 "Current version: claude 1.0.0"
+# （install.rs update()），随后 mock npm 失败退出
+if echo "$OUTPUT" | grep -qF "Current version"; then
+    echo "✓ Test 3 passed: Update-cli command detects installed CLI and runs update logic"
 else
-    echo "⚠ Test 3: Update-cli command behavior with installed CLI needs verification"
+    echo "❌ Error: Expected 'Current version' in update output, got: $OUTPUT"
+    exit 1
 fi
 
-# Clean up mock
-rm -f "$MOCK_BIN_DIR/claude"
+# Clean up mocks
+rm -f "$MOCK_BIN_DIR/npm-global/claude" "$MOCK_BIN_DIR/npm"
 
 # ─────────────────────────────────────────────
 # Test 4: Upgrade alias works for claude

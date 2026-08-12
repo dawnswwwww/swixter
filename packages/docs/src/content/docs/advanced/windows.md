@@ -53,14 +53,19 @@ Note: Codex recommends WSL for best Windows experience.
 ## Installation on Windows
 
 ```powershell
+# PowerShell installer
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.ps1 | iex"
+
 # npm (global)
 npm install -g swixter
 
-# or from source
+# Cargo
+cargo install swixter
+
+# or from source (requires a Rust toolchain)
 git clone https://github.com/dawnswwwww/swixter.git
 cd swixter
-bun install
-bun run build
+cargo install --path packages/cli/crates/swixter
 ```
 
 ## Limitations

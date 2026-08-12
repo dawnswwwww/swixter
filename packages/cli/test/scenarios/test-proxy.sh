@@ -3,7 +3,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 CONFIG_FILE="$HOME/.config/swixter/config.json"
 PROXY_PORT=18731
 
@@ -20,10 +20,13 @@ cleanup
 echo "=== Test: Proxy Gateway Token ==="
 
 # Test 1: Create profile and group for proxy runtime
+# 上游指向不可达地址（127.0.0.1:9），保证鉴权边界测试离线确定：
+# 通过网关鉴权后转发失败应得 502 而非依赖外网的真实上游响应
 $CLI_CMD claude create \
   --quiet \
   --name test-proxy-profile \
-  --provider anthropic \
+  --provider custom \
+  --base-url http://127.0.0.1:9 \
   --api-key sk-ant-test-proxy-key
 
 $CLI_CMD group create test-proxy-group --profiles test-proxy-profile >/dev/null 2>&1

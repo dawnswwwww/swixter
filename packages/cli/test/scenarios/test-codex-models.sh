@@ -3,14 +3,10 @@
 
 set -e
 
-CLI_CMD="node dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 CONFIG_FILE="$HOME/.codex/config.toml"
 
 echo "=== Test: Codex Model Environment Variable ==="
-
-# Build the project first
-echo "Building project..."
-bun run build > /dev/null 2>&1
 
 # Clean up any existing config
 rm -f "$CONFIG_FILE"
@@ -27,9 +23,19 @@ $CLI_CMD codex create \
   --apply > /dev/null 2>&1
 
 # Test 2: Verify model is in TOML
+# Rust 偏差：model 写入独立 profile 文件（Codex 0.134.0+ 的
+# swixter-<name>.config.toml），主 config.toml 只保留 model_provider 指针
 echo "Test 2: Verify model in TOML..."
-if ! grep -q 'model = "gpt-4"' "$CONFIG_FILE"; then
-    echo "❌ Error: Model not found in config.toml"
+CODEX_PROFILE_FILE="$(dirname "$CONFIG_FILE")/swixter-test-codex-model.config.toml"
+if ! grep -q 'model = "gpt-4"' "$CODEX_PROFILE_FILE"; then
+    echo "❌ Error: Model not found in $CODEX_PROFILE_FILE"
+    echo "Profile file content:"
+    cat "$CODEX_PROFILE_FILE" 2>&1 || echo "Profile file not found"
+    exit 1
+fi
+
+if ! grep -q 'model_provider = "swixter-test-codex-model"' "$CONFIG_FILE"; then
+    echo "❌ Error: model_provider not set in config.toml"
     echo "Config file content:"
     cat "$CONFIG_FILE" 2>&1 || echo "Config file not found"
     exit 1
@@ -108,12 +114,12 @@ echo "✓ OPENAI_MODEL correctly set during run"
 
 # Test 6: Test with openaiModel field
 echo "Test 6: Create profile with openaiModel field..."
-# We need to manually create a profile with openaiModel since CLI doesn't set it directly
-# For this test, we'll use the API key environment variable setting
+# Rust import 只接受导出格式（profiles 数组 + exportedAt/version），
+# TS 时代这里导入的是裸 config 格式（会被 Rust 拒绝）。
 cat > /tmp/test-profile.json << 'EOF'
 {
-  "profiles": {
-    "test-openai-model": {
+  "profiles": [
+    {
       "name": "test-openai-model",
       "providerId": "custom",
       "apiKey": "sk-test",
@@ -121,12 +127,8 @@ cat > /tmp/test-profile.json << 'EOF'
       "createdAt": "2024-01-01T00:00:00.000Z",
       "updatedAt": "2024-01-01T00:00:00.000Z"
     }
-  },
-  "coders": {
-    "codex": {
-      "activeProfile": "test-openai-model"
-    }
-  },
+  ],
+  "exportedAt": "2024-01-01T00:00:00.000Z",
   "version": "1.0.0"
 }
 EOF
@@ -134,8 +136,14 @@ EOF
 # Import the profile
 $CLI_CMD import /tmp/test-profile.json > /dev/null 2>&1
 
-# Test export with openaiModel
-echo "✓ openaiModel field correctly exported (verified by test code implementation)"
+# Verify openaiModel field was imported
+OPENAI_MODEL=$(jq -r '.profiles["test-openai-model"].openaiModel' "$HOME/.config/swixter/config.json")
+if [ "$OPENAI_MODEL" != "claude-3-5-sonnet-20241022" ]; then
+    echo "❌ Error: openaiModel field not imported correctly, got $OPENAI_MODEL"
+    exit 1
+fi
+
+echo "✓ openaiModel field correctly imported"
 
 # Cleanup
 rm -f /tmp/test-profile.json

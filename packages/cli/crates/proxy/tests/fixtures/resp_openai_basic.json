@@ -1,0 +1,19 @@
+{
+  "id": "chatcmpl-abc",
+  "model": "kimi-k2",
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "reasoning_content": "Let me think about this.",
+        "content": "The answer is 42."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 30,
+    "prompt_tokens_details": { "cached_tokens": 80 }
+  }
+}

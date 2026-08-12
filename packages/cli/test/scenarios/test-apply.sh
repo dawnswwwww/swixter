@@ -3,7 +3,7 @@
 
 set -e
 
-CLI_CMD="node /home/testuser/dist/cli/index.js"
+CLI_CMD="${SWIXTER_BIN:-/home/testuser/swixter}"
 CONFIG_FILE="$HOME/.config/swixter/config.json"
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 CONTINUE_CONFIG="$HOME/.continue/config.yaml"

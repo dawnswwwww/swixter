@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "activeProfile": "work-kimi",
+  "profiles": {
+    "work-kimi": {
+      "name": "work-kimi",
+      "providerId": "kimi-coding",
+      "apiKey": "sk-test-1234567890",
+      "authToken": "tok-abc",
+      "baseURL": "https://api.kimi.com/coding/",
+      "models": {
+        "anthropicModel": "kimi-for-coding",
+        "defaultHaikuModel": "h1",
+        "defaultOpusModel": "o1",
+        "defaultSonnetModel": "s1"
+      },
+      "headers": {
+        "X-Custom": "v"
+      },
+      "apiFormat": "anthropic_messages",
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-02T00:00:00.000Z"
+    },
+    "local-ollama": {
+      "name": "local-ollama",
+      "providerId": "ollama",
+      "apiKey": "",
+      "baseURL": "http://localhost:11434",
+      "model": "qwen2.5-coder:7b",
+      "openaiModel": "qwen2.5-coder:7b",
+      "envKey": "OLLAMA_API_KEY",
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    }
+  }
+}

@@ -20,11 +20,48 @@ echo -e "${BLUE}   Swixter E2E Docker Tests${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Step 1: Build project
-echo -e "${YELLOW}[1/5]${NC} Building project..."
-bun run build > /dev/null 2>&1
-echo -e "${GREEN}✓${NC} Project build successful"
-echo ""
+# Step 1: Build project (Rust binary; use E2E_CARGO_PROFILE=debug for faster local iteration)
+CARGO_PROFILE="${E2E_CARGO_PROFILE:-release}"
+# E2E_BUILD_IN_CONTAINER=1（CI 必走）：强制在 rust:1-bookworm 容器内构建。
+# 测试镜像是 debian:bookworm-slim（glibc 2.36），若直接用 ubuntu-latest 宿主
+# （glibc 2.39+）编译的二进制，容器内会报 "GLIBC_2.xx not found" 全线失败。
+# 本地 macOS 主机产出的二进制不是 Linux ELF，也会自动走容器构建。
+FORCE_CONTAINER_BUILD="${E2E_BUILD_IN_CONTAINER:-0}"
+SWIXTER_BIN=""
+if [ "$FORCE_CONTAINER_BUILD" != "1" ]; then
+    echo -e "${YELLOW}[1/5]${NC} Building project (cargo build --$CARGO_PROFILE)..."
+    if [ "$CARGO_PROFILE" = "release" ]; then
+        cargo build --release > /dev/null 2>&1
+    else
+        cargo build > /dev/null 2>&1
+    fi
+    SWIXTER_BIN="$PROJECT_ROOT/target/$CARGO_PROFILE/swixter"
+    if [ ! -x "$SWIXTER_BIN" ]; then
+        echo -e "${RED}✗${NC} Binary not found: $SWIXTER_BIN"
+        exit 1
+    fi
+    echo -e "${GREEN}✓${NC} Project build successful"
+    echo ""
+fi
+
+# Step 1b: 在 rust:1-bookworm 容器内构建 Linux 二进制（与测试镜像 glibc 对齐；
+# registry 用命名卷缓存，产物输出到独立 target/e2e-linux，避免与主机 target 互相污染）
+if [ "$FORCE_CONTAINER_BUILD" = "1" ] || ! file -b "$SWIXTER_BIN" | grep -q "ELF"; then
+    echo -e "${YELLOW}[1b]${NC} Building Linux binary in container (rust:1-bookworm)..."
+    docker run --rm \
+        -v "$PROJECT_ROOT:/ws" -w /ws \
+        -v swixter-e2e-cargo-registry:/usr/local/cargo/registry \
+        -e CARGO_TARGET_DIR=/ws/target/e2e-linux \
+        rust:1-bookworm \
+        cargo build --release -p swixter > /dev/null 2>&1
+    SWIXTER_BIN="$PROJECT_ROOT/target/e2e-linux/release/swixter"
+    if [ ! -x "$SWIXTER_BIN" ]; then
+        echo -e "${RED}✗${NC} Linux binary not found: $SWIXTER_BIN"
+        exit 1
+    fi
+    echo -e "${GREEN}✓${NC} Linux binary build successful"
+    echo ""
+fi
 
 # Step 2: Build Docker image
 echo -e "${YELLOW}[2/5]${NC} Building Docker test image..."
@@ -49,12 +86,12 @@ cleanup() {
 # Register cleanup function
 trap cleanup EXIT INT TERM
 
-# Step 4: Copy build artifacts and test scripts to container
+# Step 4: Copy binary and test scripts to container
 echo -e "${YELLOW}[4/5]${NC} Copying files to container..."
-docker cp ./dist "$CONTAINER_ID:/home/testuser/"
+docker cp "$SWIXTER_BIN" "$CONTAINER_ID:/home/testuser/swixter"
 docker cp test/scenarios "$CONTAINER_ID:/home/testuser/"
 # Ensure test scripts have execute permissions (must run chmod and chown as root)
-docker exec -u root "$CONTAINER_ID" sh -c 'chmod +x /home/testuser/scenarios/*.sh && chown -R testuser:testuser /home/testuser/scenarios /home/testuser/dist'
+docker exec -u root "$CONTAINER_ID" sh -c 'chmod +x /home/testuser/scenarios/*.sh /home/testuser/swixter && chown -R testuser:testuser /home/testuser/scenarios /home/testuser/swixter'
 echo -e "${GREEN}✓${NC} Files copied successfully"
 echo ""
 
@@ -65,7 +102,9 @@ echo ""
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-# Test scenario list
+# Test scenario list (all 19; the 4 model/provider scenarios were missing in the TS era)
+# 顺序说明：前 14 个依赖逐步累积的配置状态；5 个补充场景自带状态
+# （test-claude-models 会清空 swixter config 重建），放在最后执行。
 SCENARIOS=(
     "test-install-detection.sh"
     "test-install-command.sh"
@@ -81,17 +120,26 @@ SCENARIOS=(
     "test-group.sh"
     "test-proxy.sh"
     "test-daemon.sh"
+    "test-claude-models.sh"
+    "test-codex-models.sh"
+    "test-qwen-models.sh"
+    "test-providers.sh"
+    "test-version.sh"
 )
 
 for scenario in "${SCENARIOS[@]}"; do
     TEST_NAME=$(basename "$scenario" .sh | sed 's/test-//')
     echo -e "${BLUE}▸${NC} Running test: ${YELLOW}${TEST_NAME}${NC}"
 
-    if docker exec -u testuser "$CONTAINER_ID" bash "/home/testuser/scenarios/$scenario" 2>&1 | tee /tmp/test-output.log | grep -q "✅"; then
+    # 通过判据：docker exec 退出码为 0 且输出含 ✅（退出码取自 PIPESTATUS，
+    # 不被 tee/grep 管道吞掉）
+    docker exec -u testuser "$CONTAINER_ID" bash "/home/testuser/scenarios/$scenario" 2>&1 | tee /tmp/test-output.log
+    SCENARIO_RC=${PIPESTATUS[0]}
+    if [ "$SCENARIO_RC" -eq 0 ] && grep -q "✅" /tmp/test-output.log; then
         echo -e "${GREEN}  ✓ Pass${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
-        echo -e "${RED}  ✗ Fail${NC}"
+        echo -e "${RED}  ✗ Fail (exit code: $SCENARIO_RC)${NC}"
         cat /tmp/test-output.log
         TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
