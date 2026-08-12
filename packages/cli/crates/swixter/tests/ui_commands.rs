@@ -105,7 +105,10 @@ fn ui_foreground_lifecycle() {
     let _ = child.wait();
 }
 
+// Windows 上挂死（CI 实测：assert 永不返回；daemon 分离进程语义在 Windows
+// 属受限能力，见 docs/WINDOWS.md），按项目惯例限 unix
 #[test]
+#[cfg(unix)]
 fn ui_daemon_lifecycle() {
     let dir = tempfile::tempdir().unwrap();
     let port = free_port();
