@@ -8,14 +8,17 @@ pub const SWIXTER_CLAUDE_HAIKU_MODEL: &str = "SWIXTER_CLAUDE_HAIKU_MODEL";
 pub const SWIXTER_CLAUDE_SONNET_MODEL: &str = "SWIXTER_CLAUDE_SONNET_MODEL";
 pub const SWIXTER_CLAUDE_OPUS_MODEL: &str = "SWIXTER_CLAUDE_OPUS_MODEL";
 
-/// TS: buildClaudeProxyMarkerModels —— 有对应真实模型才写 marker；全无可配 → None
+/// TS: buildClaudeProxyMarkerModels —— 有对应真实模型才写 marker；全无可配 → None。
+/// 各条件均为 TS 真值判断（`models?.anthropicModel || model` 等）：空串视为未配置，
+/// 故 `.or`/`.map` 前先 filter 掉空串（Rust Option 只判 None，需显式对齐 `||` 语义）
 pub fn build_claude_proxy_marker_models(p: &Profile) -> Option<ModelsConfig> {
     let m = ModelsConfig {
         anthropic_model: if p
             .models
             .as_ref()
             .and_then(|x| x.anthropic_model.as_deref())
-            .or(p.model.as_deref())
+            .filter(|s| !s.is_empty())
+            .or(p.model.as_deref().filter(|s| !s.is_empty()))
             .is_some()
         {
             Some(SWIXTER_CLAUDE_MODEL.into())
@@ -26,16 +29,19 @@ pub fn build_claude_proxy_marker_models(p: &Profile) -> Option<ModelsConfig> {
             .models
             .as_ref()
             .and_then(|x| x.default_haiku_model.as_deref())
+            .filter(|s| !s.is_empty())
             .map(|_| SWIXTER_CLAUDE_HAIKU_MODEL.into()),
         default_sonnet_model: p
             .models
             .as_ref()
             .and_then(|x| x.default_sonnet_model.as_deref())
+            .filter(|s| !s.is_empty())
             .map(|_| SWIXTER_CLAUDE_SONNET_MODEL.into()),
         default_opus_model: p
             .models
             .as_ref()
             .and_then(|x| x.default_opus_model.as_deref())
+            .filter(|s| !s.is_empty())
             .map(|_| SWIXTER_CLAUDE_OPUS_MODEL.into()),
     };
     if m.anthropic_model.is_none()
@@ -49,13 +55,16 @@ pub fn build_claude_proxy_marker_models(p: &Profile) -> Option<ModelsConfig> {
     }
 }
 
-/// TS: model-helper.ts getOpenAIModel — 有 models 对象时返回 None
+/// TS: model-helper.ts getOpenAIModel — 有 models 对象时返回 None。
+/// `profile.model || profile.openaiModel`：model 为空串同样回退 openaiModel，
+/// 故 filter 必须放在 `.or` 之前（而非只过滤最终结果）
 pub fn get_openai_model(p: &Profile) -> Option<&str> {
     if p.models.is_some() {
         return None;
     }
     p.model
         .as_deref()
+        .filter(|s| !s.is_empty())
         .or(p.openai_model.as_deref())
         .filter(|s| !s.is_empty())
 }
@@ -210,5 +219,32 @@ mod tests {
             build_claude_proxy_marker_models(&profile(None, Some(ModelsConfig::default())))
                 .is_none()
         );
+    }
+
+    #[test]
+    fn marker_models_treat_empty_string_as_unset() {
+        // TS `||` 真值语义：空串等同未配置
+        assert!(build_claude_proxy_marker_models(&profile(Some(""), None)).is_none());
+        // anthropicModel 空串 → 回退 model
+        let m = ModelsConfig {
+            anthropic_model: Some("".into()),
+            default_haiku_model: Some("".into()), // 空串 → 不写 marker
+            ..Default::default()
+        };
+        let m = build_claude_proxy_marker_models(&profile(Some("glm-4"), Some(m))).unwrap();
+        assert_eq!(m.anthropic_model.as_deref(), Some(SWIXTER_CLAUDE_MODEL));
+        assert!(m.default_haiku_model.is_none());
+    }
+
+    #[test]
+    fn openai_model_empty_string_falls_back() {
+        // TS `profile.model || profile.openaiModel`：model 空串回退 openaiModel
+        let mut p = profile(Some(""), None);
+        p.openai_model = Some("gpt-4o".into());
+        assert_eq!(get_openai_model(&p), Some("gpt-4o"));
+        // 两者皆空串 → None
+        let mut p = profile(Some(""), None);
+        p.openai_model = Some("".into());
+        assert_eq!(get_openai_model(&p), None);
     }
 }

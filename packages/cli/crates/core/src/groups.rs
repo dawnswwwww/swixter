@@ -23,10 +23,25 @@ pub fn generate_id() -> String {
     format!("grp_{millis}_{s}")
 }
 
-/// TS: cli/group.ts validateGroupNameOrExit —— trim 后为空复用 profile name 校验文案
-fn validate_group_name(name: &str) -> Result<(), CoreError> {
-    if name.trim().is_empty() {
+/// TS: cli/group.ts validateGroupNameOrExit → utils/validation.ts validateProfileName
+/// （group 复用 profile name 校验规则）：trim 后为空 / 长度 < 2 / 字符集外字符均拒绝。
+/// 字符集 ^[a-zA-Z0-9_-]+$（VALIDATION_RULES.profileNamePattern），最小长度 2。
+fn validate_group_name(trimmed: &str) -> Result<(), CoreError> {
+    if trimmed.is_empty() {
         return Err(CoreError::Validation("Profile name cannot be empty".into()));
+    }
+    if trimmed.chars().count() < 2 {
+        return Err(CoreError::Validation(
+            "Profile name must be at least 2 characters".into(),
+        ));
+    }
+    if !trimmed
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err(CoreError::Validation(
+            "Can only contain letters, numbers, underscores and hyphens".into(),
+        ));
     }
     Ok(())
 }
@@ -54,6 +69,8 @@ pub fn create(
     name: &str,
     profiles: Vec<String>,
 ) -> Result<Group, CoreError> {
+    // TS validateGroupNameOrExit 返回 trim 后的名字并以其存储
+    let name = name.trim();
     validate_group_name(name)?;
     if profiles.is_empty() {
         return Err(CoreError::Validation(
@@ -105,8 +122,16 @@ pub fn update(
     if !mgr.config().groups.contains_key(id) {
         return Err(CoreError::NotFound(format!("Group \"{id}\" not found")));
     }
+    let name = name.map(str::trim);
     if let Some(n) = name {
         validate_group_name(n)?;
+        // TS validateGroupNameOrExit(name, currentGroupName) —— 排除自身后拒绝与现有组重名
+        let is_current = mgr.config().groups[id].name == n;
+        if !is_current && mgr.config().groups.values().any(|g| g.name == n) {
+            return Err(CoreError::Validation(format!(
+                "Group \"{n}\" already exists"
+            )));
+        }
     }
     if let Some(ps) = &profiles {
         if ps.is_empty() {
@@ -126,7 +151,7 @@ pub fn update(
     let groups = &mut mgr.config_mut_for_test().groups;
     let g = groups.get_mut(id).unwrap();
     if let Some(n) = name {
-        g.name = n.to_string();
+        g.name = n.to_string(); // n 已 trim
     }
     if let Some(ps) = profiles {
         g.profiles = ps;
@@ -139,11 +164,12 @@ pub fn update(
 }
 
 pub fn delete(mgr: &mut ConfigManager, id: &str) -> Result<(), CoreError> {
-    if mgr.config_mut_for_test().groups.remove(id).is_none() {
+    // shift_remove 保持剩余键的插入序（对齐 TS 对象 delete 后的键序）
+    if mgr.config_mut_for_test().groups.shift_remove(id).is_none() {
         return Err(CoreError::NotFound(format!("Group \"{id}\" not found")));
     }
     if mgr.config().active_group.as_deref() == Some(id) {
-        // 回退到剩余第一个；无剩余则移除字段（序列化时省略，与 TS 一致）
+        // 回退到剩余第一个（IndexMap 插入序首个，确定性）；无剩余则移除字段（序列化时省略，与 TS 一致）
         let fallback = mgr.config().groups.keys().next().cloned();
         mgr.config_mut_for_test().active_group = fallback;
     }
@@ -233,7 +259,7 @@ mod tests {
     fn create_rejects_unknown_profile() {
         let (_d, mut m) = mgr_with_profiles();
         assert!(matches!(
-            crate::groups::create(&mut m, "x", vec!["nope".into()]),
+            crate::groups::create(&mut m, "gx", vec!["nope".into()]),
             Err(crate::CoreError::NotFound(_))
         ));
     }
@@ -306,10 +332,70 @@ mod tests {
     }
 
     #[test]
+    fn create_and_update_trim_name() {
+        // TS validateGroupNameOrExit 返回 trim 后的名字，以其存储
+        let (_d, mut m) = mgr_with_profiles();
+        let g = crate::groups::create(&mut m, "  main  ", vec!["p1".into()]).unwrap();
+        assert_eq!(g.name, "main");
+        assert_eq!(m.config().groups[&g.id].name, "main");
+        let g = crate::groups::update(&mut m, &g.id, Some("  renamed "), None).unwrap();
+        assert_eq!(g.name, "renamed");
+        assert_eq!(m.config().groups[&g.id].name, "renamed");
+    }
+
+    #[test]
+    fn create_rejects_short_and_invalid_char_names() {
+        // TS VALIDATION_RULES：最小长度 2，字符集 ^[a-zA-Z0-9_-]+$
+        let (_d, mut m) = mgr_with_profiles();
+        let err = crate::groups::create(&mut m, "x", vec!["p1".into()]).unwrap_err();
+        match err {
+            crate::CoreError::Validation(msg) => {
+                assert_eq!(msg, "Profile name must be at least 2 characters");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        for bad in ["has space", "中文名", "a.b", "a/b"] {
+            let err = crate::groups::create(&mut m, bad, vec!["p1".into()]).unwrap_err();
+            match err {
+                crate::CoreError::Validation(msg) => {
+                    assert_eq!(
+                        msg,
+                        "Can only contain letters, numbers, underscores and hyphens"
+                    );
+                }
+                other => panic!("expected Validation, got {other:?}"),
+            }
+        }
+        assert!(m.config().groups.is_empty()); // 校验失败不得落盘
+                                               // 合法字符集：字母/数字/下划线/连字符
+        crate::groups::create(&mut m, "ok_name-1", vec!["p1".into()]).unwrap();
+    }
+
+    #[test]
+    fn update_rejects_duplicate_name_excluding_self() {
+        // TS validateGroupNameOrExit(name, currentGroupName)：排除自身后重名拒绝
+        let (_d, mut m) = mgr_with_profiles();
+        let g1 = crate::groups::create(&mut m, "ga", vec!["p1".into()]).unwrap();
+        crate::groups::create(&mut m, "gb", vec!["p2".into()]).unwrap();
+        // 改名为其他组名 → 拒绝
+        let err = crate::groups::update(&mut m, &g1.id, Some("gb"), None).unwrap_err();
+        match err {
+            crate::CoreError::Validation(msg) => {
+                assert_eq!(msg, "Group \"gb\" already exists");
+            }
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        assert_eq!(m.config().groups[&g1.id].name, "ga"); // 未落盘
+                                                          // 改名为自身（含 trim 后相同）→ 放行
+        crate::groups::update(&mut m, &g1.id, Some("ga"), None).unwrap();
+        crate::groups::update(&mut m, &g1.id, Some(" ga "), None).unwrap();
+    }
+
+    #[test]
     fn set_default_is_exclusive() {
         let (_d, mut m) = mgr_with_profiles();
-        let g1 = crate::groups::create(&mut m, "a", vec!["p1".into()]).unwrap();
-        let g2 = crate::groups::create(&mut m, "b", vec!["p2".into()]).unwrap();
+        let g1 = crate::groups::create(&mut m, "ga", vec!["p1".into()]).unwrap();
+        let g2 = crate::groups::create(&mut m, "gb", vec!["p2".into()]).unwrap();
         crate::groups::set_default(&mut m, &g1.id).unwrap();
         // 哨兵值：若第二次 set_default 误刷新非目标 group 的 updated_at，哨兵会被覆盖
         m.config_mut_for_test()
@@ -327,8 +413,8 @@ mod tests {
     #[test]
     fn delete_active_group_falls_back() {
         let (_d, mut m) = mgr_with_profiles();
-        let g1 = crate::groups::create(&mut m, "a", vec!["p1".into()]).unwrap();
-        let g2 = crate::groups::create(&mut m, "b", vec!["p2".into()]).unwrap();
+        let g1 = crate::groups::create(&mut m, "ga", vec!["p1".into()]).unwrap();
+        let g2 = crate::groups::create(&mut m, "gb", vec!["p2".into()]).unwrap();
         assert_eq!(m.config().active_group.as_deref(), Some(g1.id.as_str()));
         crate::groups::delete(&mut m, &g1.id).unwrap();
         assert!(m.config().active_group.is_some()); // 回退到剩余第一个

@@ -95,8 +95,8 @@ echo ""
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-# Test scenario list (all 18; the 4 model/provider scenarios were missing in the TS era)
-# 顺序说明：前 14 个依赖逐步累积的配置状态；4 个补充场景自带状态
+# Test scenario list (all 19; the 4 model/provider scenarios were missing in the TS era)
+# 顺序说明：前 14 个依赖逐步累积的配置状态；5 个补充场景自带状态
 # （test-claude-models 会清空 swixter config 重建），放在最后执行。
 SCENARIOS=(
     "test-install-detection.sh"
@@ -117,6 +117,7 @@ SCENARIOS=(
     "test-codex-models.sh"
     "test-qwen-models.sh"
     "test-providers.sh"
+    "test-version.sh"
 )
 
 for scenario in "${SCENARIOS[@]}"; do

@@ -69,4 +69,36 @@ fi
 
 echo "✓ Test 2 passed"
 
+# Test 3: delete 接受 --force（TS 兼容：旧脚本会传该 flag，解析但行为不变）
+echo "Test 3: Delete with --force flag..."
+$CLI_CMD claude create \
+  --quiet \
+  --name test-force-delete \
+  --provider anthropic \
+  --api-key sk-ant-force-xxx >/dev/null
+
+if ! $CLI_CMD claude delete test-force-delete --force 2>&1; then
+    echo "❌ Error: delete should accept --force flag"
+    exit 1
+fi
+
+if jq -e '.profiles["test-force-delete"]' "$CONFIG_FILE" > /dev/null; then
+    echo "❌ Error: test-force-delete should be deleted"
+    exit 1
+fi
+
+# -f 短形式同样接受
+$CLI_CMD claude create \
+  --quiet \
+  --name test-force-delete \
+  --provider anthropic \
+  --api-key sk-ant-force-xxx >/dev/null
+
+if ! $CLI_CMD claude delete test-force-delete -f 2>&1; then
+    echo "❌ Error: delete should accept -f flag"
+    exit 1
+fi
+
+echo "✓ Test 3 passed"
+
 echo "✅ All delete configuration tests passed"

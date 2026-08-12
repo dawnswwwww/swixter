@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -15,9 +16,11 @@ pub fn now_iso() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ConfigFile {
-    pub profiles: HashMap<String, Profile>,
-    pub coders: HashMap<String, CoderConfig>,
-    pub groups: HashMap<String, Group>,
+    // IndexMap 保插入序（对齐 TS JSON 对象序）：否则 config 每次保存键序随机、
+    // REST 列表每请求乱序、CLI list 每进程乱序
+    pub profiles: IndexMap<String, Profile>,
+    pub coders: IndexMap<String, CoderConfig>,
+    pub groups: IndexMap<String, Group>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_group: Option<String>,
     pub version: String,
@@ -59,6 +62,10 @@ pub struct Profile {
     pub api_format: Option<ApiFormat>,
     pub created_at: String,
     pub updated_at: String,
+    /// 未知字段原样保留（TS 对象展开天然保留）：REST 更新、export/import、
+    /// sync push 的 roundtrip 不得剥掉用户手加或未来版本新增的字段
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -166,6 +173,9 @@ pub struct ProviderPreset {
     pub env_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_families: Option<Vec<ModelFamily>>,
+    /// 同 Profile：未知字段 roundtrip 保留（用户自定义 provider 经 REST/sync 不丢字段）
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

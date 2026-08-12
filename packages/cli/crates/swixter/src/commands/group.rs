@@ -10,7 +10,11 @@ pub fn dispatch(args: GroupArgs) -> i32 {
             EXIT_INVALID_ARG
         }
         Some(GroupCommand::List) => list(),
-        Some(GroupCommand::Create { name, profiles }) => create(name, profiles),
+        Some(GroupCommand::Create {
+            name,
+            name_flag,
+            profiles,
+        }) => create(name.or(name_flag), profiles),
         Some(GroupCommand::Edit {
             name,
             new_name,
@@ -118,14 +122,16 @@ fn delete(name: &str, force: bool) -> i32 {
         }
     };
     if !force {
-        let ok = dialoguer::Confirm::with_theme(&crate::theme::swixter_theme())
+        let confirm = dialoguer::Confirm::with_theme(&crate::theme::swixter_theme())
             .with_prompt(format!("Delete group \"{name}\"?"))
             .default(false)
-            .interact()
-            .unwrap_or(false);
-        if !ok {
-            // TS: 确认框 cancel → exit 130
-            return EXIT_CANCELLED;
+            .interact();
+        match delete_confirm_action(confirm) {
+            DeleteConfirm::Delete => {}
+            // TS: 选 No → 静默 exit 0（不删除）
+            DeleteConfirm::Declined => return EXIT_SUCCESS,
+            // TS: Esc/Ctrl+C（含非 TTY 无法交互）→ exit 130
+            DeleteConfirm::Cancelled => return EXIT_CANCELLED,
         }
     }
     match groups::delete(&mut mgr, &group.id) {
@@ -137,6 +143,23 @@ fn delete(name: &str, force: bool) -> i32 {
             eprintln!("✗ {e}");
             EXIT_GENERAL
         }
+    }
+}
+
+/// TS cmdDelete 确认框三态（纯函数便于单测）：
+/// Yes → 删除；No → 静默 exit 0；取消（Esc/Ctrl+C/非 TTY）→ exit 130
+#[derive(Debug, PartialEq, Eq)]
+enum DeleteConfirm {
+    Delete,
+    Declined,
+    Cancelled,
+}
+
+fn delete_confirm_action(r: Result<bool, dialoguer::Error>) -> DeleteConfirm {
+    match r {
+        Ok(true) => DeleteConfirm::Delete,
+        Ok(false) => DeleteConfirm::Declined,
+        Err(_) => DeleteConfirm::Cancelled,
     }
 }
 
@@ -174,5 +197,21 @@ fn show(name: &str) -> i32 {
             eprintln!("✗ Group \"{name}\" not found");
             EXIT_NOT_FOUND
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delete_confirm_three_way() {
+        // Yes → 删除
+        assert_eq!(delete_confirm_action(Ok(true)), DeleteConfirm::Delete);
+        // No → 静默 exit 0（TS 对齐：此前被错当成 cancel 返回 130）
+        assert_eq!(delete_confirm_action(Ok(false)), DeleteConfirm::Declined);
+        // Esc/Ctrl+C/非 TTY → exit 130
+        let err = dialoguer::Error::IO(std::io::Error::other("not a terminal"));
+        assert_eq!(delete_confirm_action(Err(err)), DeleteConfirm::Cancelled);
     }
 }

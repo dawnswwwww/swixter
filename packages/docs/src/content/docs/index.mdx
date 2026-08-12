@@ -21,7 +21,11 @@ Swixter provides a unified way to create, switch between, and apply configuratio
 ## Quick Start
 
 ```bash
-npm install -g swixter
+# Install — pick one channel:
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh  # Shell (macOS / Linux)
+brew install dawnswwwww/tap/swixter   # Homebrew
+npm install -g swixter                # npm
+
 swixter claude create my-profile
 swixter claude switch my-profile
 swixter claude apply

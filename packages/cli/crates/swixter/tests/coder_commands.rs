@@ -284,3 +284,34 @@ fn delete_profile_referenced_by_group_fails_without_adapter_cleanup() {
     let cleaned = std::fs::read_to_string(&codex_config).unwrap();
     assert!(!cleaned.contains("swixter-gp1"));
 }
+
+#[test]
+fn delete_accepts_force_flag() {
+    // TS 兼容：--force/-f 被接受（解析但行为不变）
+    let dir = tempfile::tempdir().unwrap();
+    for (n, flag) in [("f1", "--force"), ("f2", "-f")] {
+        swixter(&dir)
+            .args([
+                "claude",
+                "create",
+                "--quiet",
+                "--name",
+                n,
+                "--provider",
+                "anthropic",
+                "--api-key",
+                "sk-x",
+            ])
+            .assert()
+            .success();
+        swixter(&dir)
+            .args(["claude", "delete", n, flag])
+            .assert()
+            .success();
+        swixter(&dir)
+            .args(["claude", "list"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(n).not());
+    }
+}

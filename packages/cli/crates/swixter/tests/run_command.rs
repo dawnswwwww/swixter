@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use predicates::prelude::*;
 
 #[cfg(unix)]
 fn fake_cli(dir: &tempfile::TempDir, name: &str) {
@@ -174,4 +175,99 @@ fn qwen_run_base_url_falls_back_to_preset_base_url_chat() {
 fn run_without_profile_exits_3() {
     let dir = tempfile::tempdir().unwrap();
     setup(&dir).args(["claude", "run"]).assert().code(3);
+}
+
+#[test]
+#[cfg(unix)]
+fn claude_run_extracts_trailing_yolo() {
+    // --yolo 在透传参数之后也被提取（TS parseFlags 全局提取），不透传给 claude
+    let dir = tempfile::tempdir().unwrap();
+    fake_cli(&dir, "claude");
+    setup(&dir)
+        .args([
+            "claude",
+            "create",
+            "--quiet",
+            "--name",
+            "ry1",
+            "--provider",
+            "anthropic",
+            "--api-key",
+            "sk-ant-yolo",
+        ])
+        .assert()
+        .success();
+    setup(&dir)
+        .args(["claude", "run", "chat", "--yolo"])
+        .assert()
+        .success();
+    let args = std::fs::read_to_string(dir.path().join("out.args")).unwrap();
+    assert!(args.contains("--dangerously-skip-permissions"));
+    assert!(args.contains("chat"));
+    assert!(
+        !args.contains("--yolo"),
+        "--yolo must not reach claude: {args}"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn qwen_run_extracts_trailing_profile_both_forms() {
+    // --profile 在透传参数之后也被提取：用指定 profile 注入，且不透传 --profile
+    let dir = tempfile::tempdir().unwrap();
+    fake_cli(&dir, "qwen");
+    for (n, m) in [("qp1", "model-one"), ("qp2", "model-two")] {
+        setup(&dir)
+            .args([
+                "qwen",
+                "create",
+                "--quiet",
+                "--name",
+                n,
+                "--provider",
+                "ollama",
+                "--model",
+                m,
+            ])
+            .assert()
+            .success();
+    }
+    // 空格形式：激活的是 qp1，指定 qp2 → 注入 qp2 的 model
+    setup(&dir)
+        .args(["qwen", "run", "chat", "--profile", "qp2"])
+        .assert()
+        .success();
+    let args = std::fs::read_to_string(dir.path().join("out.args")).unwrap();
+    assert!(args.contains("--model model-two"), "args: {args}");
+    assert!(
+        !args.contains("--profile"),
+        "--profile must be stripped: {args}"
+    );
+    // 等号形式
+    setup(&dir)
+        .args(["qwen", "run", "chat", "--profile=qp2"])
+        .assert()
+        .success();
+    let args = std::fs::read_to_string(dir.path().join("out.args")).unwrap();
+    assert!(args.contains("--model model-two"), "args: {args}");
+    assert!(
+        !args.contains("--profile"),
+        "--profile=... must be stripped: {args}"
+    );
+}
+
+#[test]
+fn run_unknown_profile_reports_not_found() {
+    // --profile 指向不存在 profile：明确 "not found" 文案（两种位置都要）
+    let dir = tempfile::tempdir().unwrap();
+    setup(&dir)
+        .args(["claude", "run", "--profile", "ghost"])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("Profile \"ghost\" not found"));
+    setup(&dir)
+        .args(["claude", "run", "chat", "--profile", "ghost"])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("Profile \"ghost\" not found"));
 }

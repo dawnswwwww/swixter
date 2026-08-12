@@ -12,9 +12,10 @@ cleanup() {
     $CLI_CMD group delete test-group-2-renamed --force 2>/dev/null || true
     $CLI_CMD group delete test-group-duplicate --force 2>/dev/null || true
     $CLI_CMD group delete test-group-unknown --force 2>/dev/null || true
-    # Rust delete 无 --force 标志（无交互确认，直接删除）
-    $CLI_CMD claude delete test-group-profile-a 2>/dev/null || true
-    $CLI_CMD claude delete test-group-profile-b 2>/dev/null || true
+    $CLI_CMD group delete test-group-name-flag --force 2>/dev/null || true
+    $CLI_CMD group delete test-group-no --force 2>/dev/null || true
+    $CLI_CMD claude delete test-group-profile-a --force 2>/dev/null || true
+    $CLI_CMD claude delete test-group-profile-b --force 2>/dev/null || true
 }
 
 trap cleanup EXIT
@@ -259,6 +260,59 @@ if ! echo "$STATUS_OUTPUT" | grep -q "No proxy instances running"; then
     exit 1
 fi
 
+# 裸 `swixter proxy` 等同于 proxy status（TS 行为），exit 0
+if ! BARE_OUTPUT=$($CLI_CMD proxy 2>&1); then
+    echo "❌ Error: bare 'swixter proxy' should exit 0"
+    exit 1
+fi
+if ! echo "$BARE_OUTPUT" | grep -q "No proxy instances running"; then
+    echo "❌ Error: bare 'swixter proxy' should show status"
+    echo "$BARE_OUTPUT"
+    exit 1
+fi
+
 echo "✓ Test 12 passed"
+
+# Test 13: group create 支持 --name flag（TS 兼容）
+echo "Test 13: Create group with --name flag..."
+$CLI_CMD group create --name test-group-name-flag --profiles test-group-profile-a
+
+if ! jq -e '.groups[] | select(.name == "test-group-name-flag")' "$CONFIG_FILE" > /dev/null; then
+    echo "❌ Error: Group test-group-name-flag was not created via --name"
+    exit 1
+fi
+
+# 位置参数与 --name 同时给 → 冲突报错（exit 2）
+if $CLI_CMD group create test-group-conflict --name test-group-name-flag --profiles test-group-profile-a 2>/dev/null; then
+    echo "❌ Error: positional name + --name should conflict"
+    $CLI_CMD group delete test-group-conflict --force 2>/dev/null || true
+    exit 1
+fi
+
+echo "✓ Test 13 passed"
+
+# Test 14: group delete 确认框回答 No → 静默 exit 0 且 group 保留（TS 行为）
+echo "Test 14: Group delete answering No exits 0..."
+$CLI_CMD group create test-group-no --profiles test-group-profile-a >/dev/null 2>&1
+
+if command -v script >/dev/null 2>&1 && script --version 2>&1 | grep -qi "util-linux"; then
+    # dialoguer 需要 TTY：util-linux script 分配 pty，回车取默认值 No
+    printf '\n' | script -qec "$CLI_CMD group delete test-group-no" /dev/null >/dev/null 2>&1
+    RC=$?
+    if [ "$RC" != "0" ]; then
+        echo "❌ Error: answering No should exit 0, got $RC"
+        exit 1
+    fi
+    if ! jq -e '.groups[] | select(.name == "test-group-no")' "$CONFIG_FILE" > /dev/null; then
+        echo "❌ Error: group should still exist after answering No"
+        exit 1
+    fi
+    echo "✓ Test 14 passed"
+else
+    # 无 util-linux script（如 macOS 本地跑）则跳过 pty 交互验证；
+    # 三分支判定由 Rust 单元测试 delete_confirm_three_way 覆盖
+    echo "⚠ Test 14 skipped: util-linux script(1) not available for pty"
+    $CLI_CMD group delete test-group-no --force 2>/dev/null || true
+fi
 
 echo "✅ All group management tests passed"

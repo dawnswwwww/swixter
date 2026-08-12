@@ -30,11 +30,15 @@ pub struct ExportFileInfo {
 }
 
 /// TS: API_KEY_FORMAT sanitizeLength=8, prefixLength=4, suffixLength=4
+/// 按字符数切片（对齐 TS slice(0,4)/slice(-4) 语义）——按字节切非 ASCII key 会 panic
 pub fn sanitize_api_key(key: &str) -> String {
-    if key.len() <= 8 {
+    let chars: Vec<char> = key.chars().collect();
+    if chars.len() <= 8 {
         return "***".into();
     }
-    format!("{}***{}", &key[..4], &key[key.len() - 4..])
+    let head: String = chars[..4].iter().collect();
+    let tail: String = chars[chars.len() - 4..].iter().collect();
+    format!("{head}***{tail}")
 }
 
 pub fn export_config(
@@ -99,6 +103,14 @@ pub fn import_config(
     };
     let now = now_iso();
     for profile in data.profiles {
+        // TS export.ts importConfig —— 逐条 try/catch：失败项收集进 errors（含原因），
+        // 不中断整体导入；消息格式对齐 TS `Failed to import "<name>": <error>`
+        if let Err(e) = crate::validate::validate_profile(&profile) {
+            stats
+                .errors
+                .push(format!("Failed to import \"{}\": {e}", profile.name));
+            continue;
+        }
         let existing = mgr.config().profiles.get(&profile.name);
         if existing.is_some() && !overwrite {
             stats.skipped += 1;
@@ -155,6 +167,44 @@ mod tests {
     }
 
     #[test]
+    fn sanitize_non_ascii_key_no_panic() {
+        // 非 ASCII key 按字符切片（TS slice(0,4)/slice(-4) 语义），不得按字节 panic
+        assert_eq!(sanitize_api_key("sk-中文密钥测试-key-abcd"), "sk-中***abcd");
+        assert_eq!(sanitize_api_key("中文密钥测试12345"), "中文密钥***2345");
+        assert_eq!(sanitize_api_key("中文密钥"), "***"); // 4 字符 ≤ 8
+    }
+
+    #[test]
+    fn import_collects_per_profile_errors() {
+        // 逐条校验：非法 profile 进 errors（含名称与原因），合法 profile 照常导入
+        let dir = tempfile::tempdir().unwrap();
+        let mut mgr = ConfigManager::load_from(dir.path().join("config.json"));
+        let out = dir.path().join("export.json");
+        let mut bad = profile("bad", "k-123456789");
+        bad.base_url = Some("not a url".into());
+        std::fs::write(
+            &out,
+            serde_json::json!({
+                "profiles": [
+                    serde_json::to_value(profile("good", "k-000000000")).unwrap(),
+                    serde_json::to_value(bad).unwrap(),
+                ],
+                "exportedAt": "2025-01-01T00:00:00.000Z",
+                "version": "1.0.0"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let stats = import_config(&mut mgr, &out, false, true).unwrap();
+        assert_eq!(stats.imported, 1);
+        assert_eq!(stats.errors.len(), 1);
+        assert!(stats.errors[0].starts_with("Failed to import \"bad\":"));
+        assert!(stats.errors[0].contains("invalid profile baseURL"));
+        assert!(mgr.get_profile("good").is_some());
+        assert!(mgr.get_profile("bad").is_none());
+    }
+
+    #[test]
     fn export_sanitized_roundtrip_and_skip() {
         let dir = tempfile::tempdir().unwrap();
         let mut mgr = ConfigManager::load_from(dir.path().join("config.json"));
@@ -192,6 +242,34 @@ mod tests {
         assert_eq!(stats.imported, 1);
         assert_eq!(mgr.get_profile("p1").unwrap().api_key, "sk-1234567890abcd");
         assert!(!validate_export_file(&out).unwrap().sanitized);
+    }
+
+    #[test]
+    fn export_import_roundtrip_preserves_extra_fields() {
+        // 未知字段随 profile 一并导出/导入（flatten extra）；
+        // apiKey 是已知字段仍正常走 sanitize，extra 无法绕过脱敏
+        let dir = tempfile::tempdir().unwrap();
+        let mut mgr = ConfigManager::load_from(dir.path().join("config.json"));
+        let mut p = profile("p1", "sk-1234567890abcd");
+        p.extra
+            .insert("customField".into(), serde_json::json!({"x": 1}));
+        mgr.upsert_profile(p, None).unwrap();
+        let out = dir.path().join("export.json");
+        export_config(mgr.config(), &out, true, None).unwrap();
+        let raw: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
+        assert_eq!(
+            raw["profiles"][0]["customField"],
+            serde_json::json!({"x": 1})
+        );
+        assert_eq!(raw["profiles"][0]["apiKey"], "sk-1***abcd");
+        let mut mgr2 = ConfigManager::load_from(dir.path().join("config2.json"));
+        let stats = import_config(&mut mgr2, &out, false, false).unwrap();
+        assert_eq!(stats.imported, 1);
+        assert_eq!(
+            mgr2.get_profile("p1").unwrap().extra.get("customField"),
+            Some(&serde_json::json!({"x": 1}))
+        );
     }
 
     #[test]

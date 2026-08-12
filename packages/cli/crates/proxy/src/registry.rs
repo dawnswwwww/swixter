@@ -76,12 +76,16 @@ pub fn save_registry(registry: &InstanceRegistry) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    // 原子写（与 core config 同款模式）：先写临时文件再 rename，避免半截 JSON
+    // 原子写（与 core config 同款模式）：先写临时文件再 rename，避免半截 JSON。
+    // tmp 名带 pid：两进程同毫秒并发 save 不会共用同名 tmp 互踩
     let millis = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_millis();
-    let tmp = path.with_file_name(format!(".proxy-instances.tmp-{millis}"));
+    let tmp = path.with_file_name(format!(
+        ".proxy-instances.tmp-{millis}-{}",
+        std::process::id()
+    ));
     std::fs::write(&tmp, serde_json::to_string_pretty(registry)?)?;
     std::fs::rename(&tmp, &path)?;
     Ok(())

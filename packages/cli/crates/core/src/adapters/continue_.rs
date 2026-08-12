@@ -51,6 +51,8 @@ impl ContinueAdapter {
         let mut e = Mapping::new();
         e.insert("title".into(), profile.name.clone().into());
         e.insert("provider".into(), map_provider(&profile.provider_id).into());
+        // base_url 回退链同 TS `profile.baseURL || preset?.baseURL || ""`；
+        // baseURL 空串在 load 校验阶段即被拒（URL 解析失败），`.or` 前无需 filter
         let base = profile
             .base_url
             .as_deref()
@@ -119,6 +121,7 @@ impl super::CoderAdapter for ContinueAdapter {
             let entry = models
                 .iter()
                 .find(|m| m.get("title").and_then(|t| t.as_str()) == Some(profile.name.as_str()))?;
+            // 同 build_entry：baseURL 空串不可达（load 校验拒绝），保持 `.or` 即可
             let expected_base = profile
                 .base_url
                 .as_deref()

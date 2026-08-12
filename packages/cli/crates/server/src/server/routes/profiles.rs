@@ -9,6 +9,7 @@ use axum::{
 use swixter_core::types::{now_iso, Profile, ProviderPreset};
 
 use crate::server::error::ApiError;
+use crate::server::extract::JsonBody;
 use crate::server::state::AppState;
 use crate::server::util::sanitize_profile;
 
@@ -59,7 +60,7 @@ async fn get_profile(
 
 async fn create_profile(
     State(state): State<AppState>,
-    Json(body): Json<serde_json::Value>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
     let name = body.get("name").and_then(|v| v.as_str());
     let provider_id = body.get("providerId").and_then(|v| v.as_str());
@@ -86,6 +87,7 @@ async fn create_profile(
     }
 
     // TS createProfile：未传字段回退默认值；baseURL 缺省继承 provider
+    // （TS 用 `||`，空串同样视为未提供而回退 provider 默认 baseURL）
     let now = now_iso();
     let mut v = serde_json::json!({
         "name": name,
@@ -94,6 +96,7 @@ async fn create_profile(
         "baseURL": body
             .get("baseURL")
             .and_then(|x| x.as_str())
+            .filter(|s| !s.is_empty())
             .unwrap_or(&provider.base_url),
         "createdAt": now,
         "updatedAt": now,
@@ -123,7 +126,7 @@ async fn create_profile(
 async fn update_profile(
     State(state): State<AppState>,
     Path(name): Path<String>,
-    Json(body): Json<serde_json::Value>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
     let mut mgr = state.config_manager();
     let existing = mgr.get_profile(&name).cloned().ok_or_else(|| {

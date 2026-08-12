@@ -11,6 +11,7 @@ use swixter_proxy::types::{InstanceKind, ProxyServerConfig};
 use swixter_proxy::{registry, DEFAULT_PROXY_HOST, DEFAULT_PROXY_PORT, DEFAULT_TIMEOUT_MS};
 
 use crate::server::error::ApiError;
+use crate::server::extract::JsonBody;
 use crate::server::state::AppState;
 
 const DEFAULT_LINES: usize = 200;
@@ -65,18 +66,15 @@ async fn list_instances(State(state): State<AppState>) -> impl IntoResponse {
 /// host 默认 127.0.0.1、端口 15721 起递增避开运行中实例占用
 async fn start_proxy(
     State(state): State<AppState>,
-    body: Option<Json<serde_json::Value>>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
-    let body = body.map(|Json(v)| v);
     let host = body
-        .as_ref()
-        .and_then(|b| b.get("host"))
+        .get("host")
         .and_then(|v| v.as_str())
         .unwrap_or(DEFAULT_PROXY_HOST)
         .to_string();
     let requested_port = body
-        .as_ref()
-        .and_then(|b| b.get("port"))
+        .get("port")
         .and_then(|v| v.as_u64())
         .map(|p| {
             if (1..=65535).contains(&p) {
@@ -99,7 +97,15 @@ async fn start_proxy(
                 .filter(|s| s.running)
                 .map(|s| s.port)
                 .collect();
+            // 与 find_available_port 一致：递增到 65535 仍被占用则报错，
+            // 避免 debug 下 `port += 1` 溢出 panic
             while occupied.contains(&port) {
+                if port == u16::MAX {
+                    return Err(ApiError::bad_request(
+                        "START_PROXY_FAILED",
+                        "no available port for proxy instance",
+                    ));
+                }
                 port += 1;
             }
             port
@@ -123,13 +129,11 @@ async fn start_proxy(
 }
 
 /// POST /api/proxy/stop —— body {instanceId?}（默认 "default"）
-async fn stop_proxy(body: Option<Json<serde_json::Value>>) -> Result<impl IntoResponse, ApiError> {
+async fn stop_proxy(JsonBody(body): JsonBody) -> Result<impl IntoResponse, ApiError> {
     let instance_id = body
-        .and_then(|Json(v)| {
-            v.get("instanceId")
-                .and_then(|x| x.as_str())
-                .map(String::from)
-        })
+        .get("instanceId")
+        .and_then(|x| x.as_str())
+        .map(String::from)
         .unwrap_or_else(|| "default".into());
     // TS stopProxyServer：停进程内实例；无论是否进程内都清 registry + 广播 InstanceStop
     if !swixter_proxy::server::stop_in_process_instance(&instance_id).await {

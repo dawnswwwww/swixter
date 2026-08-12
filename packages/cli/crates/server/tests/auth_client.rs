@@ -71,6 +71,47 @@ async fn get_access_token_refreshes_within_buffer() {
     assert_eq!(rec[0].body["refreshToken"], "refresh-0");
 }
 
+/// 刷新成功但 save 失败（文件只读）：仍返回新 token（不视同登出），磁盘保持旧值
+#[cfg(unix)]
+#[tokio::test]
+async fn save_failure_after_refresh_still_returns_fresh_token() {
+    use std::os::unix::fs::PermissionsExt;
+    if unsafe { libc::geteuid() } == 0 {
+        return; // root 无视文件权限，无法模拟 save 失败
+    }
+    let mock = MockCloud::start(vec![(
+        "/api/auth/refresh",
+        vec![(
+            200,
+            serde_json::json!({"accessToken":"access-2","expiresAt":"2999-01-01T00:00:00Z"}),
+        )],
+    )])
+    .await;
+    let dir = tempfile::tempdir().unwrap();
+    let auth_file = dir.path().join("auth.json");
+    let store = TokenStore::new(auth_file.clone());
+    let soon = (time::OffsetDateTime::now_utc() + time::Duration::minutes(4))
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap();
+    store.save(&auth_state(&soon)).unwrap();
+    // 文件只读 → save 时 open(O_WRONLY|O_TRUNC) 失败（EACCES）
+    let mut perm = std::fs::metadata(&auth_file).unwrap().permissions();
+    perm.set_mode(0o444);
+    std::fs::set_permissions(&auth_file, perm).unwrap();
+
+    let client = AuthClient::new(&mock.base_url);
+    assert_eq!(
+        store.get_access_token(&client).await.as_deref(),
+        Some("access-2")
+    );
+    assert_eq!(store.load().unwrap().access_token, "access-0"); // 未落盘
+
+    // 恢复可写，保证 tempdir 清理
+    let mut perm = std::fs::metadata(&auth_file).unwrap().permissions();
+    perm.set_mode(0o600);
+    std::fs::set_permissions(&auth_file, perm).unwrap();
+}
+
 #[tokio::test]
 async fn refresh_failure_clears_auth_and_returns_none() {
     let mock = MockCloud::start(vec![(
@@ -129,6 +170,20 @@ async fn login_and_magic_link_session_polling_contract() {
         client.check_magic_link_session("s1").await.unwrap().status,
         "completed"
     );
+}
+
+#[tokio::test]
+async fn magic_link_session_id_is_percent_encoded() {
+    // TS: encodeURIComponent(sessionId) —— 含 '/'/空格的 session_id 必须编码进路径段
+    let mock = MockCloud::start(vec![(
+        "/api/auth/magic-link/session/",
+        vec![(200, serde_json::json!({"status":"pending"}))],
+    )])
+    .await;
+    let client = AuthClient::new(&mock.base_url);
+    client.check_magic_link_session("ab/c d?e").await.unwrap();
+    let rec = mock.recorded.lock().unwrap();
+    assert_eq!(rec[0].path, "/api/auth/magic-link/session/ab%2Fc%20d%3Fe");
 }
 
 #[tokio::test]

@@ -246,3 +246,25 @@ fn proxy_run_injects_coder_env() {
         .success()
         .stdout(predicate::str::contains("No proxy instances running"));
 }
+
+#[test]
+fn bare_proxy_shows_status() {
+    // TS: 裸 `swixter proxy` 显示 status 并 exit 0
+    let dir = tempfile::tempdir().unwrap();
+    setup(&dir)
+        .args(["proxy"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No proxy instances running"));
+}
+
+#[test]
+fn proxy_run_extracts_profile_from_coder_args() {
+    // coder 参数里的 --profile 被提取并参与校验：不存在 → exit 3 + 明确文案
+    let dir = tempfile::tempdir().unwrap();
+    setup(&dir)
+        .args(["proxy", "run", "--", "true", "--profile", "ghost"])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("Profile \"ghost\" not found"));
+}

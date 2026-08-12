@@ -10,8 +10,7 @@ PROXY_PORT=18731
 cleanup() {
     $CLI_CMD proxy stop >/dev/null 2>&1 || true
     $CLI_CMD group delete test-proxy-group --force 2>/dev/null || true
-    # Rust delete 无 --force 标志（无交互确认，直接删除）
-    $CLI_CMD claude delete test-proxy-profile 2>/dev/null || true
+    $CLI_CMD claude delete test-proxy-profile --force 2>/dev/null || true
 }
 
 trap cleanup EXIT

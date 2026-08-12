@@ -570,3 +570,220 @@ async fn group_all_skipped_returns_503() {
     assert_eq!(v["error"], "All providers failed");
     assert_eq!(anthropic_upstream.recorded.lock().unwrap().len(), 0);
 }
+
+// ---------------------------------------------------------------------------
+// gzip 上游 + 透传回退（accept-encoding 修复 & JSON 解析失败透传修复）
+// ---------------------------------------------------------------------------
+
+fn gzip_bytes(data: &[u8]) -> Vec<u8> {
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+    let mut enc = GzEncoder::new(Vec::new(), Compression::default());
+    enc.write_all(data).unwrap();
+    enc.finish().unwrap()
+}
+
+/// 上游回 gzip（content-encoding: gzip）的非流式响应：reqwest 自动解压 →
+/// 客户端拿到明文 body 且响应不带 content-encoding（dispatch 剔除）；
+/// 客户端的 accept-encoding 不原样转发（reqwest 只声明自己能解压的编码）
+#[tokio::test]
+async fn gzip_upstream_non_streaming_end_to_end() {
+    let dir = tempfile::tempdir().unwrap();
+    let _reg = RegistryPathOverride::set(dir.path().join("proxy-instances.json"));
+    let _log = LogPathOverride::set(dir.path().to_path_buf());
+    let plain = r#"{"ok":true,"n":1}"#;
+    let gz = gzip_bytes(plain.as_bytes());
+    let mock = MockUpstream::start_with_headers(move || {
+        (
+            axum::http::StatusCode::OK,
+            "application/json".into(),
+            vec![("content-encoding".to_string(), "gzip".to_string())],
+            axum::body::Body::from(gz.clone()),
+        )
+    })
+    .await;
+    let cfg = write_config(
+        dir.path(),
+        serde_json::json!({
+            "version":"2.0.0","coders":{},"groups":{},
+            "profiles":{"p1":profile_json("p1", &mock.base_url)}
+        }),
+    );
+    let mut config = handler_config(cfg, None, Some("p1"));
+    config.instance_id = "srv-gzip".into();
+    let status = swixter_proxy::server::start_proxy_server(config)
+        .await
+        .unwrap();
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!(
+            "http://127.0.0.1:{}/v1/chat/completions",
+            status.port
+        ))
+        .header("authorization", "Bearer swixter-local-proxy")
+        .header("content-type", "application/json")
+        // 模拟 Claude Code 客户端的 accept-encoding
+        .header("accept-encoding", "gzip, deflate, br")
+        .body(r#"{"model":"m"}"#)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert!(
+        resp.headers().get("content-encoding").is_none(),
+        "content-encoding 必须剔除，否则客户端对明文再 gunzip: {:?}",
+        resp.headers()
+    );
+    let body = resp.text().await.unwrap();
+    assert_eq!(body, plain, "gzip body 应被透明解压");
+
+    // 客户端的 accept-encoding 未原样到达上游（deflate 不在 reqwest 解压能力内，不应声明）
+    {
+        let rec = mock.recorded.lock().unwrap();
+        assert_eq!(rec.len(), 1);
+        let ae = rec[0]
+            .headers
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("accept-encoding"))
+            .map(|(_, v)| v.as_str());
+        assert!(
+            !ae.unwrap_or("").contains("deflate"),
+            "客户端 accept-encoding 不应原样转发，实际: {ae:?}"
+        );
+    }
+
+    assert!(swixter_proxy::server::stop_in_process_instance("srv-gzip").await);
+}
+
+/// gzip 压缩的 SSE 流：解压后的字节流入 SseChunker，事件正常转换流出
+#[tokio::test]
+async fn gzip_upstream_streaming_sse_flows() {
+    let dir = tempfile::tempdir().unwrap();
+    let _reg = RegistryPathOverride::set(dir.path().join("proxy-instances.json"));
+    let _log = LogPathOverride::set(dir.path().to_path_buf());
+    let sse = include_str!("fixtures/sse_openai_text.upstream.sse").to_string();
+    let gz = gzip_bytes(sse.as_bytes());
+    let mock = MockUpstream::start_with_headers(move || {
+        (
+            axum::http::StatusCode::OK,
+            "text/event-stream".into(),
+            vec![("content-encoding".to_string(), "gzip".to_string())],
+            axum::body::Body::from(gz.clone()),
+        )
+    })
+    .await;
+    let cfg = write_config(
+        dir.path(),
+        serde_json::json!({
+            "version":"2.0.0","coders":{},"groups":{},
+            "profiles":{"p1":profile_json("p1", &mock.base_url)}
+        }),
+    );
+    let mut config = handler_config(cfg, None, Some("p1"));
+    config.instance_id = "srv-gzip-sse".into();
+    let status = swixter_proxy::server::start_proxy_server(config)
+        .await
+        .unwrap();
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("http://127.0.0.1:{}/v1/messages", status.port))
+        .header("authorization", "Bearer swixter-local-proxy")
+        .header("content-type", "application/json")
+        .header("accept-encoding", "gzip, deflate, br")
+        .body(r#"{"model":"m","stream":true,"messages":[{"role":"user","content":"hi"}],"max_tokens":16}"#)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert!(resp.headers().get("content-encoding").is_none());
+    let text = resp.text().await.unwrap();
+    assert!(
+        text.contains("event: message_start"),
+        "missing message_start: {text}"
+    );
+    assert!(
+        text.contains("event: message_stop"),
+        "missing message_stop: {text}"
+    );
+
+    assert!(swixter_proxy::server::stop_in_process_instance("srv-gzip-sse").await);
+}
+
+/// 请求体 JSON 解析失败（需 transform 的场景）：对齐 TS catch —— 不做 transform，
+/// 原 body + 原 endpoint 逐字节透传
+#[tokio::test]
+async fn bad_json_request_passthrough_to_original_endpoint() {
+    let dir = tempfile::tempdir().unwrap();
+    let _log = LogPathOverride::set(dir.path().to_path_buf());
+    let mock = MockUpstream::start(|| {
+        (
+            axum::http::StatusCode::OK,
+            "application/json".into(),
+            axum::body::Body::from(r#"{"ok":true}"#),
+        )
+    })
+    .await;
+    let cfg = write_config(
+        dir.path(),
+        serde_json::json!({
+            "version":"2.0.0","coders":{},"groups":{},
+            "profiles":{"p1":profile_json("p1", &mock.base_url)}
+        }),
+    );
+    let h = ProxyHandler::new(&handler_config(cfg, None, Some("p1")));
+    // /v1/messages → custom（chat 上游）需 transform，但 body 是坏 JSON → 原样透传
+    let resp = h
+        .handle(
+            "POST",
+            "/v1/messages",
+            &bearer(),
+            &Bytes::from("<not json>"),
+        )
+        .await;
+    assert_eq!(resp.status, 200);
+    assert_eq!(body_bytes(resp.body).await.as_ref(), br#"{"ok":true}"#);
+    let rec = mock.recorded.lock().unwrap();
+    assert_eq!(rec.len(), 1);
+    assert_eq!(rec[0].path, "/v1/messages", "应保持原 endpoint 不做改写");
+    assert_eq!(rec[0].body, b"<not json>", "原 body 应逐字节透传");
+}
+
+/// 上游 2xx 但 body 非 JSON（如网关 HTML 错误页）：逐字节回传原始 body，不替换成 {}
+#[tokio::test]
+async fn non_json_upstream_response_returned_raw() {
+    let dir = tempfile::tempdir().unwrap();
+    let _log = LogPathOverride::set(dir.path().to_path_buf());
+    let html = "<html><body>Bad Gateway from gateway</body></html>";
+    let mock = MockUpstream::start(move || {
+        (
+            axum::http::StatusCode::OK,
+            "text/html".into(),
+            axum::body::Body::from(html.to_string()),
+        )
+    })
+    .await;
+    let cfg = write_config(
+        dir.path(),
+        serde_json::json!({
+            "version":"2.0.0","coders":{},"groups":{},
+            "profiles":{"p1":profile_json("p1", &mock.base_url)}
+        }),
+    );
+    let h = ProxyHandler::new(&handler_config(cfg, None, Some("p1")));
+    // 合法请求 → transform 成功 ctx=Some（非流式）；上游回 HTML → 原样返回
+    let resp = h
+        .handle(
+            "POST",
+            "/v1/messages",
+            &bearer(),
+            &Bytes::from(
+                r#"{"model":"m","messages":[{"role":"user","content":"hi"}],"max_tokens":16}"#,
+            ),
+        )
+        .await;
+    assert_eq!(resp.status, 200);
+    assert_eq!(body_bytes(resp.body).await.as_ref(), html.as_bytes());
+}

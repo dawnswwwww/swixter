@@ -26,7 +26,15 @@ pub struct ForwardResponse {
     pub body: ForwardBody,
 }
 
-const STRIP_HEADERS: [&str; 4] = ["authorization", "x-api-key", "content-length", "host"];
+// accept-encoding 一并剔除：规范上游回 identity（reqwest 虽启用了 gzip/brotli 自动解压，
+// 但那是防御仍回 gzip 的上游；首选还是不让上游压缩，避免压缩字节流入 SseChunker）
+const STRIP_HEADERS: [&str; 5] = [
+    "authorization",
+    "x-api-key",
+    "content-length",
+    "host",
+    "accept-encoding",
+];
 
 /// TS: baseURL = (profile.baseURL || preset.baseURL).replace(/\/+$/,"")；
 /// base 以 /v1 结尾且 path 以 /v1/ 开头 → path 去掉前 3 字符

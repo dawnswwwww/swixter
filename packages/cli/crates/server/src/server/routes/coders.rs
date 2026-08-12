@@ -9,6 +9,7 @@ use swixter_core::coder::{get_coder, CODERS};
 use swixter_core::types::WireApi;
 
 use crate::server::error::ApiError;
+use crate::server::extract::JsonBody;
 use crate::server::state::AppState;
 use crate::server::util::sanitize_profile;
 
@@ -68,7 +69,7 @@ async fn get_active_profile(
 async fn set_active_profile(
     State(state): State<AppState>,
     Path(coder): Path<String>,
-    Json(body): Json<serde_json::Value>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
     let spec = require_coder(&coder)?;
     let profile_name = body

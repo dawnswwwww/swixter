@@ -728,3 +728,156 @@ async fn static_spa_fallback_and_mime() {
     let resp = http.get(format!("{base}/api/nope")).send().await.unwrap();
     assert_eq!(resp.status(), 404);
 }
+
+// ---- 评审修复追加：baseURL 空串回退 / isDefault:false / 畸形 JSON 信封 ----
+
+#[tokio::test]
+async fn create_profile_blank_base_url_falls_back_to_provider() {
+    // TS createProfile `body.baseURL || provider.baseURL`：空串视为未提供
+    let dir = tempfile::tempdir().unwrap();
+    write_config(dir.path(), serde_json::json!({}), serde_json::json!({}));
+    let base = spawn_server(dir.path()).await;
+    let http = reqwest::Client::new();
+
+    let resp = http
+        .post(format!("{base}/api/profiles"))
+        .json(&serde_json::json!({"name": "blank", "providerId": "ollama", "baseURL": ""}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 201);
+    let created: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(created["baseURL"], "http://localhost:11434"); // ollama 默认
+
+    // 落盘值同样回退（非空串）
+    let cfg: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("config.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        cfg["profiles"]["blank"]["baseURL"],
+        "http://localhost:11434"
+    );
+}
+
+#[tokio::test]
+async fn groups_update_is_default_false_clears_default() {
+    // TS updateGroup：显式 isDefault:false 仅取消本组默认，不动 activeGroup
+    let dir = tempfile::tempdir().unwrap();
+    write_config(
+        dir.path(),
+        serde_json::json!({"p1": profile_json("p1", "ollama", "k-123456789")}),
+        serde_json::json!({}),
+    );
+    let base = spawn_server(dir.path()).await;
+    let http = reqwest::Client::new();
+
+    // g1 创建即默认；g2 非默认
+    let resp = http
+        .post(format!("{base}/api/groups"))
+        .json(&serde_json::json!({"name": "g1", "profiles": ["p1"], "isDefault": true}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 201);
+    let g1: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(g1["isDefault"], true);
+    let g1id = g1["id"].as_str().unwrap().to_string();
+    let resp = http
+        .post(format!("{base}/api/groups"))
+        .json(&serde_json::json!({"name": "g2", "profiles": ["p1"]}))
+        .send()
+        .await
+        .unwrap();
+    let g2: serde_json::Value = resp.json().await.unwrap();
+    let g2id = g2["id"].as_str().unwrap().to_string();
+
+    // 显式 isDefault:false → 取消 g1 默认；g2 不受影响；activeGroup 不变
+    let resp = http
+        .put(format!("{base}/api/groups/{g1id}"))
+        .json(&serde_json::json!({"isDefault": false}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let updated: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(updated["isDefault"], false);
+    let cfg: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("config.json")).unwrap())
+            .unwrap();
+    assert_eq!(cfg["groups"][&g1id]["isDefault"], false);
+    assert_eq!(cfg["groups"][&g2id]["isDefault"], false);
+    assert_eq!(cfg["activeGroup"], g1id); // 取消默认不动 activeGroup
+
+    // isDefault:true 互斥语义不回归：g2 设默认后 g1 非默认
+    let resp = http
+        .put(format!("{base}/api/groups/{g2id}"))
+        .json(&serde_json::json!({"isDefault": true}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let cfg: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("config.json")).unwrap())
+            .unwrap();
+    assert_eq!(cfg["groups"][&g2id]["isDefault"], true);
+    assert_eq!(cfg["groups"][&g1id]["isDefault"], false);
+}
+
+#[tokio::test]
+async fn malformed_json_returns_ts_error_envelope() {
+    // TS jsonBodyMiddleware 解析失败 → router finalize → sendError(Error, 500)
+    let dir = tempfile::tempdir().unwrap();
+    write_config(dir.path(), serde_json::json!({}), serde_json::json!({}));
+    let base = spawn_server(dir.path()).await;
+    let http = reqwest::Client::new();
+
+    let resp = http
+        .post(format!("{base}/api/profiles"))
+        .header("content-type", "application/json")
+        .body("{not json")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 500);
+    let err: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(err["error"]["code"], "UNKNOWN_ERROR");
+    assert_eq!(err["error"]["message"], "Invalid JSON body");
+}
+
+#[tokio::test]
+async fn non_json_content_type_is_treated_as_absent_body() {
+    // TS jsonBodyMiddleware：非 application/json 不解析 body，由 handler 判缺参
+    let dir = tempfile::tempdir().unwrap();
+    write_config(
+        dir.path(),
+        serde_json::json!({"p1": profile_json("p1", "ollama", "k-123456789")}),
+        serde_json::json!({}),
+    );
+    let base = spawn_server(dir.path()).await;
+    let http = reqwest::Client::new();
+
+    // POST create：body 被忽略 → 400 INVALID_PARAMS（TS 同款）
+    let resp = http
+        .post(format!("{base}/api/profiles"))
+        .header("content-type", "text/plain")
+        .body(r#"{"name":"x","providerId":"ollama"}"#)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 400);
+    let err: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(err["error"]["code"], "INVALID_PARAMS");
+
+    // PUT update：body 被忽略 → {...existing} 无变化成功（TS 同款）
+    let resp = http
+        .put(format!("{base}/api/profiles/p1"))
+        .header("content-type", "text/plain")
+        .body(r#"{"model":"should-not-stick"}"#)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let updated: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(updated["name"], "p1");
+    assert!(updated["model"].is_null());
+}

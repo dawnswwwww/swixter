@@ -1,0 +1,29 @@
+# cargo-dist workspace 根：Cargo workspace 在 packages/cli/ 下，
+# 因此 dist 配置放在仓库根的 dist-workspace.toml（而非已废弃的 [workspace.metadata.dist]）。
+# 修改本文件后需重新生成 CI：`dist generate`（会重写 .github/workflows/release.yml）。
+[workspace]
+members = ["cargo:packages/cli/"]
+
+[dist]
+# 版本号必须与本机/CI 实际使用的 cargo-dist 一致（`dist --version`）
+cargo-dist-version = "0.32.0"
+ci = "github"
+installers = ["shell", "powershell", "npm", "homebrew"]
+# Homebrew tap 仓库——需先在 GitHub 创建 dawnswwwww/homebrew-tap（见 docs/RELEASE-SETUP.md）
+tap = "dawnswwwww/homebrew-tap"
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-musl",
+  "x86_64-pc-windows-msvc",
+]
+install-path = "CARGO_HOME"
+# 发布 job：npm 包 + homebrew formula（需 NPM_TOKEN secret 与 tap 仓库）
+publish-jobs = ["homebrew", "npm"]
+# PR 上只跑 dist plan，不构建产物
+pr-run-mode = "plan"
+# npm installer 包名与现行 npm 包一致（决策记录：npm 包名不变）
+npm-package = "swixter"

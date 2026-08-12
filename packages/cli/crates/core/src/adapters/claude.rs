@@ -30,6 +30,7 @@ impl ClaudeCodeAdapter {
 
     fn expected_env(profile: &Profile, preset: Option<&ProviderPreset>) -> Vec<(String, String)> {
         // TS: baseURL 回退链 profile.baseURL || preset?.baseURL || ""
+        // （TS `||` 空串亦回退；但 baseURL 空串在 load 的 URL 校验阶段即被拒，此处不可达）
         let base_url = profile
             .base_url
             .as_deref()

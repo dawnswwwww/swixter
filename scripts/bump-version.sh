@@ -5,10 +5,32 @@
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Changelog gate: [Unreleased] must contain entries for the release being cut
-UNRELEASED=$(awk '/^## \[Unreleased\]/{flag=1; next} /^## \[/{flag=0} flag' "$ROOT/CHANGELOG.md")
-if [ -z "$(echo "$UNRELEASED" | tr -d '[:space:]')" ]; then
-  echo "CHANGELOG.md [Unreleased] section is empty. Document the release changes before bumping." >&2
+CURRENT_VERSION=$(grep -A5 '\[workspace.package\]' "$ROOT/packages/cli/Cargo.toml" | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+# Resolve the target version up front so the changelog gate can check its section
+case "$1" in
+  patch|minor|major)
+    IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+    case "$1" in
+      patch) PATCH=$((PATCH + 1)) ;;
+      minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+      major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+    esac
+    TARGET_VERSION="$MAJOR.$MINOR.$PATCH"
+    ;;
+  *.*.*)
+    TARGET_VERSION="$1"
+    ;;
+  *)
+    echo "Usage: scripts/bump-version.sh <patch|minor|major|X.Y.Z>" >&2
+    exit 1
+    ;;
+esac
+
+# Changelog gate: the ## [TARGET_VERSION] section must exist and contain entries
+SECTION=$(awk -v header="## [$TARGET_VERSION]" 'index($0, header) == 1 {flag=1; next} /^## \[/{flag=0} flag' "$ROOT/CHANGELOG.md")
+if [ -z "$(echo "$SECTION" | tr -d '[:space:]')" ]; then
+  echo "CHANGELOG.md has no entries under ## [$TARGET_VERSION]. Document the release changes before bumping." >&2
   exit 1
 fi
 

@@ -24,7 +24,8 @@ pub fn dispatch(coder_id: &str, args: CoderArgs) -> i32 {
             no_apply,
         }) => cmd_switch(coder, &name, apply, no_apply),
         Some(CoderCommand::Edit { name }) => crate::commands::interactive::edit_wizard(coder, name),
-        Some(CoderCommand::Delete { name }) => cmd_delete(coder, &name),
+        // force 仅解析（TS 兼容），delete 本身无确认流程，行为不变
+        Some(CoderCommand::Delete { name, force: _ }) => cmd_delete(coder, &name),
         Some(CoderCommand::Apply) => match apply_active(coder) {
             Ok(()) => {
                 println!("✓ Applied to {}", coder.display_name);
@@ -146,6 +147,7 @@ pub fn create_quiet(coder: &CoderSpec, a: &CreateArgs) -> Result<Profile, (Strin
         api_format,
         created_at: now.clone(),
         updated_at: now,
+        ..Default::default()
     })
 }
 

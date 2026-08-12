@@ -28,7 +28,10 @@ impl ConfigManager {
         &self.path
     }
 
-    /// 仅供 crate 内部与测试使用；外部代码走具体 mutator 方法。
+    /// 底层 ConfigFile 的可变引用（逃生舱）。
+    /// 名字里的 for_test 已名不副实：除 crate 内部 mutator（groups/export 等）
+    /// 与测试外，server 的 sync flow/auto_sync、groups 路由等生产路径也在用。
+    /// 新增代码优先走具体 mutator 方法，无对应方法时才用本方法。
     #[doc(hidden)]
     pub fn config_mut_for_test(&mut self) -> &mut ConfigFile {
         &mut self.config
@@ -61,8 +64,14 @@ impl ConfigManager {
         // TS manager.ts:173 —— updatedAt 由 upsert 统一设置，
         // 调用方即便自己塞了值也会被覆盖（重复设置无害，值同为 now）
         profile.updated_at = crate::types::now_iso();
-        if let Some(existing) = self.config.profiles.get(&profile.name) {
-            profile.created_at = existing.created_at.clone();
+        // TS manager.ts upsertProfile —— `existing?.createdAt || now`：
+        // 已有 profile 的 createdAt 为空串时同样回退 now（updated_at 上面已刷新为 now）
+        match self.config.profiles.get(&profile.name) {
+            Some(existing) if !existing.created_at.is_empty() => {
+                profile.created_at = existing.created_at.clone();
+            }
+            Some(_) => profile.created_at = profile.updated_at.clone(),
+            None => {}
         }
         self.config
             .profiles
@@ -105,7 +114,8 @@ impl ConfigManager {
                 referencing.join(", ")
             )));
         }
-        self.config.profiles.remove(name);
+        // shift_remove 保持剩余键的插入序（对齐 TS 对象 delete 后的键序）
+        self.config.profiles.shift_remove(name);
         for c in self.config.coders.values_mut() {
             if c.active_profile == name {
                 c.active_profile.clear();
@@ -169,7 +179,7 @@ impl ConfigManager {
 fn parse_and_migrate(raw: &str) -> ConfigFile {
     let mut v: serde_json::Value = match serde_json::from_str(raw) {
         Ok(v) => v,
-        Err(_) => return ConfigFile::empty(),
+        Err(e) => return fallback_default(format!("invalid JSON: {e}")),
     };
     // TS manager.ts:57 —— 仅当 version=="1.0.0" 且存在顶层 activeProfile（非空）才迁移；
     // v1 但无 activeProfile → 后续严格校验不过，整体回退默认空配置
@@ -178,6 +188,10 @@ fn parse_and_migrate(raw: &str) -> ConfigFile {
             .and_then(|x| x.as_str())
             .is_some_and(|s| !s.is_empty())
     {
+        // TS manager.ts:58 —— 迁移时打印提示
+        eprintln!(
+            "Detected old version configuration, automatically upgrading to {CONFIG_VERSION}..."
+        );
         let active = v
             .get("activeProfile")
             .and_then(|x| x.as_str())
@@ -192,6 +206,11 @@ fn parse_and_migrate(raw: &str) -> ConfigFile {
         );
         obj.insert("coders".into(), coders.into());
         obj.insert("version".into(), CONFIG_VERSION.into());
+    }
+    // TS manager.ts:67 —— `if (!data.groups) data.groups = {}` 对所有配置生效
+    // （在 v1 迁移分支之外）：v0.0.x 写的 2.0.0 配置没有 groups 字段，
+    // 缺了会被下面的严格校验当作缺键而整体回退空配置（profiles 数据丢失）
+    if let Some(obj) = v.as_object_mut() {
         obj.entry("groups".to_string())
             .or_insert_with(|| serde_json::json!({}));
     }
@@ -199,19 +218,25 @@ fn parse_and_migrate(raw: &str) -> ConfigFile {
     // 顶层 version/profiles/coders/groups；每个 profile 的
     // name/providerId/apiKey/createdAt/updatedAt（均须为 string）
     if !has_required_keys(&v) {
-        return ConfigFile::empty();
+        return fallback_default("missing required keys".into());
     }
     let cfg: ConfigFile = match serde_json::from_value(v) {
         Ok(c) => c,
-        Err(_) => return ConfigFile::empty(),
+        Err(e) => return fallback_default(format!("schema mismatch: {e}")),
     };
     if cfg.version.is_empty() {
-        return ConfigFile::empty();
+        return fallback_default("empty version".into());
     }
     match crate::validate::validate_config(&cfg) {
         Ok(()) => cfg,
-        Err(_) => ConfigFile::empty(),
+        Err(e) => fallback_default(e.to_string()),
     }
+}
+
+/// TS manager.ts loadConfig catch —— 加载失败打印原因（console.error）后回退默认配置
+fn fallback_default(reason: String) -> ConfigFile {
+    eprintln!("Failed to load configuration, using default config: {reason}");
+    ConfigFile::empty()
 }
 
 /// serde 解析前的必需键检查（TS zod 严格性；serde 的 default 会静默容忍缺失）
@@ -360,6 +385,40 @@ mod tests {
         let cfg = parse_and_migrate(raw);
         assert_eq!(cfg.version, CONFIG_VERSION);
         assert!(cfg.profiles.is_empty()); // 整体回退默认空配置
+    }
+
+    #[test]
+    fn upsert_empty_created_at_falls_back_to_now() {
+        // TS manager.ts upsertProfile —— `existing?.createdAt || now`：空串同样回退 now
+        let (_d, mut m) = mgr();
+        m.upsert_profile(profile("p1"), None).unwrap();
+        m.config_mut_for_test()
+            .profiles
+            .get_mut("p1")
+            .unwrap()
+            .created_at = String::new();
+        let mut p2 = profile("p1");
+        p2.created_at = "1999-01-01T00:00:00.000Z".into(); // 调用方值应被空串兜底覆盖
+        m.upsert_profile(p2, None).unwrap();
+        let saved = &m.config().profiles["p1"];
+        assert!(!saved.created_at.is_empty());
+        assert_ne!(saved.created_at, "1999-01-01T00:00:00.000Z");
+        assert_eq!(saved.created_at, saved.updated_at); // 同为本次 upsert 的 now
+    }
+
+    #[test]
+    fn v2_missing_groups_still_loads() {
+        // groups 兜底在 v1 迁移分支之外：v2 配置缺 groups 字段照常加载（TS manager.ts:67）
+        let raw = r#"{
+            "version": "2.0.0",
+            "profiles": {"p1": {"name":"p1","providerId":"ollama","apiKey":"k",
+                "createdAt":"2025-01-01T00:00:00.000Z","updatedAt":"2025-01-01T00:00:00.000Z"}},
+            "coders": {"claude": {"activeProfile": "p1"}}
+        }"#;
+        let cfg = parse_and_migrate(raw);
+        assert!(cfg.profiles.contains_key("p1"));
+        assert_eq!(cfg.coders["claude"].active_profile, "p1");
+        assert!(cfg.groups.is_empty());
     }
 
     #[test]

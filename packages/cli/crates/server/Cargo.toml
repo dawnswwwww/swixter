@@ -28,6 +28,7 @@ base64.workspace = true
 rust-embed.workspace = true
 mime_guess.workspace = true
 open.workspace = true
+url.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

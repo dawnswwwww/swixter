@@ -10,6 +10,7 @@ homepage.workspace = true
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+indexmap.workspace = true
 toml_edit.workspace = true
 serde_yaml_ng.workspace = true
 url.workspace = true

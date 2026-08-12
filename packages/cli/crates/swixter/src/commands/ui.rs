@@ -40,7 +40,8 @@ fn now_iso() -> String {
     swixter_core::types::now_iso()
 }
 
-/// TS: runForeground —— 已运行则只开浏览器；否则前台 serve 并写 PID 文件，
+/// TS: runForeground —— 已运行则只开浏览器；否则前台 serve。
+/// listen 成功（拿到实际绑定端口）后才写 PID 文件（TS 同款顺序），
 /// SIGINT/SIGTERM 时删 PID 文件退出
 async fn run_foreground(port: Option<u16>, no_browser: bool) -> i32 {
     let dir = config_dir();
@@ -54,8 +55,10 @@ async fn run_foreground(port: Option<u16>, no_browser: bool) -> i32 {
         return EXIT_SUCCESS;
     }
 
-    let port = match swixter_server::find_available_port(port.unwrap_or(DEFAULT_UI_PORT)).await {
-        Ok(p) => p,
+    // start_server 内部递增 bind 探测（无先探测再 bind 的竞争窗口）；
+    // 返回的是实际绑定端口，--status / 健康检查都依赖它
+    let (port, server) = match swixter_server::start_server(port, Default::default()).await {
+        Ok(v) => v,
         Err(e) => {
             eprintln!("✗ No available port: {e}");
             return EXIT_GENERAL;
@@ -67,7 +70,7 @@ async fn run_foreground(port: Option<u16>, no_browser: bool) -> i32 {
         swixter_server::open_browser(&url);
     }
 
-    // 写 PID 文件，让 --status / --stop 能发现本实例（TS runForeground 同款）
+    // listen 成功后写 PID 文件，让 --status / --stop 能发现本实例（TS runForeground 同款）
     let _ = daemon::write_pid_file(
         &dir,
         &UiPidFile {
@@ -77,7 +80,6 @@ async fn run_foreground(port: Option<u16>, no_browser: bool) -> i32 {
         },
     );
 
-    let server = tokio::spawn(swixter_server::start_server(Some(port), Default::default()));
     wait_for_shutdown_signal().await;
     println!();
     println!("Shutting down...");
@@ -187,7 +189,9 @@ async fn start_daemon(port: Option<u16>) -> i32 {
     let child_pid = child.id();
     drop(child); // unref：不持有句柄，父进程退出不等子进程
 
-    // 立即写 PID 文件，防止并发启动拉起重复实例
+    // 立即写 PID 文件，防止并发启动拉起重复实例。
+    // 注意：此处端口是探测值，子进程（run_foreground）listen 成功后会用
+    // 实际绑定端口重写 PID 文件；健康检查仍按探测端口轮询（TS 同款）
     let pid_pf = UiPidFile {
         pid: child_pid,
         port,
@@ -205,7 +209,7 @@ async fn start_daemon(port: Option<u16>) -> i32 {
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
     if !started {
-        daemon::terminate(pid_pf.pid, true);
+        let _ = daemon::terminate(pid_pf.pid, true); // TS 同款：超时清理失败也吞掉
         let _ = daemon::remove_pid_file(&dir);
         println!();
         println!("✗ Failed to start daemon (timed out waiting for server).");

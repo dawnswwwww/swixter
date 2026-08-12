@@ -29,6 +29,19 @@ impl MockUpstream {
     where
         F: Fn() -> (StatusCode, String, Body) + Send + Sync + 'static,
     {
+        Self::start_with_headers(move || {
+            let (status, ct, body) = respond();
+            (status, ct, Vec::new(), body)
+        })
+        .await
+    }
+
+    /// start 的扩展：额外响应头（如 content-encoding: gzip，模拟压缩上游）
+    #[allow(dead_code)] // 按需使用：仅 gzip/编码类测试需要自定义响应头
+    pub async fn start_with_headers<F>(respond: F) -> Self
+    where
+        F: Fn() -> (StatusCode, String, Vec<(String, String)>, Body) + Send + Sync + 'static,
+    {
         let recorded = Arc::new(Mutex::new(Vec::new()));
         let rec = recorded.clone();
         let respond = Arc::new(respond);
@@ -41,7 +54,7 @@ impl MockUpstream {
                       body: axum::body::Bytes| {
                     let rec = rec.clone();
                     let respond = respond.clone();
-                    let (status, ct, resp_body) = respond();
+                    let (status, ct, extra_headers, resp_body) = respond();
                     async move {
                         let query = uri.query().map(|q| format!("?{q}")).unwrap_or_default();
                         rec.lock().unwrap().push(RecordedRequest {
@@ -53,11 +66,13 @@ impl MockUpstream {
                                 .collect(),
                             body: body.to_vec(),
                         });
-                        Response::builder()
+                        let mut builder = Response::builder()
                             .status(status)
-                            .header("content-type", ct)
-                            .body(resp_body)
-                            .unwrap()
+                            .header("content-type", ct);
+                        for (k, v) in extra_headers {
+                            builder = builder.header(k, v);
+                        }
+                        builder.body(resp_body).unwrap()
                     }
                 },
             ),

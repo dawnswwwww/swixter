@@ -225,12 +225,23 @@ impl AuthClient {
         &self,
         session_id: &str,
     ) -> Result<MagicLinkSessionResponse, AuthApiError> {
-        let body = self
-            .send(
-                self.http
-                    .get(self.url(&format!("/api/auth/magic-link/session/{session_id}"))),
-            )
-            .await?;
+        // TS 用 encodeURIComponent(sessionId)：session_id 作为路径段 percent-encode，
+        // 防止 '/'、'?' 等字符改变路径语义（base 不带尾斜杠，push 恰好补一层）
+        let mut url = url::Url::parse(&self.url("/api/auth/magic-link/session")).map_err(|e| {
+            AuthApiError {
+                status: 0,
+                code: "INVALID_URL".into(),
+                message: e.to_string(),
+            }
+        })?;
+        url.path_segments_mut()
+            .map_err(|_| AuthApiError {
+                status: 0,
+                code: "INVALID_URL".into(),
+                message: "base url is cannot-be-a-base".into(),
+            })?
+            .push(session_id);
+        let body = self.send(self.http.get(url)).await?;
         Ok(serde_json::from_slice(&body)?)
     }
 }

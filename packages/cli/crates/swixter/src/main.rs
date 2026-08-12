@@ -46,5 +46,46 @@ fn run() -> i32 {
         Commands::Proxy(a) => commands::proxy::dispatch(a),
         Commands::Export { file } => commands::transfer::export_cmd(&file),
         Commands::Import { file } => commands::transfer::import_cmd(&file),
+        Commands::Version => {
+            print_version();
+            EXIT_SUCCESS
+        }
     }
+}
+
+/// TS cli/index.ts cmdVersion：完整版本信息块（含 Config/Export Version）
+fn print_version() {
+    use console::style;
+    println!();
+    println!(
+        "{}{}",
+        style("Swixter").bold().cyan(),
+        style(" - AI Coder Configuration Manager").dim()
+    );
+    println!();
+    println!(
+        "  {}          {}",
+        style("Version:").bold(),
+        style(env!("CARGO_PKG_VERSION")).green()
+    );
+    println!(
+        "  {}   {}",
+        style("Config Version:").bold(),
+        style(swixter_core::types::CONFIG_VERSION).cyan()
+    );
+    println!(
+        "  {}   {}",
+        style("Export Version:").bold(),
+        style(swixter_core::export::EXPORT_VERSION).cyan()
+    );
+    println!();
+    println!(
+        "{}",
+        style("  GitHub: https://github.com/dawnswwwww/swixter").dim()
+    );
+    println!(
+        "{}",
+        style("  NPM:    https://www.npmjs.com/package/swixter").dim()
+    );
+    println!();
 }

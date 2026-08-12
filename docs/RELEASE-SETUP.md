@@ -9,10 +9,12 @@
 - **`.github/workflows/release.yml`**（cargo-dist 生成，勿手改）：7 target 矩阵构建 → GitHub Release（含 changelog 与 checksums）→ 发布 shell/powershell installer、npm 包、Homebrew formula
 - **`.github/workflows/publish-crates.yml`**：按依赖顺序 `cargo publish`（swixter-core → swixter-proxy → swixter-server → swixter）
 
+dist 配置在仓库根的 **`dist-workspace.toml`**（`[dist]` 段）；Cargo workspace 位于 `packages/cli/`，由文件顶部 `[workspace] members = ["cargo:packages/cli/"]` 指认。修改配置后在仓库根运行 `dist generate` 重新生成 release.yml。
+
 ## 前置步骤（首次发布前手动完成，仅一次）
 
 1. **创建 Homebrew tap 仓库**：在 GitHub 创建空仓库 `dawnswwwww/homebrew-tap`（cargo-dist 会自动推 formula，无需任何初始内容）。
-   - ⚠️ 未创建前 release.yml 的 `publish-homebrew-formula` job 会失败。过渡方案：在 `packages/cli/Cargo.toml` 的 `installers` 中临时移除 `"homebrew"` 并重新 `cargo dist generate`，或接受该 job 红（其余产物不受影响）。
+   - ⚠️ 未创建前 release.yml 的 `publish-homebrew-formula` job 会失败。过渡方案：在根目录 `dist-workspace.toml` 的 `installers` 中临时移除 `"homebrew"` 并重新 `dist generate`，或接受该 job 红（其余产物不受影响）。
 2. **确认 crates.io 名称可用**：`cargo search swixter`（以及 swixter-core / swixter-proxy / swixter-server），确认未被占用。
 3. **配置下述三个 GitHub Secrets**。
 
@@ -46,7 +48,8 @@ release.yml 的 `publish-homebrew-formula` job 需要以写权限 checkout `dawn
 ## 发布流程
 
 ```bash
-# 1. 更新 CHANGELOG.md（在 [Unreleased] 下新增 ## [X.Y.Z] - YYYY-MM-DD 段）
+# 1. 更新 CHANGELOG.md：新建 `## [X.Y.Z] - YYYY-MM-DD` 段并填写条目
+#    （bump-version.sh 会校验该段存在且非空，否则拒绝执行）
 
 # 2. 运行发布命令（bump Cargo workspace 版本 + 同步各 package.json + commit + tag）
 bun run release:patch  # 或 release:minor / release:major
@@ -87,11 +90,15 @@ A: crates.io 索引刷新有延迟。workflow 每步间 sleep 30 秒；若仍失
 
 ### Q: homebrew job 失败，显示仓库不存在？
 
-A: 确认 `dawnswwwww/homebrew-tap` 已创建且 `HOMEBREW_TAP_TOKEN` 对该仓库有 Contents 写权限。临时跳过：从 `packages/cli/Cargo.toml` 的 `installers` 移除 `"homebrew"` 后 `cargo dist generate` 重新生成 release.yml。
+A: 确认 `dawnswwwww/homebrew-tap` 已创建且 `HOMEBREW_TAP_TOKEN` 对该仓库有 Contents 写权限。临时跳过：从根目录 `dist-workspace.toml` 的 `installers` 移除 `"homebrew"` 后 `dist generate` 重新生成 release.yml。
+
+### Q: homebrew formula 的提交者是谁？
+
+A: `publish-homebrew-formula` job 使用 cargo-dist 默认的 git 身份 **"axo bot \<admin+bot@axo.dev\>"** 提交到 tap 仓库。如介意该身份，可在 tap 仓库侧调整（例如仓库规则或事后 amend），或在 release.yml 生成后自行维护该 job 的 `GITHUB_USER`/`GITHUB_EMAIL`（注意手改会在下次 `dist generate` 时被覆盖）。
 
 ### Q: release.yml 可以手改吗？
 
-A: 不可以。该文件由 `cargo dist generate` 生成并自检（`cargo dist generate --check`），手改会在下次 generate 时被覆盖。需要调整时改 `packages/cli/Cargo.toml` 的 `[workspace.metadata.dist]` 后重新 generate。
+A: 不可以。该文件由 `dist generate` 生成并自检（`dist generate --check`），手改会在下次 generate 时被覆盖。需要调整时改仓库根 `dist-workspace.toml` 的 `[dist]` 段后重新 generate。
 
 ## 安全注意事项
 

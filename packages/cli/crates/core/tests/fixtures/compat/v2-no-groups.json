@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "profiles": {
+    "work-kimi": {
+      "name": "work-kimi",
+      "providerId": "kimi-coding",
+      "apiKey": "sk-test-1234567890",
+      "baseURL": "https://api.kimi.com/coding/",
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-02T00:00:00.000Z"
+    },
+    "local-ollama": {
+      "name": "local-ollama",
+      "providerId": "ollama",
+      "apiKey": "",
+      "model": "qwen2.5-coder:7b",
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    }
+  },
+  "coders": {
+    "claude": {
+      "activeProfile": "work-kimi"
+    }
+  }
+}

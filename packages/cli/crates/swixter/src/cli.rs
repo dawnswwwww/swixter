@@ -38,6 +38,11 @@ pub enum Commands {
     Auth(AuthArgs),
     /// Cloud sync (push/pull/status/enable/disable)
     Sync(SyncArgs),
+    /// Print version information
+    // TS cli/index.ts：version/-v/--version 均打印完整信息块并 exit 0；
+    // -v 经 clap short_flag 映射到本子命令（clap 自带的 --version/-V 保持不变）
+    #[command(short_flag = 'v')]
+    Version,
 }
 
 #[derive(Args)]
@@ -114,7 +119,7 @@ pub struct UiArgs {
 #[derive(Args)]
 pub struct ProxyArgs {
     #[command(subcommand)]
-    pub command: ProxyCommand,
+    pub command: Option<ProxyCommand>,
 }
 
 #[derive(Subcommand)]
@@ -195,7 +200,12 @@ pub enum CoderCommand {
     Edit { name: Option<String> },
     /// Delete a profile
     #[command(alias = "rm", alias = "delete-profile")]
-    Delete { name: String },
+    Delete {
+        name: String,
+        // TS 兼容：旧脚本（含本仓库旧 E2E）会传 --force；解析但行为不变
+        #[arg(long, short = 'f')]
+        force: bool,
+    },
     /// Apply active profile to the coder's config file
     Apply,
     /// Show current active profile
@@ -316,6 +326,9 @@ pub enum GroupCommand {
     #[command(alias = "new")]
     Create {
         name: Option<String>,
+        /// 同位置参数 name（TS 支持 --name）；二选一，同时给会冲突报错
+        #[arg(long = "name", conflicts_with = "name")]
+        name_flag: Option<String>,
         #[arg(long)]
         profiles: Option<String>,
     }, // 逗号分隔

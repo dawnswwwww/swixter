@@ -54,7 +54,8 @@ impl TokenStore {
         let _ = fs::remove_file(&self.auth_path);
     }
 
-    /// TS: getAccessToken —— 5min 缓冲；刷新失败清除并返回 None（决策点 5）
+    /// TS: getAccessToken —— 5min 缓冲；刷新失败清除并返回 None（决策点 5）；
+    /// 刷新成功但落盘失败 → 告警并照常返回新 token（不视同登出，见下）
     pub async fn get_access_token(&self, client: &AuthClient) -> Option<String> {
         let mut state = self.load()?;
         let expiry = time::OffsetDateTime::parse(
@@ -70,7 +71,12 @@ impl TokenStore {
             Ok(r) => {
                 state.access_token = r.access_token.clone();
                 state.expires_at = r.expires_at;
-                self.save(&state).ok()?;
+                if let Err(e) = self.save(&state) {
+                    // 刷新已成功，新 token 有效，仅持久化失败（磁盘/权限问题）。
+                    // 吞成 None 会被调用方视同登出（"Session expired"），属于误报；
+                    // 告警后照常返回新 token，下次调用会基于磁盘旧 state 重新刷新
+                    eprintln!("Warning: failed to save refreshed auth state: {e}");
+                }
                 Some(r.access_token)
             }
             Err(_) => {

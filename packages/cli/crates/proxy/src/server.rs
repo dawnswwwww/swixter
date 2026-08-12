@@ -31,6 +31,9 @@ fn instances() -> &'static DashMap<String, RunningInstance> {
 /// axum 薄适配层：只做 请求/响应 类型转换，全部逻辑在 ProxyHandler。
 /// 复制上游 headers 时跳过 content-length —— transform 会改变 body 长度，
 /// 流式响应由 hyper 自行 chunked。
+/// content-encoding 也必须剔除：reqwest 自动解压后仍保留该头，
+/// 不剔会导致客户端对已是明文的 body 再 gunzip；
+/// connection/transfer-encoding 属 hop-by-hop 头，同样不能转发。
 async fn dispatch(State(h): State<Arc<ProxyHandler>>, req: Request) -> Response {
     let method = req.method().to_string();
     let path = req.uri().path().to_string()
@@ -54,7 +57,10 @@ async fn dispatch(State(h): State<Arc<ProxyHandler>>, req: Request) -> Response 
     let resp = h.handle(&method, &path, &headers, &body).await;
     let mut builder = Response::builder().status(resp.status);
     for (k, v) in resp.headers.iter() {
-        if k.as_str() == "content-length" {
+        if matches!(
+            k.as_str(),
+            "content-length" | "content-encoding" | "connection" | "transfer-encoding"
+        ) {
             continue;
         }
         builder = builder.header(k, v);

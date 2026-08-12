@@ -12,6 +12,7 @@ use swixter_core::export::{export_config, import_config, EXPORT_VERSION};
 use swixter_core::types::CONFIG_VERSION;
 
 use crate::server::error::ApiError;
+use crate::server::extract::JsonBody;
 use crate::server::state::AppState;
 use crate::server::util::{generate_etag, parse_if_none_match};
 
@@ -142,7 +143,7 @@ async fn export_config_file(
 /// POST /api/config/import —— body {config, overwrite?=true}
 async fn import_config_file(
     State(state): State<AppState>,
-    Json(body): Json<serde_json::Value>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
     let Some(config) = body.get("config") else {
         return Err(ApiError::bad_request(

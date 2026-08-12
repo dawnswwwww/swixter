@@ -19,36 +19,44 @@ pub fn is_swixter_claude_proxy_marker(model: &str) -> bool {
 
 /// TS: resolveSwixterClaudeProxyMarker（事实表 §model 改写）：
 /// HAIKU→defaultHaikuModel||anthropicModel||model；SONNET/OPUS 同理；主 marker→anthropicModel||model
+/// 注意 TS `||` 在空串时同样回退，Rust `.or` 只判 None —— 故每级回退前先 filter 掉空串
+/// （与 core/src/model.rs resolve_env_key 同款写法）
 pub fn resolve_swixter_claude_proxy_marker(model: &str, profile: &Profile) -> Option<String> {
     let models = profile.models.as_ref();
-    let anthropic = models.and_then(|m| m.anthropic_model.as_deref());
+    let anthropic = models
+        .and_then(|m| m.anthropic_model.as_deref())
+        .filter(|s| !s.is_empty());
+    let profile_model = profile.model.as_deref().filter(|s| !s.is_empty());
     let resolved = match model {
-        SWIXTER_CLAUDE_MODEL => anthropic.or(profile.model.as_deref()),
+        SWIXTER_CLAUDE_MODEL => anthropic.or(profile_model),
         SWIXTER_CLAUDE_HAIKU_MODEL => models
             .and_then(|m| m.default_haiku_model.as_deref())
+            .filter(|s| !s.is_empty())
             .or(anthropic)
-            .or(profile.model.as_deref()),
+            .or(profile_model),
         SWIXTER_CLAUDE_SONNET_MODEL => models
             .and_then(|m| m.default_sonnet_model.as_deref())
+            .filter(|s| !s.is_empty())
             .or(anthropic)
-            .or(profile.model.as_deref()),
+            .or(profile_model),
         SWIXTER_CLAUDE_OPUS_MODEL => models
             .and_then(|m| m.default_opus_model.as_deref())
+            .filter(|s| !s.is_empty())
             .or(anthropic)
-            .or(profile.model.as_deref()),
+            .or(profile_model),
         _ => return None,
     };
-    resolved.filter(|s| !s.is_empty()).map(str::to_string)
+    resolved.map(str::to_string)
 }
 
-/// TS: getGeneralProxyModel = models?.anthropicModel || model
+/// TS: getGeneralProxyModel = models?.anthropicModel || model（空串同样回退）
 pub fn general_proxy_model(profile: &Profile) -> Option<String> {
     profile
         .models
         .as_ref()
         .and_then(|m| m.anthropic_model.as_deref())
-        .or(profile.model.as_deref())
         .filter(|s| !s.is_empty())
+        .or(profile.model.as_deref().filter(|s| !s.is_empty()))
         .map(str::to_string)
 }
 
@@ -113,6 +121,67 @@ mod tests {
             resolve_swixter_claude_proxy_marker(SWIXTER_CLAUDE_HAIKU_MODEL, &p2).as_deref(),
             Some("m")
         );
+    }
+
+    /// TS `||` 真值语义：空串等同未配置，中间任一级为空串都要继续回退
+    #[test]
+    fn empty_string_falls_back_like_ts_or() {
+        // anthropicModel="" → 主 marker 回退 profile.model
+        let p = Profile {
+            models: Some(ModelsConfig {
+                anthropic_model: Some("".into()),
+                ..Default::default()
+            }),
+            model: Some("fallback".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            resolve_swixter_claude_proxy_marker(SWIXTER_CLAUDE_MODEL, &p).as_deref(),
+            Some("fallback")
+        );
+        assert_eq!(general_proxy_model(&p).as_deref(), Some("fallback"));
+
+        // haiku="" → 回退 anthropicModel；anthropicModel 也 "" → 回退 model
+        let p2 = Profile {
+            models: Some(ModelsConfig {
+                anthropic_model: Some("main".into()),
+                default_haiku_model: Some("".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            resolve_swixter_claude_proxy_marker(SWIXTER_CLAUDE_HAIKU_MODEL, &p2).as_deref(),
+            Some("main")
+        );
+        let p3 = Profile {
+            models: Some(ModelsConfig {
+                anthropic_model: Some("".into()),
+                default_haiku_model: Some("".into()),
+                ..Default::default()
+            }),
+            model: Some("m".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            resolve_swixter_claude_proxy_marker(SWIXTER_CLAUDE_HAIKU_MODEL, &p3).as_deref(),
+            Some("m")
+        );
+
+        // 全空串 → None（不产出空 model 名）
+        let p4 = Profile {
+            models: Some(ModelsConfig {
+                anthropic_model: Some("".into()),
+                ..Default::default()
+            }),
+            model: Some("".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            resolve_swixter_claude_proxy_marker(SWIXTER_CLAUDE_MODEL, &p4),
+            None
+        );
+        assert_eq!(general_proxy_model(&p4), None);
     }
 
     #[test]

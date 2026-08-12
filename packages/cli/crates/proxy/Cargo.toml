@@ -29,3 +29,4 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_
 
 [dev-dependencies]
 tempfile.workspace = true
+flate2 = "1" # 测试现场压缩 gzip，模拟回压缩响应的上游

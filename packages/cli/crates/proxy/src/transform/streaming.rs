@@ -330,7 +330,12 @@ pub struct ChatToResponsesStream {
     usage: Option<Value>,
     finished: bool,
     /// finish_reason 已处理但 response.completed 尚未发出：
-    /// 延迟到下一个事件（尾部 choices:[] 的 usage-only chunk 或 [DONE]）再发，以便捕获 usage
+    /// 延迟到下一个事件（尾部 choices:[] 的 usage-only chunk 或 [DONE]）再发，以便捕获 usage。
+    ///
+    /// 已知假设（与 TS 语义权衡后保留现状）：上游发完 finish chunk 后还会发 [DONE] 或关流，
+    /// completed 随之在下一事件/drain 时发出；若上游既不发 [DONE] 也不关流，
+    /// 客户端将永远等不到 response.completed。目标上游均满足该假设，
+    /// 关流场景由 drain() 兜底（见下）。
     pending_completed: bool,
     /// finish 时构建好的完整 output[]，供 response.completed 使用
     completed_output: Vec<Value>,
@@ -361,7 +366,7 @@ impl StreamTransformer for ChatToResponsesStream {
             self.usage = chunk.get("usage").cloned();
         }
 
-        let mut outs = self.take_pending_completed();
+        let mut outs = self.take_pending_completed(); // 延迟的 completed 在任一后续事件前发出（usage 已先捕获）
 
         // choices 可能缺失（尾部 choices:[] 的 usage-only chunk 只用于捕获 usage）
         let Some(choice) = chunk
@@ -405,7 +410,9 @@ impl StreamTransformer for ChatToResponsesStream {
         outs
     }
 
-    /// 上游断流（无 [DONE]/usage chunk）时仍发出挂起的 response.completed（带最新捕获的 usage）
+    /// 上游断流（无 [DONE]/usage chunk）时仍发出挂起的 response.completed（带最新捕获的 usage）。
+    /// 这是 completed 延迟语义的兜底：覆盖「finish 后直接关流」的上游；
+    /// 「finish 后既不发 [DONE] 也不关流」的上游不在保障范围（见 pending_completed 字段注释）
     fn drain(&mut self) -> Vec<SseOut> {
         self.take_pending_completed()
     }

@@ -28,6 +28,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .eslintcache
 .cache
 *.tsbuildinfo
+.astro/
 
 # IntelliJ based IDEs
 .idea
@@ -40,6 +41,9 @@ ui/node_modules
 
 .claude/worktrees/
 .worktrees/
+
+# local tool binaries (cargo-dist etc., not committed)
+.tools/
 
 # Rust build output
 target/

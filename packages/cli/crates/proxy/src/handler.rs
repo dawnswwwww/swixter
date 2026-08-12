@@ -350,33 +350,44 @@ impl ProxyHandler {
         let mut ctx: Option<transform::TransformCtx> = None;
 
         if client_format != target_format {
-            let parsed: Value = if body.is_empty() {
-                json!({})
+            // TS：JSON.parse 在 try 内，解析抛错落入 catch → 不做 transform，
+            // 原 body + 原 endpoint 原样透传（ctx 保持 None）
+            let parsed: Option<Value> = if body.is_empty() {
+                Some(json!({}))
             } else {
                 match serde_json::from_slice(body) {
-                    Ok(v) => v,
-                    Err(_) => json!({}),
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        self.logger.error(
+                            "Request JSON parse failed, falling back to passthrough",
+                            Some(&e),
+                            None,
+                        );
+                        None
+                    }
                 }
             };
-            let c = transform::TransformCtx {
-                endpoint: endpoint.to_string(),
-                client_format,
-                target_format,
-                stream: parsed.get("stream").and_then(Value::as_bool) == Some(true),
-            };
-            match transform::transform_request(&parsed, &c) {
-                Ok(t) => {
-                    eff_body = Bytes::from(serde_json::to_vec(&t.body).unwrap());
-                    target_endpoint = t.target_endpoint;
-                    ctx = Some(c);
-                }
-                Err(e) => {
-                    // transform 失败回退透传原 body + 原 endpoint（事实表 §Group 故障转移 ④）
-                    self.logger.error(
-                        "Request transform failed, falling back to passthrough",
-                        Some(&e),
-                        None,
-                    );
+            if let Some(parsed) = parsed {
+                let c = transform::TransformCtx {
+                    endpoint: endpoint.to_string(),
+                    client_format,
+                    target_format,
+                    stream: parsed.get("stream").and_then(Value::as_bool) == Some(true),
+                };
+                match transform::transform_request(&parsed, &c) {
+                    Ok(t) => {
+                        eff_body = Bytes::from(serde_json::to_vec(&t.body).unwrap());
+                        target_endpoint = t.target_endpoint;
+                        ctx = Some(c);
+                    }
+                    Err(e) => {
+                        // transform 失败回退透传原 body + 原 endpoint（事实表 §Group 故障转移 ④）
+                        self.logger.error(
+                            "Request transform failed, falling back to passthrough",
+                            Some(&e),
+                            None,
+                        );
+                    }
                 }
             }
         }
@@ -419,32 +430,45 @@ impl ProxyHandler {
                 let ForwardBody::Full(bytes) = resp.body else {
                     unreachable!()
                 };
-                let parsed: Value = if bytes.is_empty() {
-                    json!({})
+                // TS：responseText ? JSON.parse : {}，解析抛错落入 catch → 原样返回原始 body
+                // （如上游 200 但回了 HTML 错误页，不能替换成 {} 掩盖真实故障）
+                let parsed: Option<Value> = if bytes.is_empty() {
+                    Some(json!({}))
                 } else {
                     match serde_json::from_slice(&bytes) {
-                        Ok(v) => v,
-                        Err(_) => json!({}),
+                        Ok(v) => Some(v),
+                        Err(e) => {
+                            self.logger.error(
+                                "Response JSON parse failed, returning raw response",
+                                Some(&e),
+                                None,
+                            );
+                            None
+                        }
                     }
                 };
-                match transform::transform_response(&parsed, &c) {
-                    Ok(v) => TryOutcome::Success(HandlerResponse {
+                let transformed = parsed.and_then(|p| {
+                    transform::transform_response(&p, &c)
+                        .map_err(|e| {
+                            self.logger.error(
+                                "Response transform failed, returning raw response",
+                                Some(&e),
+                                None,
+                            );
+                        })
+                        .ok()
+                });
+                match transformed {
+                    Some(v) => TryOutcome::Success(HandlerResponse {
                         status: resp.status,
                         headers: resp.headers,
                         body: HandlerBody::Full(Bytes::from(serde_json::to_vec(&v).unwrap())),
                     }),
-                    Err(e) => {
-                        self.logger.error(
-                            "Response transform failed, returning raw response",
-                            Some(&e),
-                            None,
-                        );
-                        TryOutcome::Success(HandlerResponse {
-                            status: resp.status,
-                            headers: resp.headers,
-                            body: HandlerBody::Full(bytes),
-                        })
-                    }
+                    None => TryOutcome::Success(HandlerResponse {
+                        status: resp.status,
+                        headers: resp.headers,
+                        body: HandlerBody::Full(bytes),
+                    }),
                 }
             }
             (None, true) => {

@@ -66,10 +66,11 @@ pub fn pid_alive(pid: u32) -> bool {
 }
 
 /// TS: stopDaemon 的 kill —— graceful=SIGTERM，否则 SIGKILL；
-/// Windows 统一 TerminateProcess（无信号语义）
+/// Windows 统一 TerminateProcess（无信号语义）。
+/// kill 失败（EPERM/ESRCH/OpenProcess 失败等）返回 Err，调用方不得当作已停止
 #[cfg(unix)]
-pub fn terminate(pid: u32, graceful: bool) {
-    unsafe {
+pub fn terminate(pid: u32, graceful: bool) -> Result<(), String> {
+    let rc = unsafe {
         libc::kill(
             pid as i32,
             if graceful {
@@ -77,18 +78,29 @@ pub fn terminate(pid: u32, graceful: bool) {
             } else {
                 libc::SIGKILL
             },
-        );
+        )
+    };
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error().to_string())
     }
 }
 
 #[cfg(windows)]
-pub fn terminate(pid: u32, _graceful: bool) {
+pub fn terminate(pid: u32, _graceful: bool) -> Result<(), String> {
     use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
     unsafe {
         let h = OpenProcess(PROCESS_TERMINATE, 0, pid);
-        if !h.is_null() {
-            TerminateProcess(h, 1);
-            windows_sys::Win32::Foundation::CloseHandle(h);
+        if h.is_null() {
+            return Err(format!("OpenProcess({pid}) failed"));
+        }
+        let ok = TerminateProcess(h, 1) != 0;
+        windows_sys::Win32::Foundation::CloseHandle(h);
+        if ok {
+            Ok(())
+        } else {
+            Err(format!("TerminateProcess({pid}) failed"))
         }
     }
 }
@@ -141,7 +153,12 @@ pub async fn stop_daemon(config_dir: &Path) -> Result<String, String> {
         return Err("Daemon process is not running (stale PID file removed).".to_string());
     }
 
-    terminate(pf.pid, true);
+    // TS stopDaemon：SIGTERM 失败（EPERM 等）→ 删 PID 文件并返回失败消息，
+    // 不得当作已停止
+    if terminate(pf.pid, true).is_err() {
+        let _ = remove_pid_file(config_dir);
+        return Err("Failed to stop daemon process (PID file removed).".to_string());
+    }
     for _ in 0..50 {
         if !pid_alive(pf.pid) {
             break;
@@ -149,7 +166,7 @@ pub async fn stop_daemon(config_dir: &Path) -> Result<String, String> {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     if pid_alive(pf.pid) {
-        terminate(pf.pid, false);
+        let _ = terminate(pf.pid, false); // TS 同款：SIGKILL 失败吞掉
     }
     let _ = remove_pid_file(config_dir);
     Ok(format!("Daemon process {} stopped.", pf.pid))
@@ -192,5 +209,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let err = stop_daemon(dir.path()).await.unwrap_err();
         assert!(err.contains("No daemon process is running"));
+    }
+
+    /// kill 不存在的 pid → ESRCH → Err（stop_daemon 的 SIGTERM 失败路径依赖此语义）
+    #[cfg(unix)]
+    #[test]
+    fn terminate_reports_failure_for_nonexistent_pid() {
+        assert!(terminate(4_000_000, true).is_err());
+        assert!(terminate(4_000_000, false).is_err());
     }
 }

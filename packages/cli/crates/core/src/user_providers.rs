@@ -5,6 +5,8 @@ use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 struct ProvidersFile {
+    // TS user-providers.ts 只读 data.providers，version 从不校验——容忍缺失
+    #[serde(default)]
     version: String,
     #[serde(default)]
     providers: Vec<ProviderPreset>,
@@ -80,5 +82,35 @@ pub fn remove_from(path: &Path, id: &str) -> Result<bool, CoreError> {
         Ok(true)
     } else {
         Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_tolerates_missing_version() {
+        // TS user-providers.ts 只读 data.providers：version 缺失不应让整个文件回退空数组
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("providers.json");
+        std::fs::write(
+            &path,
+            serde_json::json!({
+                "providers": [{
+                    "id": "my",
+                    "name": "my",
+                    "displayName": "My Provider",
+                    "baseURL": "https://api.example.com",
+                    "defaultModels": [],
+                    "authType": "api-key"
+                }]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let all = load_from(&path);
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "my");
     }
 }

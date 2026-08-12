@@ -6,7 +6,7 @@ This document provides comprehensive information about Swixter's Windows support
 
 ## Current Status
 
-**Swixter v0.0.8 is ~90% compatible with Windows out of the box.**
+**Swixter v0.2.0 (the Rust rewrite) works on Windows 10/11 out of the box.** Every GitHub Release ships a prebuilt x86_64 (MSVC) binary, installable via the PowerShell one-liner, npm, or Cargo.
 
 ### ✅ What Works on Windows
 
@@ -18,13 +18,17 @@ This document provides comprehensive information about Swixter's Windows support
 
 2. **Configuration file handling**
    - JSON, YAML, and TOML parsing
-   - Cross-platform path resolution via `os.homedir()`
+   - Cross-platform path resolution (home directory located via the `dirs` crate)
    - All three AI coder adapters (Claude, Codex, Continue)
 
 3. **AI Coder Integration**
    - Claude Code: Full support (uses `~/.claude/settings.json`)
    - Codex: Early support (uses `~/.codex/config.toml`)
    - Continue/Qwen: Full support (uses `~/.continue/config.yaml`)
+
+4. **Launching coder CLIs (`run`, `proxy run`)**
+   - npm-installed global CLIs are `.cmd` shims (not `.exe`); Swixter launches them via `cmd /C` so they resolve correctly on Windows
+   - Install-method detection (`which` lookup) honors `PATHEXT` extensions (`.exe`/`.cmd`/`.bat`)
 
 ### ⚠️ What Has Limitations
 
@@ -33,8 +37,9 @@ This document provides comprehensive information about Swixter's Windows support
    - ❌ PowerShell completion not yet implemented
 
 2. **E2E Testing**
-   - ✅ Docker-based tests work on Windows (requires Docker Desktop + WSL2)
-   - ❌ Native Windows test suite not yet available
+   - ✅ Unit/integration tests (`cargo test --workspace`) run natively on Windows in CI (`windows-latest`)
+   - ✅ Docker-based E2E tests work on Windows (requires Docker Desktop + WSL2)
+   - ❌ Docker E2E scenarios themselves still run inside a Linux container
 
 3. **Build**
    - ✅ Rust build works (`cargo build --release`)
@@ -50,7 +55,7 @@ This document provides comprehensive information about Swixter's Windows support
 | **macOS** | `~/.config/swixter/config.json` | XDG Base Directory spec |
 | **Linux** | `~/.config/swixter/config.json` | XDG Base Directory spec |
 
-**Implementation:** `src/constants/paths.ts:getSwixterConfigDir()`
+**Implementation:** `packages/cli/crates/core/src/paths.rs`
 
 ### AI Coder Tool Paths (Cross-Platform)
 
@@ -151,7 +156,7 @@ bash test/e2e-docker.sh
 
 ### Option 2: Native Windows Testing (Future)
 
-**Status:** Not implemented (v0.1.0 roadmap)
+**Status:** Superseded — since the v0.2.0 Rust rewrite, `cargo test --workspace` runs natively on Windows CI. A Docker-free E2E variant exercising real Windows paths remains future work.
 
 **Approach:** Rewrite test scenarios in Node.js/TypeScript for true cross-platform tests.
 
@@ -225,7 +230,7 @@ swixter claude --help
 
 **Workaround:** Use Git Bash or WSL for completion support.
 
-**Fix (v0.1.0):** Add PowerShell completion generator:
+**Planned fix:** Add a PowerShell completion generator:
 ```powershell
 swixter completion powershell > $PROFILE\..\Completions\swixter.ps1
 ```
@@ -255,17 +260,18 @@ const configPath = join(homedir(), ".config", "swixter", "config.json");
 - [x] Model configuration support for all coders
 - [x] Edit profile enhancements
 
-### v0.1.0 (Next)
-- [ ] Add PowerShell completion generator
-- [ ] Cross-platform E2E tests (Node.js/TypeScript)
-- [ ] Windows-specific CI/CD pipeline (GitHub Actions)
-- [ ] Test on Windows 10/11 real machines
+### v0.2.0 (Current) ✅
+- [x] Prebuilt Windows binaries (x86_64 MSVC) on every GitHub Release
+- [x] PowerShell installer (`swixter-installer.ps1`)
+- [x] Windows CI: `cargo test --workspace` runs on `windows-latest`
+- [x] Rust build instructions (`cargo build --release` / `cargo install`)
 
-### v0.2.0 (Future)
+### Future
+- [ ] Add PowerShell completion generator
 - [ ] Windows package manager support (Chocolatey, Scoop, winget)
 - [ ] Windows-specific installer (`.exe` with NSIS)
-- [ ] Native Windows paths documentation
-- [ ] PowerShell-specific examples in README
+- [ ] Docker-free E2E scenarios that exercise native Windows paths
+- [ ] Test on Windows 10/11 real machines
 
 ## Developer Notes
 
@@ -344,5 +350,5 @@ If you encounter Windows-specific issues:
 
 ---
 
-**Last Updated:** 2026-02-12 (v0.0.8)
+**Last Updated:** 2026-08-12 (v0.2.0)
 **Status:** Active development - Windows support improving with each release

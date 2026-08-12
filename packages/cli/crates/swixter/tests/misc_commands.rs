@@ -200,3 +200,42 @@ fn export_import_roundtrip() {
     // 缺文件参数 → clap 报错 exit 2
     setup(&dir).args(["export"]).assert().code(2);
 }
+
+#[test]
+fn group_create_name_flag() {
+    // TS 兼容：group create 支持 --name（与位置参数二选一，冲突报 clap exit 2）
+    let dir = tempfile::tempdir().unwrap();
+    setup(&dir)
+        .args([
+            "claude",
+            "create",
+            "--quiet",
+            "--name",
+            "np1",
+            "--provider",
+            "ollama",
+        ])
+        .assert()
+        .success();
+    setup(&dir)
+        .args(["group", "create", "--name", "flag-g", "--profiles", "np1"])
+        .assert()
+        .success();
+    setup(&dir)
+        .args(["group", "show", "flag-g"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("np1"));
+    setup(&dir)
+        .args([
+            "group",
+            "create",
+            "pos-g",
+            "--name",
+            "flag2",
+            "--profiles",
+            "np1",
+        ])
+        .assert()
+        .code(2);
+}

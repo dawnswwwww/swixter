@@ -9,6 +9,7 @@ use axum::{
 use swixter_core::types::ProviderPreset;
 
 use crate::server::error::ApiError;
+use crate::server::extract::JsonBody;
 use crate::server::state::AppState;
 
 pub fn routes() -> Router<AppState> {
@@ -50,7 +51,7 @@ async fn list_providers(State(state): State<AppState>) -> impl IntoResponse {
 
 async fn create_provider(
     State(state): State<AppState>,
-    Json(body): Json<serde_json::Value>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
     let id = body.get("id").and_then(|v| v.as_str());
     let name = body.get("name").and_then(|v| v.as_str());
@@ -108,7 +109,7 @@ async fn create_provider(
 async fn update_provider(
     State(state): State<AppState>,
     Path(id): Path<String>,
-    Json(body): Json<serde_json::Value>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
     let existing = load_user(&state)
         .into_iter()

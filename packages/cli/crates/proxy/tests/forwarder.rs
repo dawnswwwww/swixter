@@ -38,6 +38,7 @@ fn headers_stripped_and_credential_injected() {
     h.insert("x-api-key", "old".parse().unwrap());
     h.insert("host", "localhost".parse().unwrap());
     h.insert("content-length", "10".parse().unwrap());
+    h.insert("accept-encoding", "gzip, deflate, br".parse().unwrap());
     h.insert("x-custom", "keep".parse().unwrap());
     let out = filtered_headers(&h, ApiFormat::AnthropicMessages, "sk-real").unwrap();
     assert!(
@@ -47,6 +48,8 @@ fn headers_stripped_and_credential_injected() {
     assert_eq!(out.get("x-api-key").unwrap(), "sk-real");
     assert!(out.get("host").is_none());
     assert!(out.get("content-length").is_none());
+    // 客户端的 accept-encoding 不转发：由 reqwest 按自身解压能力重新声明
+    assert!(out.get("accept-encoding").is_none());
     assert_eq!(out.get("x-custom").unwrap(), "keep");
     // openai 目标 → Bearer
     let out2 = filtered_headers(&h, ApiFormat::OpenaiChat, "sk-real").unwrap();

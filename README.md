@@ -55,7 +55,7 @@ Config stored at:
 ## Quick Start
 
 ```bash
-swixter                          # Interactive mode
+swixter                          # Show help
 swixter claude create            # Create profile
 swixter claude list              # List profiles
 swixter claude switch my-profile # Switch profile

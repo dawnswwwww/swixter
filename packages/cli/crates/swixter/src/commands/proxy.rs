@@ -15,10 +15,14 @@ use crate::{EXIT_GENERAL, EXIT_INVALID_ARG, EXIT_NOT_FOUND, EXIT_SUCCESS};
 
 pub fn dispatch(args: ProxyArgs) -> i32 {
     match args.command {
-        ProxyCommand::Start(a) => cmd_start(a),
-        ProxyCommand::Stop { instance_id } => cmd_stop(instance_id.as_deref().unwrap_or("default")),
-        ProxyCommand::Status => cmd_status(),
-        ProxyCommand::Run(a) => cmd_run(a),
+        // TS: 裸 `swixter proxy` 显示 status 并 exit 0
+        None => cmd_status(),
+        Some(ProxyCommand::Start(a)) => cmd_start(a),
+        Some(ProxyCommand::Stop { instance_id }) => {
+            cmd_stop(instance_id.as_deref().unwrap_or("default"))
+        }
+        Some(ProxyCommand::Status) => cmd_status(),
+        Some(ProxyCommand::Run(a)) => cmd_run(a),
     }
 }
 
@@ -341,12 +345,22 @@ pub fn build_coder_proxy_env(
 
 fn cmd_run(a: ProxyRunArgs) -> i32 {
     let mgr = ConfigManager::load();
-    if let Err(code) = validate_group_profile(&mgr, a.group.as_deref(), a.profile.as_deref()) {
+    let coder_args = a.args.clone();
+    let coder_opt = coder_args.first().cloned();
+    // TS parseFlags 全局提取语义：coder 参数里的 --profile/--yolo 先提取再透传剩余。
+    // 提取到的 --profile 在显式 --profile 缺省时生效（TS proxy run 只认 -- 前的 --profile，
+    // 透传里的会被静默丢弃；这里让其生效，避免被吞）
+    let extracted = crate::commands::run::extract_run_flags(
+        coder_args.get(1..).unwrap_or(&[]),
+        coder_opt.as_deref() == Some("claude"),
+    );
+    let profile = a.profile.clone().or(extracted.profile);
+    if let Err(code) = validate_group_profile(&mgr, a.group.as_deref(), profile.as_deref()) {
         return code;
     }
     // 都未指定 → active group；仍无 → 报错提示
     let mut group = a.group.clone();
-    if group.is_none() && a.profile.is_none() {
+    if group.is_none() && profile.is_none() {
         group = mgr
             .config()
             .active_group
@@ -354,7 +368,7 @@ fn cmd_run(a: ProxyRunArgs) -> i32 {
             .and_then(|id| mgr.config().groups.get(id))
             .map(|g| g.name.clone());
     }
-    if group.is_none() && a.profile.is_none() {
+    if group.is_none() && profile.is_none() {
         eprintln!("No group or profile specified, and no default group set");
         eprintln!("Use --group, --profile, or create a default group first");
         return EXIT_GENERAL;
@@ -362,7 +376,7 @@ fn cmd_run(a: ProxyRunArgs) -> i32 {
 
     let instances = registry::list_proxy_instances();
     let binding =
-        resolve_proxy_runtime_binding(group.as_deref(), a.profile.as_deref(), a.port, &instances);
+        resolve_proxy_runtime_binding(group.as_deref(), profile.as_deref(), a.port, &instances);
     let instance_id = format!("run-{}", binding.port);
     // 有意偏差（Global Constraints）：复用实例时 coder 退出不停该实例；TS 会误停
     let started_by_us = !binding.reuse_existing;
@@ -370,16 +384,25 @@ fn cmd_run(a: ProxyRunArgs) -> i32 {
         println!("✓ Reusing running instance: {id}");
     }
 
-    let coder_args = a.args.clone();
-    let Some(coder) = coder_args.first().cloned() else {
+    let Some(coder) = coder_opt else {
         eprintln!("Coder command required after --");
         eprintln!("Example: swixter proxy run -- claude");
         return EXIT_GENERAL;
     };
+    // claude 的 --yolo 重写为 --dangerously-skip-permissions（TS spawnClaudeWithEnv 同款；
+    // TS proxy run 里 --yolo 被过滤但未生效，属 TS 瑕疵，这里让其生效）
+    let mut coder_rest = extracted.rest;
+    if coder == "claude"
+        && extracted.yolo
+        && !coder_rest
+            .iter()
+            .any(|x| x == "--dangerously-skip-permissions")
+    {
+        coder_rest.push("--dangerously-skip-permissions".into());
+    }
     // claude：proxy profile + marker models 写入 ~/.claude/settings.json（TS applyClaudeProfile 路径）
     if coder == "claude" {
-        let target = a
-            .profile
+        let target = profile
             .as_ref()
             .and_then(|n| mgr.get_profile(n))
             .or_else(|| {
@@ -397,10 +420,7 @@ fn cmd_run(a: ProxyRunArgs) -> i32 {
         let proxy_profile = Profile {
             name: format!(
                 "proxy-{}",
-                a.profile
-                    .as_deref()
-                    .or(group.as_deref())
-                    .unwrap_or("default")
+                profile.as_deref().or(group.as_deref()).unwrap_or("default")
             ),
             provider_id: "anthropic".into(),
             api_key: String::new(),
@@ -431,7 +451,7 @@ fn cmd_run(a: ProxyRunArgs) -> i32 {
                 // TS run 不传 timeout → forwarder 默认
                 timeout: Duration::from_millis(swixter_proxy::DEFAULT_TIMEOUT_MS),
                 group_name: group,
-                profile_name: a.profile,
+                profile_name: profile,
                 config_path: None,
             };
             if let Err(e) = server::start_proxy_server(config).await {
@@ -439,12 +459,15 @@ fn cmd_run(a: ProxyRunArgs) -> i32 {
                 return EXIT_GENERAL;
             }
         }
-        println!("✓ Running: {} {}", coder, coder_args[1..].join(" "));
+        println!("✓ Running: {} {}", coder, coder_rest.join(" "));
         println!("  Proxy: {}:{}", binding.host, binding.port);
 
         // env 已是完整环境（含删除项处理），必须 env_clear 才能真正删掉 ANTHROPIC_API_KEY 等
-        let mut child = match tokio::process::Command::new(&coder)
-            .args(&coder_args[1..])
+        // Windows 下 npm 全局 CLI 是 .cmd shim，经 cmd /C 启动（TS spawnCLI shell: isWin32）
+        let (prog, pre_args) = crate::commands::run::launch_spec(&coder, cfg!(windows));
+        let mut child = match tokio::process::Command::new(prog)
+            .args(pre_args)
+            .args(&coder_rest)
             .env_clear()
             .envs(env)
             .stdin(Stdio::inherit())

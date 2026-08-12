@@ -209,7 +209,22 @@ fn detect_installation_method(coder: &CoderSpec) -> Option<&'static install_data
 
 fn which_path(exe: &str) -> Option<std::path::PathBuf> {
     let path = std::env::var_os("PATH")?;
+    // Windows：无扩展名的名字无法直接执行，需按 PATHEXT 补全（.exe/.cmd/.bat 等），
+    // 否则 detect_installation_method 永远探测不到
+    let exts: Vec<String> = if cfg!(windows) && std::path::Path::new(exe).extension().is_none() {
+        std::env::var("PATHEXT")
+            .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into())
+            .split(';')
+            .filter(|e| !e.is_empty())
+            .map(|e| e.trim_start_matches('.').to_string())
+            .collect()
+    } else {
+        vec![]
+    };
     std::env::split_paths(&path)
-        .map(|dir| dir.join(exe))
+        .flat_map(|dir| {
+            let base = dir.join(exe);
+            std::iter::once(base.clone()).chain(exts.iter().map(move |e| base.with_extension(e)))
+        })
         .find(|p| p.is_file())
 }

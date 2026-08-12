@@ -21,6 +21,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **`create --apply` parity with TS** — `create --apply` now switches to the newly created profile before applying, matching the historical TS behavior (and group validation was aligned likewise)
+- **Config compatibility with v0.0.x** — Config files written by v0.0.1–v0.0.12 (version `2.0.0` without the `groups` field) no longer reset to the empty default on load; the `groups` default is now applied unconditionally, as the TS loader did
+- **Proxy handles compressed upstreams** — `Accept-Encoding` is no longer forwarded verbatim, the HTTP client now decodes gzip/brotli, and `Content-Encoding`/hop-by-hop headers are stripped from upstream responses; gzipped SSE streams and non-streaming bodies flow correctly
+- **Proxy passthrough on unparseable JSON** — Malformed request bodies and non-JSON upstream 2xx responses are forwarded byte-for-byte (TS fallback semantics) instead of being replaced with `{}`
+- **Codex adapter `remove` precision** — The top-level `profile` key in `config.toml` is only deleted when it points at a swixter-managed provider; user-written values are preserved
+- **Stable profile/group ordering** — Profiles, coders, and groups now preserve file insertion order (IndexMap), fixing random ordering in config serialization, REST list responses, and CLI `list` output
+- **Edit wizard no longer echoes secrets** — API key / auth token prompts show a masked placeholder instead of the full value, keeping secrets out of terminal scrollback
+- **UI server bind race** — The PID file is written after a successful bind with the actual port, and port exhaustion returns a structured error instead of panicking
+- **Cloud sync token refresh** — A failed save after a successful refresh now warns and returns the fresh token instead of silently reporting the session as expired
+- **Key handling robustness** — API-key sanitizing and wizard masking slice by characters, not bytes (no panic on non-ASCII keys)
+- **Group management parity** — Renames reject duplicate names; names are trimmed and validated with the TS charset/length rules; deleting the default group falls back deterministically; `group create --name` is supported again; answering "No" to `group delete` exits 0
+- **Import diagnostics** — Per-profile import failures are collected into `ImportStats.errors` and printed
+- **Unknown fields preserved** — Unknown fields on profiles and provider presets survive load/save, export/import, REST updates, and cloud sync round-trips
+- **Run command parity** — `--profile` / `--yolo` are extracted from passthrough args in both `--flag value` and `--flag=value` forms; an unknown `--profile` reports "Profile not found"; Windows launches `.cmd` shims via `cmd /C` and install detection honors `PATHEXT`
+- **REST API parity** — Malformed JSON bodies return the TS error envelope; `profiles create` treats an empty `baseURL` as unset; `groups update` accepts explicit `isDefault: false`; magic-link session IDs are URL-encoded; daemon stop reports kill failures
+- **Release pipeline** — `dist-workspace.toml` at the repo root lets cargo-dist discover the workspace (the `[workspace.metadata.dist]` form only worked when run inside `packages/cli`); the `bump-version.sh` changelog gate now matches the documented release flow
+- **Docs site and website** — Installation docs cover all channels (shell/Homebrew/cargo/npm/PowerShell) and no longer claim a Node.js runtime requirement; from-source instructions use cargo; `WINDOWS.md` reflects v0.2.0
+- **Config load diagnostics** — Parse/validation failures and v1 migrations now log a line to stderr before falling back, instead of failing silently
+
+### Known behavior changes vs the TS version
+- **Exit codes remapped** — Invalid arguments exit 2, not-found exits 3, cancel exits 130 (the TS `EXIT_CODES.invalidArguments` quirk resolved to exit 0)
+- **Interactive wizards reduced** — `providers add` and `group create`/`group edit` have no interactive mode yet (flags only); the profile create/edit wizards are intact
+- **`run` no longer pre-checks CLI installation** — The TS interactive install prompt on missing coder CLIs was dropped
+- **Prompts on stderr** — dialoguer renders interactive prompts to stderr (clack wrote to stdout)
+- **List output reformatted** — No table borders/`Total` line; scripted parsing of human output was never guaranteed
 
 ## [0.1.12] - 2026-07-23
 

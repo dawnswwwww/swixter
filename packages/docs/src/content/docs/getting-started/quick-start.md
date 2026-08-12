@@ -9,9 +9,20 @@ This guide walks you through creating your first Swixter profile and applying it
 
 ## 1. Install Swixter
 
+Pick whichever channel fits your setup:
+
 ```bash
+# Shell installer (macOS / Linux)
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh
+
+# Homebrew
+brew install dawnswwwww/tap/swixter
+
+# npm
 npm install -g swixter
 ```
+
+See [Installation](/getting-started/installation) for Cargo, PowerShell, and other options.
 
 ## 2. List Available Providers
 

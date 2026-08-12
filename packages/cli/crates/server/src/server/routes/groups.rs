@@ -10,6 +10,7 @@ use swixter_core::groups;
 use swixter_core::types::Group;
 
 use crate::server::error::ApiError;
+use crate::server::extract::JsonBody;
 use crate::server::state::AppState;
 
 pub fn routes() -> Router<AppState> {
@@ -66,7 +67,7 @@ async fn get_group(
 
 async fn create_group(
     State(state): State<AppState>,
-    Json(body): Json<serde_json::Value>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
     let Some(name) = body.get("name").and_then(|v| v.as_str()) else {
         return Err(ApiError::bad_request("INVALID_PARAMS", "name is required"));
@@ -95,7 +96,7 @@ async fn create_group(
 async fn update_group(
     State(state): State<AppState>,
     Path(id): Path<String>,
-    Json(body): Json<serde_json::Value>,
+    JsonBody(body): JsonBody,
 ) -> Result<impl IntoResponse, ApiError> {
     let mut mgr = state.config_manager();
     if !mgr.config().groups.contains_key(&id) {
@@ -113,10 +114,23 @@ async fn update_group(
         });
     groups::update(&mut mgr, &id, name, profiles)
         .map_err(|e| ApiError::bad_request("UPDATE_GROUP_FAILED", e.to_string()))?;
-    // TS updateGroup 支持 isDefault；true → set_default（互斥清除其他）
-    if body.get("isDefault").and_then(|v| v.as_bool()) == Some(true) {
-        groups::set_default(&mut mgr, &id)
-            .map_err(|e| ApiError::bad_request("UPDATE_GROUP_FAILED", e.to_string()))?;
+    // TS updateGroup：`isDefault: updates.isDefault ?? group.isDefault` ——
+    // true → set_default（互斥清除其他）；显式 false → 仅取消本组默认
+    // （不清其他组，也不动 activeGroup）
+    match body.get("isDefault").and_then(|v| v.as_bool()) {
+        Some(true) => {
+            groups::set_default(&mut mgr, &id)
+                .map_err(|e| ApiError::bad_request("UPDATE_GROUP_FAILED", e.to_string()))?;
+        }
+        Some(false) => {
+            if let Some(g) = mgr.config_mut_for_test().groups.get_mut(&id) {
+                g.is_default = false;
+            }
+            mgr.mark_dirty();
+            mgr.save()
+                .map_err(|e| ApiError::bad_request("UPDATE_GROUP_FAILED", e.to_string()))?;
+        }
+        None => {}
     }
     let out = mgr.config().groups.get(&id).cloned().unwrap();
     Ok(Json(out))

@@ -28,6 +28,8 @@ serde_json.workspace = true
 rand.workspace = true
 tokio.workspace = true
 libc.workspace = true
+# 交互向导 base URL 校验（与 core validate 同源：WHATWG URL 解析）
+url.workspace = true
 
 [dev-dependencies]
 assert_cmd.workspace = true

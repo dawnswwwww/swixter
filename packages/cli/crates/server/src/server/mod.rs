@@ -1,6 +1,7 @@
 //! axum Web UI 后端：REST 路由 + /ws + 静态 SPA（Task 5/6）。
 pub mod cors;
 pub mod error;
+pub mod extract;
 pub mod routes;
 pub mod state;
 pub mod static_files;
@@ -37,27 +38,46 @@ pub fn open_browser(url: &str) {
     }
 }
 
-/// 启动 Web UI server（阻塞 serve，调用方负责生命周期/信号）
-pub async fn start_server(port: Option<u16>, opts: ServerOptions) {
-    let port = match find_available_port(port.unwrap_or(DEFAULT_UI_PORT)).await {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("✗ No available port: {e}");
-            return;
+/// bind 阶段：从期望端口起递增探测并就地 bind（探测即占用，没有先探测再 bind
+/// 的竞争窗口）；返回实际绑定端口与 listener。递增到 65535 仍失败 → 结构化 Err
+/// （与 find_available_port 同语义，不再 expect panic）。
+pub async fn bind_server(
+    port: Option<u16>,
+) -> Result<(u16, tokio::net::TcpListener), crate::ServerError> {
+    let mut port = port.unwrap_or(DEFAULT_UI_PORT);
+    loop {
+        match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
+            Ok(listener) => return Ok((port, listener)),
+            Err(e) if port == u16::MAX => return Err(e.into()),
+            Err(_) => port += 1,
         }
-    };
+    }
+}
+
+/// serve 阶段：在已绑定的 listener 上阻塞 serve（调用方负责生命周期/信号）
+pub async fn serve_bound(listener: tokio::net::TcpListener, port: u16, opts: ServerOptions) {
     let state = state::AppState::new(opts.config_path);
     let app = routes::router(state);
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
-        .await
-        .expect("bind ui server");
     println!("Swixter Web UI: http://127.0.0.1:{port}");
     axum::serve(listener, app).await.ok();
 }
 
+/// 启动 Web UI server：bind 成功即返回（实际绑定端口, serve 任务句柄），
+/// 调用方据实际端口写 PID 文件、用句柄管理生命周期（abort）；
+/// 端口一路递增到 65535 仍被占用 → 返回 Err 而非 panic
+pub async fn start_server(
+    port: Option<u16>,
+    opts: ServerOptions,
+) -> Result<(u16, tokio::task::JoinHandle<()>), crate::ServerError> {
+    let (port, listener) = bind_server(port).await?;
+    let handle = tokio::spawn(serve_bound(listener, port, opts));
+    Ok((port, handle))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::find_available_port;
+    use super::{find_available_port, start_server};
+    use crate::ServerOptions;
 
     #[tokio::test]
     async fn returns_free_port() {
@@ -72,5 +92,26 @@ mod tests {
             .await
             .unwrap();
         assert!(find_available_port(u16::MAX).await.is_err());
+        // start_server 同款：bind 失败返回结构化 Err 而非 expect panic
+        // （与上一个断言共用 65535 的占用，串行避免测试间端口互抢）
+        assert!(start_server(Some(u16::MAX), Default::default())
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn start_server_returns_actual_port_after_race() {
+        // 制造探测→bind 竞争：先占住一个端口，start_server 应递增 bind 到下一个
+        // 可用端口，返回实际端口（≠ 被占端口）且不 panic；实际端口上服务可用
+        let held = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let taken = held.local_addr().unwrap().port();
+        let dir = tempfile::tempdir().unwrap();
+        let opts = ServerOptions {
+            config_path: Some(dir.path().join("config.json")),
+        };
+        let (port, handle) = start_server(Some(taken), opts).await.unwrap();
+        assert_ne!(port, taken);
+        assert!(crate::daemon::health_check(port).await);
+        handle.abort();
     }
 }

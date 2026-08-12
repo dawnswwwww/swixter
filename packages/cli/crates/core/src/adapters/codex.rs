@@ -66,11 +66,15 @@ impl CodexAdapter {
     }
 
     /// TS: 清理旧版 swixter 遗留的 config.profile 与 [profiles.swixter-<name>]；空表整删。
-    /// 顶层 `profile` 选择器无条件删除（对齐 TS codex.ts apply: `delete config.profile`）。
+    /// 顶层 `profile` 选择器：apply 路径无条件删除（TS codex.ts apply: `delete config.profile`）；
+    /// remove 路径仅当其值等于本 key 才删（TS codex.ts remove: `if (config.profile === providerKey)`），
+    /// 避免误删用户手写的 `profile = "x"`。
     /// 返回是否有修改（clean_legacy 返回修改标记，remove 仅在有变化时写回）。
-    fn clean_legacy(doc: &mut DocumentMut, key: &str) -> bool {
+    fn clean_legacy(doc: &mut DocumentMut, key: &str, profile_unconditional: bool) -> bool {
         let mut modified = false;
-        if doc.remove("profile").is_some() {
+        let drop_profile =
+            profile_unconditional || doc.get("profile").and_then(|v| v.as_str()) == Some(key);
+        if drop_profile && doc.remove("profile").is_some() {
             modified = true;
         }
         let mut drop_profiles = false;
@@ -114,9 +118,11 @@ impl super::CoderAdapter for CodexAdapter {
         let key = Self::key(&profile.name);
 
         let mut doc = self.read_doc();
-        Self::clean_legacy(&mut doc, &key);
+        Self::clean_legacy(&mut doc, &key, true);
 
         // base_url 回退链：profile.baseURL || preset.baseURLChat || preset.baseURL
+        // （TS `||` 空串亦回退；但 profile.baseURL 空串在 load 的 URL 校验阶段即被拒，
+        //   此处空串不可达，`.or` 前无需 filter）
         let base_url = profile
             .base_url
             .as_deref()
@@ -212,8 +218,9 @@ impl super::CoderAdapter for CodexAdapter {
                     modified = true;
                 }
             }
-            // legacy profiles/profile 清理；clean_legacy 返回自身修改标记
-            if Self::clean_legacy(&mut doc, &key) {
+            // legacy profiles/profile 清理；clean_legacy 返回自身修改标记。
+            // remove 路径顶层 profile 选择器仅当值等于本 key 才删（TS codex.ts remove 条件删除）
+            if Self::clean_legacy(&mut doc, &key, false) {
                 modified = true;
             }
             if doc.get("model_provider").and_then(|v| v.as_str()) == Some(key.as_str()) {
@@ -457,5 +464,46 @@ mod tests {
                 .unwrap();
         assert!(parsed["model_providers"].get("swixter-test").is_none());
         assert!(parsed.get("model_provider").is_none());
+    }
+
+    #[test]
+    fn remove_preserves_user_written_profile_selector() {
+        // TS codex.ts remove —— `if (config.profile === providerKey)` 条件删除：
+        // 用户手写的 `profile = "other"` 不得被 remove 清掉
+        let (dir, a) = setup();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "profile = \"other\"\n\n[profiles.swixter-test]\nmodel = \"x\"\n",
+        )
+        .unwrap();
+        a.remove("test").unwrap();
+        let parsed: toml_edit::DocumentMut =
+            std::fs::read_to_string(dir.path().join("config.toml"))
+                .unwrap()
+                .parse()
+                .unwrap();
+        assert_eq!(
+            parsed.get("profile").and_then(|v| v.as_str()),
+            Some("other")
+        );
+        assert!(parsed.get("profiles").is_none()); // 遗留 [profiles.swixter-test] 仍清理
+    }
+
+    #[test]
+    fn remove_drops_profile_selector_matching_key() {
+        // profile 值恰为 swixter 的 provider key 时才删除（旧版 swixter 遗留）
+        let (dir, a) = setup();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "profile = \"swixter-test\"\n",
+        )
+        .unwrap();
+        a.remove("test").unwrap();
+        let parsed: toml_edit::DocumentMut =
+            std::fs::read_to_string(dir.path().join("config.toml"))
+                .unwrap()
+                .parse()
+                .unwrap();
+        assert!(parsed.get("profile").is_none());
     }
 }
