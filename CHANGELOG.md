@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-07-25
+## [0.2.2] - 2026-08-12
 
 ### Changed
 - **Full Rust rewrite** — The entire codebase was rewritten from TypeScript/Bun to a Rust workspace of four crates: `swixter-core` (config, profiles, groups, providers, adapters, import/export), `swixter-proxy` (failover proxy with circuit breaker and API-format transforms), `swixter-server` (Web UI server: REST/WebSocket, auth, cloud sync, AES-GCM field encryption with PBKDF2 key derivation), and the `swixter` binary (clap CLI). The TypeScript sources were removed
@@ -470,7 +470,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test coverage (unit + E2E)
 - Docker-based E2E testing for reliability
 
-[Unreleased]: https://github.com/dawnswwwww/swixter/compare/v0.0.10...HEAD
+[Unreleased]: https://github.com/dawnswwwww/swixter/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/dawnswwwww/swixter/compare/v0.1.12...v0.2.2
 [0.0.10]: https://github.com/dawnswwwww/swixter/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/dawnswwwww/swixter/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/dawnswwwww/swixter/compare/v0.0.7...v0.0.8

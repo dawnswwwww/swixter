@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-- **Current Version**: v0.2.0 (see CHANGELOG.md for details)
-- **Implementation**: Rust (rewritten from TypeScript/Bun in v0.2.0; the TS sources were removed)
+- **Current Version**: v0.2.2 (see CHANGELOG.md for details)
+- **Implementation**: Rust (rewritten from TypeScript/Bun in v0.2.2; the TS sources were removed)
 - **Platform Support**: Linux, macOS, Windows 10/11
 - **Distribution**: cargo-dist installers (shell/powershell), npm, Homebrew tap, crates.io
 - **CI/CD**: GitHub Actions (test.yml: fmt/clippy/test matrix + Docker E2E; release.yml: cargo-dist; publish-crates.yml: crates.io)

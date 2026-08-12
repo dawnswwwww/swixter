@@ -1,12 +1,12 @@
 # Windows Compatibility Guide
 
-> **Note (v0.2.0):** Swixter has been rewritten in Rust. The "Code Architecture" and "Developer Notes" sections below still describe the former TypeScript implementation and are kept for historical reference. Installation and build instructions in this document have been updated for the Rust codebase.
+> **Note (v0.2.2):** Swixter has been rewritten in Rust. The "Code Architecture" and "Developer Notes" sections below still describe the former TypeScript implementation and are kept for historical reference. Installation and build instructions in this document have been updated for the Rust codebase.
 
 This document provides comprehensive information about Swixter's Windows support, including current status, configuration paths, testing strategies, and future enhancements.
 
 ## Current Status
 
-**Swixter v0.2.0 (the Rust rewrite) works on Windows 10/11 out of the box.** Every GitHub Release ships a prebuilt x86_64 (MSVC) binary, installable via the PowerShell one-liner, npm, or Cargo.
+**Swixter v0.2.2 (the Rust rewrite) works on Windows 10/11 out of the box.** Every GitHub Release ships a prebuilt x86_64 (MSVC) binary, installable via the PowerShell one-liner, npm, or Cargo.
 
 ### ✅ What Works on Windows
 
@@ -156,7 +156,7 @@ bash test/e2e-docker.sh
 
 ### Option 2: Native Windows Testing (Future)
 
-**Status:** Superseded — since the v0.2.0 Rust rewrite, `cargo test --workspace` runs natively on Windows CI. A Docker-free E2E variant exercising real Windows paths remains future work.
+**Status:** Superseded — since the v0.2.2 Rust rewrite, `cargo test --workspace` runs natively on Windows CI. A Docker-free E2E variant exercising real Windows paths remains future work.
 
 **Approach:** Rewrite test scenarios in Node.js/TypeScript for true cross-platform tests.
 
@@ -260,7 +260,7 @@ const configPath = join(homedir(), ".config", "swixter", "config.json");
 - [x] Model configuration support for all coders
 - [x] Edit profile enhancements
 
-### v0.2.0 (Current) ✅
+### v0.2.2 (Current) ✅
 - [x] Prebuilt Windows binaries (x86_64 MSVC) on every GitHub Release
 - [x] PowerShell installer (`swixter-installer.ps1`)
 - [x] Windows CI: `cargo test --workspace` runs on `windows-latest`
@@ -350,5 +350,5 @@ If you encounter Windows-specific issues:
 
 ---
 
-**Last Updated:** 2026-08-12 (v0.2.0)
+**Last Updated:** 2026-08-12 (v0.2.2)
 **Status:** Active development - Windows support improving with each release

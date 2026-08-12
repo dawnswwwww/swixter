@@ -1944,7 +1944,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "swixter"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -1968,7 +1968,7 @@ dependencies = [
 
 [[package]]
 name = "swixter-core"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "dirs",
  "indexmap",
@@ -1985,7 +1985,7 @@ dependencies = [
 
 [[package]]
 name = "swixter-proxy"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "axum",
  "bytes",
@@ -2007,7 +2007,7 @@ dependencies = [
 
 [[package]]
 name = "swixter-server"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "aes-gcm",
  "axum",
