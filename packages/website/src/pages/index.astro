@@ -305,6 +305,7 @@ import Layout from '../layouts/Layout.astro';
 
   .hero-install {
     display: inline-block;
+    width: 640px;
     max-width: 100%;
     background: var(--color-surface);
     border: 1px solid var(--color-outline-variant);
@@ -355,10 +356,19 @@ import Layout from '../layouts/Layout.astro';
   }
 
   .install-cmd {
+    flex: 1;
+    min-width: 0;
     font-family: var(--font-code);
     font-size: 13px;
     color: var(--color-on-bg);
-    word-break: break-all;
+    white-space: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .install-cmd::-webkit-scrollbar {
+    display: none;
   }
 
   .hero-install-alt {
@@ -816,7 +826,6 @@ import Layout from '../layouts/Layout.astro';
     }
 
     .install-row {
-      flex-wrap: wrap;
       padding: 12px;
     }
 
