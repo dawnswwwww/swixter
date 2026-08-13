@@ -1,0 +1,10 @@
+name = "swixter-install"
+main = "src/index.js"
+compatibility_date = "2026-08-13"
+
+# Worker routes take precedence over the Pages site for these paths.
+routes = [
+  { pattern = "swixter.cc/install.sh", zone_name = "swixter.cc" },
+  { pattern = "swixter.cc/install.ps1", zone_name = "swixter.cc" },
+  { pattern = "swixter.cc/releases/*", zone_name = "swixter.cc" },
+]
