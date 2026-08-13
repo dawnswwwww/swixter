@@ -28,12 +28,21 @@ import Layout from '../layouts/Layout.astro';
           <span class="comment">//</span> One config tool for all your AI coding assistants.
         </p>
         <div class="hero-install">
-          <span class="prompt-char">$</span>
-          <code class="install-cmd">curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh</code>
-          <button class="copy-btn" data-copy="curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh" type="button">[copy]</button>
+          <div class="install-tabs" role="tablist">
+            <button class="install-tab active" data-install="shell" type="button">macOS / Linux</button>
+            <button class="install-tab" data-install="windows" type="button">Windows</button>
+            <button class="install-tab" data-install="brew" type="button">Homebrew</button>
+            <button class="install-tab" data-install="npm" type="button">npm</button>
+            <button class="install-tab" data-install="cargo" type="button">Cargo</button>
+          </div>
+          <div class="install-row">
+            <span class="prompt-char" id="install-prompt">$</span>
+            <code class="install-cmd" id="install-cmd">curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh</code>
+            <button class="copy-btn" id="install-copy" data-copy="curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh" type="button">[copy]</button>
+          </div>
         </div>
         <p class="hero-install-alt">
-          <span class="comment">#</span> also: brew install dawnswwwww/tap/swixter &middot; npm install -g swixter &middot; cargo install swixter
+          <span class="comment">#</span> single native binary &middot; no runtime required &middot; <a href="https://docs.swixter.cc/getting-started/installation/" target="_blank">full install guide</a>
         </p>
       </div>
     </section>
@@ -295,11 +304,45 @@ import Layout from '../layouts/Layout.astro';
   }
 
   .hero-install {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
+    display: inline-block;
+    max-width: 100%;
     background: var(--color-surface);
     border: 1px solid var(--color-outline-variant);
+    text-align: left;
+  }
+
+  .install-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--color-outline-variant);
+  }
+
+  .install-tab {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-on-surface-variant);
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--color-outline-variant);
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .install-tab:hover {
+    color: var(--color-on-bg);
+  }
+
+  .install-tab.active {
+    color: var(--color-primary);
+    background: var(--color-surface-lowest);
+  }
+
+  .install-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 10px 10px 10px 16px;
   }
 
@@ -323,6 +366,10 @@ import Layout from '../layouts/Layout.astro';
     font-size: 12px;
     color: var(--color-on-surface-variant);
     font-family: var(--font-body);
+  }
+
+  .hero-install-alt a {
+    color: var(--color-primary);
   }
 
   .copy-btn {
@@ -768,10 +815,9 @@ import Layout from '../layouts/Layout.astro';
       font-size: 13px;
     }
 
-    .hero-install {
-      flex-direction: column;
+    .install-row {
+      flex-wrap: wrap;
       padding: 12px;
-      gap: 8px;
     }
 
     .features-grid {
@@ -833,6 +879,31 @@ import Layout from '../layouts/Layout.astro';
         btn.textContent = '[copied]'; btn.classList.add('copied');
         setTimeout(() => { btn.textContent = '[copy]'; btn.classList.remove('copied'); }, 2000);
       }
+    });
+  });
+
+  // --- Install method tabs ---
+  const installCmds = {
+    shell: { prompt: '$', cmd: `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.sh | sh` },
+    windows: { prompt: '>', cmd: `powershell -ExecutionPolicy Bypass -c "irm https://github.com/dawnswwwww/swixter/releases/latest/download/swixter-installer.ps1 | iex"` },
+    brew: { prompt: '$', cmd: `brew install dawnswwwww/tap/swixter` },
+    npm: { prompt: '$', cmd: `npm install -g swixter` },
+    cargo: { prompt: '$', cmd: `cargo install swixter` }
+  };
+
+  const installPromptEl = document.getElementById('install-prompt');
+  const installCmdEl = document.getElementById('install-cmd');
+  const installCopyBtn = document.getElementById('install-copy');
+
+  document.querySelectorAll('.install-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.install-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const entry = installCmds[tab.dataset.install];
+      if (!entry) return;
+      installPromptEl.textContent = entry.prompt;
+      installCmdEl.textContent = entry.cmd;
+      installCopyBtn.dataset.copy = entry.cmd;
     });
   });
 
